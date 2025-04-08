@@ -1,0 +1,7 @@
+__pycache__
+checkpoints/*
+checkpoints_quant/*
+slurm-*.out
+*.yuv
+*.7z
+dataset/*

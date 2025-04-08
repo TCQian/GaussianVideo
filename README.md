@@ -1,4 +1,4 @@
-# GaussianVideo: Video Representation with 3D Gaussian Splatting
+# GaussianVideo: Video Representation Model Using Gaussian Splats for Efficient Storage and Rendering
 
 This repository contains the implementation for **GaussianVideo**, a method for representing and compressing videos using 3D Gaussian splatting. Videos are modeled as continuous volumes in space and time using parameterized Gaussian functions.
 

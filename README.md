@@ -1,124 +1,145 @@
-# GaussianImage: 1000 FPS Image Representation and Compression by 2D Gaussian Splatting
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) 
-[![arXiv](https://img.shields.io/badge/GaussianImage-2403.08551-b31b1b)](https://arxiv.org/abs/2403.08551)
-[![GitHub Repo stars](https://img.shields.io/github/stars/Xinjie-Q/GaussianImage.svg?style=social&label=Star&maxAge=60)](https://github.com/Xinjie-Q/GaussianImage)
+# GaussianVideo: Video Representation with 3D Gaussian Splatting
 
-[[paper](https://arxiv.org/abs/2403.08551)][[project page](https://xingtongge.github.io/GaussianImage-page/)][[code](https://github.com/Xinjie-Q/GaussianImage)]
+This repository contains the implementation for **GaussianVideo**, a method for representing and compressing videos using 3D Gaussian splatting. Videos are modeled as continuous volumes in space and time using parameterized Gaussian functions.
 
-[Xinjie Zhang*](https://xinjie-q.github.io/), [Xingtong Ge*](https://xingtongge.github.io/), [Tongda Xu](https://tongdaxu.github.io/), [Dailan He](https://scholar.google.com/citations?user=f5MTTy4AAAAJ&hl=en), [Yan Wang](https://yanwang202199.github.io/), [Hongwei Qin](http://qinhongwei.com/academic/), [Guo Lu](https://guolusjtu.github.io/guoluhomepage/), [Jing Geng📧](https://cs.bit.edu.cn/szdw/jsml/fjs/gj/index.htm), [Jun Zhang📧](https://eejzhang.people.ust.hk/)
+While this initial method does not yet match the rate-distortion performance of neural codecs like HNeRV or traditional codecs like AV1, it demonstrates the feasibility of using 3D Gaussians as a unit of video representation. This is a first step toward understanding how splatting-based methods could evolve for efficient, temporally coherent video compression.
 
-(* denotes equal contribution, 📧 denotes corresponding author.)
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/50c2f7a7-6c9b-4d06-9c95-44316a942ac9" width="400"/>
+      <br/>
+      <b>PSNR vs. BPP</b>
+    </td>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/b8b31c76-d8f8-4492-a49b-97dfbf0db73f" width="400"/>
+      <br/>
+      <b>MS-SSIM vs. BPP</b>
+    </td>
+  </tr>
+</table>
 
-This is the official implementation of our paper [GaussianImage](https://arxiv.org/abs/2403.08551), a groundbreaking paradigm of image representation and compression by 2D Gaussian Splatting. With compact 2D Gaussian representation and a novel rasterization method, our approach achieves high representation performance with short training duration, minimal GPU memory overhead and ultra-fast rendering speed. Furthermore, we integrate existing vector quantization technique to build an low-complexity neural image codec. Remarkably, the decoding speed of our codec reaches around 2000 FPS, outpacing traditional codecs like JPEG, while also providing enhanced compression performance at lower bitrates. This establishes a significant advancement in the field of neural image codecs. More qualitative results can be found in our paper.
+## Training Progression
 
-<div align="center">
-  <img src="./img/kodak_representation.png" alt="kodak_fitting" width="320" />
-  <img src="./img/div2k_representation.png" alt="div2k_fitting" width="320" />
-</div>
+The following images show how the output improves over training time with 10,000 Gaussians on the "HoneyBee" video in the UVG dataset:
 
-<div align="center">
-  <img src="./img/kodak_codec.png" alt="kodak_codec" width="320" />
-  <img src="./img/div2k_codec.png" alt="div2k_codec" width="320" />
-</div>
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/3ef87eb0-088b-42b9-91ca-7602b62fda3b" width="360"/><br/>
+      <code>HoneyBee_i50_g10000.png</code><br/>50 iterations
+    </td>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/bd3c0cdf-4f01-449a-aa18-35a8335bd5fa" width="360"/><br/>
+      <code>HoneyBee_i400_g10000.png</code><br/>400 iterations
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/445f6747-16d3-47bd-9aa1-d7f454fd5f84" width="360"/><br/>
+      <code>HoneyBee_i800_g10000.png</code><br/>800 iterations
+    </td>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/c8787bfa-636b-447c-9a6b-e896d2624a6a" width="360"/><br/>
+      <code>HoneyBee_i1600_g10000.png</code><br/>1600 iterations
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/ffca371c-6c00-41b8-a275-055fe3140660" width="360"/><br/>
+      <code>HoneyBee_i3200_g10000.png</code><br/>3200 iterations
+    </td>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/10b6c41d-63dc-4b5f-8703-a2474665cb8b" width="360"/><br/>
+      <code>HoneyBee_i6400_g10000.png</code><br/>6400 iterations
+    </td>
+  </tr>
+</table>
 
-<div align=center>
-<img src="./img/visual.png" alt="visual" width="640" />
-</div>
-
-## News
-
-* **2024/7/8**: 🔥 We release our Python and CUDA code for GaussianImage presented in our paper. Have a try! Compared to the first version, we further improved the decoding speed of the GaussianImage codec to around 2000 FPS by removing the entropy coding operation, while only increasing the bpp overhead very slightly.
-
-* **2024/7/1**: 🌟 Our paper has been accepted by ECCV 2024! 🎉 Cheers!
 
 ## Overview
 
-![overview](./img/overview.png)
+The pipeline consists of three main stages:
 
-Implicit neural representations (INRs) recently achieved great success in image representation and compression, offering high visual quality and fast rendering speeds with 10-1000 FPS, assuming sufficient GPU resources are available. However, this requirement often hinders their use on low-end devices with limited memory. In response, we propose a groundbreaking paradigm of image representation and compression by 2D Gaussian Splatting, named GaussianImage. We first introduce 2D Gaussian to represent the image, where each Gaussian has 8 parameters including position, covariance and color. Subsequently, we unveil a novel rendering algorithm based on accumulated summation. Remarkably, our method with a minimum of $3\times$ lower GPU memory usage and $5\times$  faster fitting time not only rivals INRs (e.g., WIRE, I-NGP) in representation performance, but also delivers a faster rendering speed of 1500-2000 FPS regardless of parameter size. Furthermore, we integrate existing vector quantization technique to build an image codec. Experimental results demonstrate that our codec attains rate-distortion performance comparable to compression-based INRs such as COIN and COIN++, while facilitating decoding speeds of approximately 2000 FPS. Additionally, preliminary proof of concept shows that our codec surpasses COIN and COIN++ in performance when using partial bits-back coding. 
+1. **Overfitting**: Learn a full-precision 3D Gaussian representation of a video segment.
+2. **Quantization-aware fine-tuning**: Adapt the model to compressed (quantized) parameter formats.
+3. **Evaluation**: Render and compare reconstructed frames using the quantized model.
 
-## Quick Started
-
-### Cloning the Repository
-
-The repository contains submodules, thus please check it out with 
-```shell
-# SSH
-git clone git@github.com:Xinjie-Q/GaussianImage.git --recursive
-```
-or
-```shell
-# HTTPS
-git clone https://github.com/Xinjie-Q/GaussianImage.git --recursive
-```
-After cloning the repository, you can follow these steps to train GaussianImage models under different tasks. 
-
-### Requirements
+## Requirements
 
 ```bash
+pip install -r requirements.txt
 cd gsplat
 pip install .[dev]
-cd ../
-pip install -r requirements.txt
 ```
 
-If you encounter errors while installing the packages listed in requirements.txt, you can try installing each Python package individually using the pip command.
+## Dataset Format
 
-Before training, you need to download the [kodak](https://r0k.us/graphics/kodak/) and [DIV2K-validation](https://data.vision.ee.ethz.ch/cvl/DIV2K/) datasets. The dataset folder is organized as follows.
+Prepare your video dataset as a folder of PNG frames, named sequentially as:
+
+```
+dataset/
+  ├── Beauty/
+  │   ├── frame_0001.png
+  │   ├── frame_0002.png
+  │   ├── ...
+  ├── HoneyBee/
+  ├── Jockey/
+```
+
+This implementation assumes extracted frames from the [UVG dataset](https://ultravideo.fi/#testsequences), or your own videos converted into this format.
+
+## Usage
+
+### 1. Overfitting (Full-precision training)
 
 ```bash
-├── dataset
-│   | kodak 
-│     ├── kodim01.png
-│     ├── kodim02.png 
-│     ├── ...
-│   | DIV2K_valid_LR_bicubic
-│     ├── X2
-│        ├── 0801x2.png
-│        ├── 0802x2.png
-│        ├── ...
+python train_video.py \
+  --dataset "dataset" \
+  --data_name "Beauty" \
+  --iterations 20000 \
+  --model_name "beauty_3dgs" \
+  --num_points 10000 \
+  --start_frame 0 \
+  --num_frames 10 \
+  --lr 1e-2 \
+  --save_imgs
 ```
 
-#### Representation
+### 2. Quantization-aware fine-tuning
 
 ```bash
-sh ./scripts/gaussianimage_cholesky/kodak.sh /path/to/your/dataset
-sh ./scripts/gaussianimage_rs/kodak.sh /path/to/your/dataset
-sh ./scripts/3dgs/kodak.sh /path/to/your/dataset
-
-sh ./scripts/gaussianimage_cholesky/div2k.sh /path/to/your/dataset
-sh ./scripts/gaussianimage_rs/div2k.sh /path/to/your/dataset
-sh ./scripts/3dgs/div2k.sh /path/to/your/dataset
+python train_quantize_video.py \
+  --dataset "dataset" \
+  --data_name "Beauty" \
+  --iterations 10000 \
+  --model_name "beauty_quant" \
+  --num_points 10000 \
+  --model_path "checkpoints/Beauty/gaussian_model.pth.tar" \
+  --start_frame 0 \
+  --num_frames 10 \
+  --lr 1e-2 \
+  --save_imgs
 ```
 
-#### Compression
-
-After overfitting the image, we load the checkpoints from image representation and apply quantization-aware training technique to obtain the image compression results of GaussianImage models.
+### 3. Evaluation of quantized model
 
 ```bash
-sh ./scripts/gaussianimage_cholesky/kodak_comp.sh /path/to/your/dataset
-sh ./scripts/gaussianimage_rs/kodak_comp.sh /path/to/your/dataset
-
-sh ./scripts/gaussianimage_cholesky/div2k_comp.sh /path/to/your/dataset
-sh ./scripts/gaussianimage_rs/div2k_comp.sh /path/to/your/dataset
+python test_quantize_video.py \
+  --dataset "dataset" \
+  --data_name "Beauty" \
+  --iterations 10000 \
+  --model_name "beauty_quant" \
+  --num_points 10000 \
+  --model_path "checkpoints_quant/Beauty/gaussian_model.best.pth.tar" \
+  --start_frame 0 \
+  --num_frames 10 \
+  --lr 1e-2 \
+  --save_imgs
 ```
 
-## Acknowledgments
+## Notes
 
-Our code was developed based on [gsplat](https://github.com/nerfstudio-project/gsplat). This is a concise and easily extensible Gaussian Splatting library.
-
-We thank [vector-quantize-pytorch](https://github.com/lucidrains/vector-quantize-pytorch) for providing the framework to implement residual vector quantization.
-
-## Citation
-
-If you find our GaussianImage paradigm useful or relevant to your research, please kindly cite our paper:
-
-```
-@inproceedings{zhang2024gaussianimage,
-  title={GaussianImage: 1000 FPS Image Representation and Compression by 2D Gaussian Splatting},
-  author={Zhang, Xinjie and Ge, Xingtong and Xu, Tongda and He, Dailan and Wang, Yan and Qin, Hongwei and Lu, Guo and Geng, Jing and Zhang, Jun},
-  booktitle={European Conference on Computer Vision},
-  year={2024}
-}
-```
-# GaussianVideo
+- `--num_points` controls the total number of 3D Gaussians.
+- `--save_imgs` enables saving rendered frames to disk.
+- All scripts require a CUDA-enabled GPU and use a modified version of `gsplat` for rasterization.

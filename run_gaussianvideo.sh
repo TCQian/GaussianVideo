@@ -1,7 +1,13 @@
 #!/bin/sh
+#SBATCH --job-name=GaussianVideo          # Job name
 #SBATCH --gres=gpu:h100-47:1
 #SBATCH --time=2:00:00
 #SBATCH --mem=16G
+#SBATCH --mail-type=ALL                  # Get email for all status updates
+#SBATCH --mail-user=e0407638@u.nus.edu   # Email for notifications
+
+source ~/.bashrc
+conda activate gv
 
 echo "Starting..."
 
@@ -46,9 +52,9 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Define dataset and checkpoint paths using the variables.
-DATASET_PATH="/home/l/leejiayi/GaussianVideo/dataset/${DATA_NAME}/"
-CHECKPOINT_PATH="/home/l/leejiayi/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
-CHECKPOINT_QUANT_PATH="/home/l/leejiayi/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME}_i${QUANT_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
+DATASET_PATH="/home/e/e0407638/GaussianVideo/dataset/${DATA_NAME}/"
+CHECKPOINT_PATH="/home/e/e0407638/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
+CHECKPOINT_QUANT_PATH="/home/e/e0407638/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME}_i${QUANT_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
 
 # Run the training script with the required arguments.
 python train_video.py \

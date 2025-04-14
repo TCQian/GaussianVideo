@@ -2,6 +2,7 @@ constriction
 numpy
 pandas
 pillow
+opencv-python
 pytorch-msssim
 PyYAML
 tqdm

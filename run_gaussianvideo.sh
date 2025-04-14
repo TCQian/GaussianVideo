@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --job-name=GaussianVideo          # Job name
+#SBATCH --job-name=GaussianVideo_HoneyBee          # Job name
 #SBATCH --gres=gpu:h100-47:1
 #SBATCH --time=2:00:00
 #SBATCH --mem=16G
@@ -12,7 +12,7 @@ conda activate gv
 echo "Starting..."
 
 # Default variable values.
-DATA_NAME="Beauty"
+DATA_NAME="HoneyBee"
 MODEL_NAME="GaussianVideo"
 TRAIN_ITERATIONS=20000
 QUANT_ITERATIONS=10000
@@ -52,9 +52,14 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Define dataset and checkpoint paths using the variables.
+YUV_PATH="/home/e/e0407638/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV_RAW/{$DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
 DATASET_PATH="/home/e/e0407638/GaussianVideo/dataset/${DATA_NAME}/"
 CHECKPOINT_PATH="/home/e/e0407638/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
 CHECKPOINT_QUANT_PATH="/home/e/e0407638/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME}_i${QUANT_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
+
+if [ ! -d "${DATASET_PATH}" ]; then
+    python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame 0
+fi
 
 # Run the training script with the required arguments.
 python train_video.py \

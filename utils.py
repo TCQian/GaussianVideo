@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from tqdm import tqdm
 import cv2
+import argparse
 
 class LogWriter:
     def __init__(self, file_path, train=True):
@@ -229,3 +230,33 @@ def calculate_vmaf(gt_yuv_path: str, generated_yuv_path: str, width: int, height
         print(f"Unexpected error: {str(e)}")
     
     return 0.0  # Fallback value
+
+def save_frames(frames: list[np.ndarray], save_dir: str):
+    os.makedirs(save_dir, exist_ok=True)
+    for idx, frame in enumerate(frames, start=1):
+        save_path = os.path.join(save_dir, f"frame_{idx:04d}.png")
+        cv2.imwrite(save_path, frame)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Extract and save frames from a YUV video.")
+    parser.add_argument("file_path", type=str, help="Path to the .yuv video file")
+    parser.add_argument("--width", type=int, required=True, help="Width of the video frames")
+    parser.add_argument("--height", type=int, required=True, help="Height of the video frames")
+    parser.add_argument("--start_frame", type=int, default=0, help="Starting frame index")
+    parser.add_argument("--num_frames", type=int, default=None, help="Number of frames to extract")
+
+    args = parser.parse_args()
+
+    video_name = os.path.splitext(os.path.basename(args.file_path))[0]
+    save_directory = os.path.join("dataset", video_name)
+
+    frames = process_yuv_video(
+        args.file_path, 
+        args.width, 
+        args.height, 
+        start_frame=args.start_frame, 
+        num_frames=args.num_frames
+    )
+    save_frames(frames, save_directory)
+    print(f"Saved {len(frames)} frames to {save_directory}")

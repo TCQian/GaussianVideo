@@ -249,7 +249,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     video_name = os.path.splitext(os.path.basename(args.file_path))[0]
-    save_directory = os.path.join("dataset", video_name)
+    save_directory = os.path.join("dataset", video_name.split('_')[0])
 
     frames = process_yuv_video(
         args.file_path, 

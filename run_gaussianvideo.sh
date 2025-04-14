@@ -58,7 +58,7 @@ CHECKPOINT_PATH="/home/e/e0407638/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL
 CHECKPOINT_QUANT_PATH="/home/e/e0407638/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME}_i${QUANT_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
 
 if [ ! -d "${DATASET_PATH}" ]; then
-    python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame 0
+    python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME} --num_frames ${NUM_FRAMES}
 fi
 
 # Run the training script with the required arguments.

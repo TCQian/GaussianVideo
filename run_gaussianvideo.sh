@@ -52,7 +52,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Define dataset and checkpoint paths using the variables.
-YUV_PATH="/home/e/e0407638/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV_RAW/{$DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
+YUV_PATH="/home/e/e0407638/GaussianVideo/YUV/{$DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
 DATASET_PATH="/home/e/e0407638/GaussianVideo/dataset/${DATA_NAME}/"
 CHECKPOINT_PATH="/home/e/e0407638/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
 CHECKPOINT_QUANT_PATH="/home/e/e0407638/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME}_i${QUANT_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"

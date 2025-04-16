@@ -4,4 +4,5 @@ checkpoints_quant/*
 slurm-*.out
 *.yuv
 *.7z
+*.xlsx
 dataset/*

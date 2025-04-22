@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=GaussianVideo_HoneyBee          # Job name
+#SBATCH --job-name=GaussianVideo_5_HoneyBee          # Job name
 #SBATCH --gres=gpu:h100-47:1
 #SBATCH --time=2:00:00
 #SBATCH --mem=16G

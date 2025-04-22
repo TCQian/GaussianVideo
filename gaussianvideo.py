@@ -97,6 +97,11 @@ class GaussianVideo(nn.Module):
         image = render_pkg["render"]
         loss = loss_fn(image, gt_image, self.loss_type, lambda_value=0.7)
         loss.backward()
+        print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        for name, param in self.named_parameters():
+            if param.grad is not None:
+                grad_norm = param.grad.data.norm().item()
+                print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         with torch.no_grad():
             mse_loss = F.mse_loss(image, gt_image)
@@ -159,7 +164,13 @@ class GaussianVideo(nn.Module):
         
         # Backpropagate the loss.
         loss.backward()
-        
+        # Log loss and PSNR
+        print(f"[Loss-Quantized] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        for name, param in self.named_parameters():
+            if param.grad is not None:
+                grad_norm = param.grad.data.norm().item()
+                print(f"[Gradient Norm - Quantized] {name}: {grad_norm:.6e}")
+
         # Optionally, you could snapshot parameters before updating if needed.
         # before_update = {name: param.clone().detach() for name, param in self.named_parameters()}
         

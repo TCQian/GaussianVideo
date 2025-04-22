@@ -6,3 +6,4 @@ slurm-*.out
 *.7z
 *.xlsx
 dataset/*
+.DS_Store

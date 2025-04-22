@@ -7,3 +7,4 @@ slurm-*.out
 *.xlsx
 dataset/*
 .DS_Store
+*.txt

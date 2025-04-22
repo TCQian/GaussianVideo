@@ -235,7 +235,7 @@ def save_frames(frames: list[np.ndarray], save_dir: str):
     os.makedirs(save_dir, exist_ok=True)
     for idx, frame in enumerate(frames, start=1):
         save_path = os.path.join(save_dir, f"frame_{idx:04d}.png")
-        cv2.imwrite(save_path, frame)
+        cv2.imwrite(save_path, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
 
 
 if __name__ == "__main__":

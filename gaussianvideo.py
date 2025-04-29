@@ -78,10 +78,15 @@ class GaussianVideo(nn.Module):
         return self._cholesky + self.cholesky_bound
     
     def forward(self):
-        print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(xyz=self.get_xyz, cholesky=self.get_cholesky_elements))
+        # print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(xyz=self.get_xyz, cholesky=self.get_cholesky_elements))
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
+        # torch.set_printoptions(profile="full")  # Set print options to display the full tensor
+        # print(
+        #     f"project_gaussians_video: xys: {self.xys}, radii: {self.radii}, conics: {conics}, num_tiles_hit: {num_tiles_hit}"
+        # )
+        torch.set_printoptions(profile="default")  # Reset print options to default after printing
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,
             self.get_features, self._opacity, self.H, self.W, self.T,

@@ -5,6 +5,7 @@
 #include <iostream>
 #include "float6.h"
 #include "helpers.cuh"
+#include <cstdio>
 
 namespace cg = cooperative_groups;
 
@@ -99,8 +100,8 @@ __global__ void project_gaussians_video_forward_kernel(
     // Useless value
     depths[idx] = 0.0f;
 
-    // printf("[DEBUG] Gaussian %d: center=(%.2f, %.2f, %.2f), radius=%d, conic=(%.2f, %.2f, %.2f, %.2f, %.2f, %.2f), num_tiles_hit=%d\n",
-    //    idx, center.x, center.y, center.z, radii[idx], 
-    //    conics[idx].x, conics[idx].y, conics[idx].z, 
-    //    conics[idx].w, conics[idx].u, conics[idx].v, num_tiles_hit[idx]);
+    printf("[DEBUG] Gaussian %d: center=(%.2f, %.2f, %.2f), radius=%d, conic=(%.2f, %.2f, %.2f, %.2f, %.2f, %.2f), num_tiles_hit=%d\n",
+       idx, center.x, center.y, center.z, radii[idx], 
+       conics[idx].x, conics[idx].y, conics[idx].z, 
+       conics[idx].w, conics[idx].u, conics[idx].v, num_tiles_hit[idx]);
 }

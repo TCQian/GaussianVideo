@@ -78,7 +78,7 @@ class GaussianVideo(nn.Module):
         return self._cholesky + self.cholesky_bound
     
     def forward(self):
-        print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(self.get_xyz, self.get_cholesky_elements))
+        # print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(xyz=self.get_xyz, cholesky=self.get_cholesky_elements))
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )

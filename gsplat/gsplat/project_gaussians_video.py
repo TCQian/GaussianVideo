@@ -92,14 +92,14 @@ class _ProjectGaussiansVideo(Function):
             tile_bounds,
             clip_thresh,
         )
-        print(
-            f"project_gaussians_video: xys: {xys}, radii: {radii}, conics: {conics}, num_tiles_hit: {num_tiles_hit}".format(
-                xys=xys,
-                radii=radii,
-                conics=conics,
-                num_tiles_hit=num_tiles_hit,
-            )
-        )
+        # print(
+        #     f"project_gaussians_video: xys: {xys}, radii: {radii}, conics: {conics}, num_tiles_hit: {num_tiles_hit}".format(
+        #         xys=xys,
+        #         radii=radii,
+        #         conics=conics,
+        #         num_tiles_hit=num_tiles_hit,
+        #     )
+        # )
         # Save non-tensors.
         ctx.img_height = img_height
         ctx.img_width = img_width

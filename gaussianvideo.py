@@ -78,6 +78,7 @@ class GaussianVideo(nn.Module):
         return self._cholesky + self.cholesky_bound
     
     def forward(self):
+        print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(self.get_xyz, self.get_cholesky_elements))
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
@@ -87,7 +88,6 @@ class GaussianVideo(nn.Module):
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )
-        print("out_img.shape", out_img.shape)
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
         return {"render": out_img}

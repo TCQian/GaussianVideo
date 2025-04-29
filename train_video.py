@@ -14,6 +14,8 @@ from tqdm import tqdm
 import random
 import torchvision.transforms as transforms
 
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+
 class VideoTrainer:
     """Trains 2d+t gaussians to fit a video."""
     def __init__(

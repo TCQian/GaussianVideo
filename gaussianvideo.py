@@ -93,10 +93,16 @@ class GaussianVideo(nn.Module):
             background=self.background, return_alpha=False
         )
         if self.debug_mode:
-            plt.hist(self.radii.cpu().numpy(), bins=50)
-            plt.xlabel('Radius(in pixels or frames)')
-            plt.ylabel('Frequency')
-            plt.savefig(f'histogram_{out_img.shape[0]}.png')
+            radii_np = self.radii.detach().cpu().numpy()
+            max_radius = np.ceil(radii_np.max() / 5) * 5
+            bins = np.arange(0, max_radius + 5, 5)  # e.g., [0, 5, 10, ..., max]
+
+            hist, bin_edges = np.histogram(radii_np, bins=bins)
+
+            # Print histogram nicely
+            print("Gaussian Radius Histogram (bin size = 5)")
+            for i in range(len(hist)):
+                print(f"[{bin_edges[i]:>2.0f} - {bin_edges[i+1]:>2.0f}) : {hist[i]} Gaussians")
             self.debug_mode = False
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()

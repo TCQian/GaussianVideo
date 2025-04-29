@@ -1079,7 +1079,7 @@ __global__ void rasterize_forward_sum_video(
             // }
 
             if (sigma < 0.f || alpha < 1.f / 255.f) {
-                print(("[DEBUG] Gaussians at i=%u, j=%u, k=%u) are skipped due to sigma=%.2f or alpha=%.2f", i, j, k, sigma, alpha));
+                // printf("[DEBUG] Gaussians at i=%u, j=%u, k=%u are skipped due to sigma=%.6f or alpha=%.6f\n", i, j, k, sigma, alpha);
                 continue;
             }
 
@@ -1103,8 +1103,8 @@ __global__ void rasterize_forward_sum_video(
         final_color.y = pix_out.y;
         final_color.z = pix_out.z;
         out_img[pix_id] = final_color;
-        printf("[DEBUG] Inside voxel (i=%u, j=%u, k=%u), color=(%.2f, %.2f, %.2f)\n",
-               i, j, k, final_color.x, final_color.y, final_color.z);
+        // printf("[DEBUG] Inside voxel (i=%u, j=%u, k=%u), color=(%.2f, %.2f, %.2f)\n",
+        //        i, j, k, final_color.x, final_color.y, final_color.z);
     } else {
         // printf("Outside voxel (i=%u, j=%u, k=%u)\n", i, j, k);
     }

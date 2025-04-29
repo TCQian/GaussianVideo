@@ -10,10 +10,14 @@ from optimizer import Adan
 from PIL import Image
 from filelock import FileLock, Timeout
 import torchvision.transforms as transforms
+import matplotlib.pyplot as plt
 
 class GaussianVideo(nn.Module):
     def __init__(self, loss_type="L2", **kwargs):
         super().__init__()
+
+        self.debug_mode = False  # enable kernel logging
+
         self.loss_type = loss_type
         self.init_num_points = kwargs["num_points"]
         self.H, self.W, self.T = kwargs["H"], kwargs["W"], kwargs["T"]
@@ -82,17 +86,18 @@ class GaussianVideo(nn.Module):
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
-        # torch.set_printoptions(profile="full")  # Set print options to display the full tensor
-        # print(
-        #     f"project_gaussians_video: xys: {self.xys}, radii: {self.radii}, conics: {conics}, num_tiles_hit: {num_tiles_hit}"
-        # )
-        torch.set_printoptions(profile="default")  # Reset print options to default after printing
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,
             self.get_features, self._opacity, self.H, self.W, self.T,
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )
+        if self.debug_mode:
+            plt.hist(self.radii.cpu().numpy(), bins=50)
+            plt.xlabel('Radius(in pixels or frames)')
+            plt.ylabel('Frequency')
+            plt.savefig(f'histogram_{out_img.shape[0]}.png')
+            self.debug_mode = False
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
         return {"render": out_img}

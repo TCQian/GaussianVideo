@@ -8,6 +8,9 @@
 
 source ~/.bashrc
 conda activate gv
+cd gsplat
+pip install .[dev]
+cd ..
 
 echo "Starting..."
 

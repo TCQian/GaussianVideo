@@ -24,7 +24,7 @@ DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
 CHECKPOINT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_${TRAIN_ITERATIONS}_${NUM_POINTS}/"
 CHECKPOINT_QUANT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME}_${QUANT_ITERATIONS}_${NUM_POINTS}/"
 
-python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
+python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame 0
 
 # Run the training script with the required arguments.
 python train.py \

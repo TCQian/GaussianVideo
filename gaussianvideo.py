@@ -87,6 +87,7 @@ class GaussianVideo(nn.Module):
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )
+        print("out_img.shape", out_img.shape)
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
         return {"render": out_img}
@@ -102,11 +103,11 @@ class GaussianVideo(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
-        print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        for name, param in self.named_parameters():
-            if param.grad is not None:
-                grad_norm = param.grad.data.norm().item()
-                print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        # for name, param in self.named_parameters():
+        #     if param.grad is not None:
+        #         grad_norm = param.grad.data.norm().item()
+        #         print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
@@ -179,11 +180,11 @@ class GaussianVideo(nn.Module):
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
         
         # Log loss and PSNR
-        print(f"[Loss-Quantized] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        for name, param in self.named_parameters():
-            if param.grad is not None:
-                grad_norm = param.grad.data.norm().item()
-                print(f"[Gradient Norm - Quantized] {name}: {grad_norm:.6e}")
+        # print(f"[Loss-Quantized] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        # for name, param in self.named_parameters():
+        #     if param.grad is not None:
+        #         grad_norm = param.grad.data.norm().item()
+        #         print(f"[Gradient Norm - Quantized] {name}: {grad_norm:.6e}")
         
         # Step the learning rate scheduler.
         self.scheduler.step()

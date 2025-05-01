@@ -120,6 +120,18 @@ def parse_args(argv):
         default=50000,
         help="2D GS points (default: %(default)s)",
     )
+    parser.add_argument(
+        "--num_frames",
+        type=int,
+        default=50,
+        help="Number of frames (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--start_frame",
+        type=int,
+        default=0,
+        help="Start frame (default: %(default)s)",
+    )
     parser.add_argument("--model_path", type=str, default=None, help="Path to a checkpoint")
     parser.add_argument("--seed", type=float, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--quantize", action="store_true", help="Quantize")
@@ -156,7 +168,7 @@ def main(argv):
     elif args.data_name == "DIV2K_valid_LRX2":
         image_length, start = 100, 800
     else:
-        image_length, start = 1, 0
+        image_length, start = args.num_frames, args.start_frame
 
     for i in range(start, start+image_length):
         if args.data_name == "kodak":

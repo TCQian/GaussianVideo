@@ -9,3 +9,4 @@ dataset/*
 .DS_Store
 *.txt
 *.out
+*_analysis/

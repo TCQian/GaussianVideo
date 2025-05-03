@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=GaussianVideo_5_HoneyBee          # Job name
+#SBATCH --job-name=GaussianVideo_${DATA_NAME}_${NUM_FRAMES}_${NUM_POINTS}    # Job name
 #SBATCH --gres=gpu:h100-47:1
-#SBATCH --time=2:00:00
+#SBATCH --time=4:00:00
 #SBATCH --mem=16G
 #SBATCH --mail-type=ALL                  # Get email for all status updates
 #SBATCH --mail-user=e0407638@u.nus.edu   # Email for notifications

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=GaussianImage_HoneyBee          # Job name
+#SBATCH --job-name=GaussianImage_${DATA_NAME}_${NUM_FRAMES}_${NUM_POINTS}          # Job name
 #SBATCH --gres=gpu:h100-47:1
 #SBATCH --time=2:00:00
 #SBATCH --mem=16G
@@ -21,7 +21,35 @@ QUANT_ITERATIONS=10000
 # Default values for parameters to be overridden.
 NUM_POINTS=10000
 START_FRAME=0
-NUM_FRAMES=5
+NUM_FRAMES=1
+
+# Parse command-line arguments.
+# Usage: ./script.sh --data_name MyData --num_points 30000 --start_frame 40 --num_frames 15
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        -d|--data_name)
+            DATA_NAME="$2"
+            shift 2
+            ;;
+        -p|--num_points)
+            NUM_POINTS="$2"
+            shift 2
+            ;;
+        -s|--start_frame)
+            START_FRAME="$2"
+            shift 2
+            ;;
+        -n|--num_frames)
+            NUM_FRAMES="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            echo "Usage: $0 [--data_name <value>] [--num_points <value>] [--start_frame <value>] [--num_frames <value>]"
+            exit 1
+            ;;
+    esac
+done
 
 # Define dataset and checkpoint paths using the variables.
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"

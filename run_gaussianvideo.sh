@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=GaussianVideo_${DATA_NAME}_${NUM_FRAMES}_${NUM_POINTS}    # Job name
+#SBATCH --job-name=GaussianVideo    # Job name
 #SBATCH --gres=gpu:h100-47:1
 #SBATCH --time=4:00:00
 #SBATCH --mem=16G
@@ -11,8 +11,6 @@ conda activate gv
 cd gsplat
 pip install .[dev]
 cd ..
-
-echo "Starting..."
 
 # Default variable values.
 DATA_NAME="HoneyBee"
@@ -53,6 +51,8 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+echo "Starting GaussianVideo_${DATA_NAME}_${NUM_FRAMES}_${NUM_POINTS}..."
 
 # Define dataset and checkpoint paths using the variables.
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"

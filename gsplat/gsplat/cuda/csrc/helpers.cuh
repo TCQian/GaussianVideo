@@ -54,6 +54,9 @@ compute_cov2d_bounds(const float3 cov2d, float3 &conic, float &radius) {
     float det = cov2d.x * cov2d.z - cov2d.y * cov2d.y;
     if (det == 0.f)
         return false;
+    if (fabsf(det) < 1e-12f) {
+        return false;  // singular or nearly singular
+    }
     float inv_det = 1.f / det;
 
     // inverse of 2x2 cov2d matrix

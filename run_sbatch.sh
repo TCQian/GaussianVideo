@@ -1,5 +1,5 @@
 # gaussian_image
-dataset=("Honeybee" "Beauty" "Jockey")
+dataset=("HoneyBee" "Beauty" "Jockey")
 testing_gaussians_1frames=(750 1500 2250 3000 3750 7500 15000 22500 30000 37500)
 for i in "${!dataset[@]}"; do
     for j in "${!testing_gaussians_1frames[@]}"; do

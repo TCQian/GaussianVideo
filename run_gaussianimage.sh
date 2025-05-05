@@ -8,6 +8,9 @@
 
 source ~/.bashrc
 conda activate gv
+cd gsplat
+pip install .[dev]
+cd ..
 
 # Define variables for easy updating.
 DATA_NAME="HoneyBee"

@@ -66,7 +66,7 @@ def test_get_tile_bin_edges():
         _isect_ids_unsorted,
         _gaussian_ids_unsorted,
     ) = _torch_impl.map_gaussian_to_intersects(
-        num_points, _xys, _depths, _radii, _cum_tiles_hit, tile_bounds
+        num_points, _xys, _depths, _radii, _cum_tiles_hit, tile_bounds, False
     )
 
     # Sorting isect_ids_unsorted

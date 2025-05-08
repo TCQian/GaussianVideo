@@ -15,12 +15,11 @@ cd ..
 # Define variables for easy updating.
 DATA_NAME="HoneyBee"
 MODEL_NAME="GaussianImage_Cholesky"
-NUM_POINTS=10000
+NUM_POINTS=2250
 TRAIN_ITERATIONS=20000
 QUANT_ITERATIONS=10000
 
 # Default values for parameters to be overridden.
-NUM_POINTS=10000
 START_FRAME=0
 NUM_FRAMES=1
 
@@ -74,27 +73,27 @@ python train.py \
     --save_imgs
 
 # Run the quantization training script.
-python train_quantize.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations "${QUANT_ITERATIONS}" \
-    --model_name "${MODEL_NAME}" \
-    --num_points "${NUM_POINTS}" \
-    --model_path "${CHECKPOINT_PATH}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --save_imgs
+# python train_quantize.py \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --iterations "${QUANT_ITERATIONS}" \
+#     --model_name "${MODEL_NAME}" \
+#     --num_points "${NUM_POINTS}" \
+#     --model_path "${CHECKPOINT_PATH}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --save_imgs
 
-# Run the quantization testing script.
-python test_quantize.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations "${QUANT_ITERATIONS}" \
-    --model_name "${MODEL_NAME}" \
-    --num_points "${NUM_POINTS}" \
-    --model_path "${CHECKPOINT_QUANT_PATH}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --save_imgs
+# # Run the quantization testing script.
+# python test_quantize.py \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --iterations "${QUANT_ITERATIONS}" \
+#     --model_name "${MODEL_NAME}" \
+#     --num_points "${NUM_POINTS}" \
+#     --model_path "${CHECKPOINT_QUANT_PATH}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --save_imgs
 
 echo "Done"

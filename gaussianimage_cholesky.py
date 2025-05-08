@@ -11,6 +11,9 @@ from optimizer import Adan
 class GaussianImage_Cholesky(nn.Module):
     def __init__(self, loss_type="L2", **kwargs):
         super().__init__()
+
+        self.debug_mode = False
+
         self.loss_type = loss_type
         self.init_num_points = kwargs["num_points"]
         self.H, self.W = kwargs["H"], kwargs["W"]
@@ -24,8 +27,18 @@ class GaussianImage_Cholesky(nn.Module):
 
         self._xyz = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 2) - 0.5)))
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 3))
-        self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
         self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
+
+        data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
+
+        if data is not None:
+            self._xyz.data = data["xyz"].to(self.device)
+            self._cholesky.data = data["cholesky"].to(self.device)
+            self._features_dc.data = data["features_dc"].to(self.device)
+        else:
+            raise ValueError("Failed to load Gaussian parameters.")
+
+        self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
         self.last_size = (self.H, self.W)
         self.quantize = kwargs["quantize"]
         self.register_buffer('background', torch.ones(3))
@@ -67,7 +80,7 @@ class GaussianImage_Cholesky(nn.Module):
     def forward(self):
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_2d(self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.tile_bounds)
         out_img = rasterize_gaussians_sum(self.xys, depths, self.radii, conics, num_tiles_hit,
-                self.get_features, self._opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False)
+                self.get_features, self._opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False, to_print=self.debug_mode)
         out_img = torch.clamp(out_img, 0, 1) #[H, W, 3]
         out_img = out_img.view(-1, self.H, self.W, 3).permute(0, 3, 1, 2).contiguous()
         return {"render": out_img}
@@ -81,11 +94,11 @@ class GaussianImage_Cholesky(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / mse_loss.item())
 
-        print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        for name, param in self.named_parameters():
-            if param.grad is not None:
-                grad_norm = param.grad.data.norm().item()
-                print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        # for name, param in self.named_parameters():
+        #     if param.grad is not None:
+        #         grad_norm = param.grad.data.norm().item()
+        #         print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none = True)
@@ -118,11 +131,11 @@ class GaussianImage_Cholesky(nn.Module):
             psnr = 10 * math.log10(1.0 / mse_loss.item())
         
         # Log loss and PSNR
-        print(f"[Loss-Quantized] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        for name, param in self.named_parameters():
-            if param.grad is not None:
-                grad_norm = param.grad.data.norm().item()
-                print(f"[Gradient Norm - Quantized] {name}: {grad_norm:.6e}")
+        # print(f"[Loss-Quantized] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        # for name, param in self.named_parameters():
+        #     if param.grad is not None:
+        #         grad_norm = param.grad.data.norm().item()
+        #         print(f"[Gradient Norm - Quantized] {name}: {grad_norm:.6e}")
         
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

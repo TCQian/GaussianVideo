@@ -280,7 +280,8 @@ std::tuple<torch::Tensor, torch::Tensor> map_gaussian_to_intersects_tensor(
     const torch::Tensor &depths,
     const torch::Tensor &radii,
     const torch::Tensor &cum_tiles_hit,
-    const std::tuple<int, int, int> tile_bounds
+    const std::tuple<int, int, int> tile_bounds,
+    bool print
 ) {
     CHECK_INPUT(xys);
     CHECK_INPUT(depths);
@@ -306,6 +307,7 @@ std::tuple<torch::Tensor, torch::Tensor> map_gaussian_to_intersects_tensor(
         radii.contiguous().data_ptr<int32_t>(),
         cum_tiles_hit.contiguous().data_ptr<int32_t>(),
         tile_bounds_dim3,
+        print,
         // Outputs.
         isect_ids_unsorted.contiguous().data_ptr<int64_t>(),
         gaussian_ids_unsorted.contiguous().data_ptr<int32_t>()
@@ -1152,7 +1154,8 @@ std::tuple<torch::Tensor, torch::Tensor> map_gaussian_to_intersects_video_tensor
     const torch::Tensor &depths,
     const torch::Tensor &radii,
     const torch::Tensor &cum_tiles_hit,
-    const std::tuple<int, int, int> tile_bounds
+    const std::tuple<int, int, int> tile_bounds,
+    bool print
 ) {
     CHECK_INPUT(xys);
     CHECK_INPUT(depths);
@@ -1178,6 +1181,7 @@ std::tuple<torch::Tensor, torch::Tensor> map_gaussian_to_intersects_video_tensor
         radii.contiguous().data_ptr<int32_t>(),
         cum_tiles_hit.contiguous().data_ptr<int32_t>(),
         tile_bounds_dim3,
+        print,
         // Outputs.
         isect_ids_unsorted.contiguous().data_ptr<int64_t>(),
         gaussian_ids_unsorted.contiguous().data_ptr<int32_t>()

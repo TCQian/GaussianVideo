@@ -107,7 +107,8 @@ __global__ void map_gaussian_to_intersects(
     const int32_t* __restrict__ cum_tiles_hit,
     const dim3 tile_bounds,
     int64_t* __restrict__ isect_ids,
-    int32_t* __restrict__ gaussian_ids
+    int32_t* __restrict__ gaussian_ids,
+    bool print // printf or not
 ) {
     unsigned idx = cg::this_grid().thread_rank();
     if (idx >= num_points)
@@ -118,9 +119,14 @@ __global__ void map_gaussian_to_intersects(
     uint2 tile_min, tile_max;
     float2 center = xys[idx];
     get_tile_bbox(center, radii[idx], tile_bounds, tile_min, tile_max);
-    // printf("point %d, %d radius, min %d %d, max %d %d\n", idx, radii[idx],
-    // tile_min.x, tile_min.y, tile_max.x, tile_max.y);
-
+    
+    // print first 3 gaussian's info
+    if (print && (idx < 3)) {
+        printf("Gaussian %d: center (%f, %f), radius %d, tile_min (%d, %d), tile_max (%d, %d)\n",
+               idx, center.x, center.y, radii[idx], tile_min.x, tile_min.y,
+               tile_max.x, tile_max.y);
+    }
+    
     // update the intersection info for all tiles this gaussian hits
     int32_t cur_idx = (idx == 0) ? 0 : cum_tiles_hit[idx - 1];
     // printf("point %d starting at %d\n", idx, cur_idx);
@@ -944,6 +950,7 @@ __global__ void map_gaussian_to_intersects_video(
     const int* __restrict__ radii, // (9000, 1) (radius of gaussians)
     const int32_t* __restrict__ cum_tiles_hit, // (the cumulative tiles hit array)
     const dim3 tile_bounds, // (120, 68, 50)
+    bool print, // printf or not
 
     // Outputs
     int64_t* __restrict__ isect_ids,
@@ -960,7 +967,14 @@ __global__ void map_gaussian_to_intersects_video(
     float3 center = xys[idx];
     get_tile_3d_bbox(center, radii[idx], tile_bounds, tile_min, tile_max);
 
-    // Update the intersection info for all tiles this Gaussian hits
+    // print first 3 gaussian's info
+    if (print && (idx < 3)) {
+        printf("Gaussian %d: center (%f, %f, %f), radius %d, tile_min (%d, %d, %d), tile_max (%d, %d, %d)\n",
+               idx, center.x, center.y, center.z, radii[idx], tile_min.x, tile_min.y, tile_min.z,
+               tile_max.x, tile_max.y, tile_max.z);
+    }
+    
+   // Update the intersection info for all tiles this Gaussian hits
     int32_t cur_idx = (idx == 0) ? 0 : cum_tiles_hit[idx - 1];
     int64_t depth_id = (int64_t) * (int32_t *)&(depths[idx]);
 

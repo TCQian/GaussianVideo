@@ -17,6 +17,7 @@ def map_gaussian_to_intersects(
     radii: Float[Tensor, "batch 1"],
     cum_tiles_hit: Float[Tensor, "batch 1"],
     tile_bounds: Tuple[int, int, int],
+    to_print: bool = False,
 ) -> Tuple[Float[Tensor, "cum_tiles_hit 1"], Float[Tensor, "cum_tiles_hit 1"]]:
     """Map each gaussian intersection to a unique tile ID and depth value for sorting.
 
@@ -46,6 +47,7 @@ def map_gaussian_to_intersects(
         radii.contiguous(),
         cum_tiles_hit.contiguous(),
         tile_bounds,
+        to_print
     )
     return (isect_ids, gaussian_ids)
 
@@ -57,6 +59,7 @@ def map_gaussian_to_intersects_video(
     radii: Float[Tensor, "batch 1"],
     cum_tiles_hit: Float[Tensor, "batch 1"],
     tile_bounds: Tuple[int, int, int],
+    to_print: bool = False,
 ) -> Tuple[Float[Tensor, "cum_tiles_hit 1"], Float[Tensor, "cum_tiles_hit 1"]]:
     isect_ids, gaussian_ids = _C.map_gaussian_to_intersects_video(
         num_points,
@@ -66,6 +69,7 @@ def map_gaussian_to_intersects_video(
         radii.contiguous(),
         cum_tiles_hit.contiguous(),
         tile_bounds,
+        to_print,
     )
     return (isect_ids, gaussian_ids)
 
@@ -151,6 +155,7 @@ def bin_and_sort_gaussians(
     radii: Float[Tensor, "batch 1"],
     cum_tiles_hit: Float[Tensor, "batch 1"],
     tile_bounds: Tuple[int, int, int],
+    to_print: bool = False,
 ) -> Tuple[
     Float[Tensor, "num_intersects 1"],
     Float[Tensor, "num_intersects 1"],
@@ -184,7 +189,7 @@ def bin_and_sort_gaussians(
         - **tile_bins** (Tensor): range of gaussians hit per tile.
     """
     isect_ids, gaussian_ids = map_gaussian_to_intersects(
-        num_points, num_intersects, xys, depths, radii, cum_tiles_hit, tile_bounds
+        num_points, num_intersects, xys, depths, radii, cum_tiles_hit, tile_bounds, to_print
     )
     isect_ids_sorted, sorted_indices = torch.sort(isect_ids)
     gaussian_ids_sorted = torch.gather(gaussian_ids, 0, sorted_indices)
@@ -206,6 +211,7 @@ def bin_and_sort_gaussians_video(
     radii: Float[Tensor, "batch 1"],
     cum_tiles_hit: Float[Tensor, "batch 1"],
     tile_bounds: Tuple[int, int, int],
+    to_print: bool = False,
 ) -> Tuple[
     Float[Tensor, "num_intersects 1"],
     Float[Tensor, "num_intersects 1"],
@@ -218,7 +224,7 @@ def bin_and_sort_gaussians_video(
     # gaussian_ids stores the corresponding Gaussian index for each tile intersection.
     # isect_ids is of length h * w * t = 120 * 68 * 1 = 8160
     isect_ids, gaussian_ids = map_gaussian_to_intersects_video(
-        num_points, num_intersects, xys, depths, radii, cum_tiles_hit, tile_bounds
+        num_points, num_intersects, xys, depths, radii, cum_tiles_hit, tile_bounds, to_print
     )
     
     # Step 2: Sort tile intersections based on tile ID

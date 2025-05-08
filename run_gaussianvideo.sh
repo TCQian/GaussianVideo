@@ -20,9 +20,9 @@ QUANT_ITERATIONS=10000
 LEARNING_RATE=0.01
 
 # Default values for parameters to be overridden.
-NUM_POINTS=10000
+NUM_POINTS=2250
 START_FRAME=0
-NUM_FRAMES=5
+NUM_FRAMES=1
 
 # Parse command-line arguments.
 # Usage: ./script.sh --data_name MyData --num_points 30000 --start_frame 40 --num_frames 15
@@ -75,29 +75,29 @@ python train_video.py \
     --save_imgs
 
 # Run the quantization training script.
-python train_quantize_video.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations "${QUANT_ITERATIONS}" \
-    --model_name "${MODEL_NAME}" \
-    --num_points "${NUM_POINTS}" \
-    --model_path "${CHECKPOINT_PATH}${DATA_NAME}/gaussian_model.pth.tar" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --lr "${LEARNING_RATE}" \
-    --save_imgs
+# python train_quantize_video.py \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --iterations "${QUANT_ITERATIONS}" \
+#     --model_name "${MODEL_NAME}" \
+#     --num_points "${NUM_POINTS}" \
+#     --model_path "${CHECKPOINT_PATH}${DATA_NAME}/gaussian_model.pth.tar" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --lr "${LEARNING_RATE}" \
+#     --save_imgs
 
-# Run the quantization testing script.
-python test_quantize_video.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations "${QUANT_ITERATIONS}" \
-    --model_name "${MODEL_NAME}" \
-    --num_points "${NUM_POINTS}" \
-    --model_path "${CHECKPOINT_QUANT_PATH}${DATA_NAME}/gaussian_model.best.pth.tar" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --lr "${LEARNING_RATE}" \
-    --save_imgs
+# # Run the quantization testing script.
+# python test_quantize_video.py \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --iterations "${QUANT_ITERATIONS}" \
+#     --model_name "${MODEL_NAME}" \
+#     --num_points "${NUM_POINTS}" \
+#     --model_path "${CHECKPOINT_QUANT_PATH}${DATA_NAME}/gaussian_model.best.pth.tar" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --lr "${LEARNING_RATE}" \
+#     --save_imgs
 
 echo "Done"

@@ -1,4 +1,5 @@
 import os
+import torch
 import torch.nn.functional as F
 from pytorch_msssim import ms_ssim, ssim
 import torch
@@ -236,6 +237,50 @@ def save_frames(frames: list[np.ndarray], save_dir: str):
     for idx, frame in enumerate(frames, start=1):
         save_path = os.path.join(save_dir, f"frame_{idx:04d}.png")
         cv2.imwrite(save_path, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+
+
+## Create pt file to record the predefined parameters
+def save_and_load_gaussian(model, dim=3, file_path: str):
+    try:
+        if not os.path.exists(file_path):
+            print(f"[INFO] Gaussian parameters not found at {file_path}, generating new ones.")
+            assert model._xyz.shape[0] == 500000, "In order to save, at least 500k Gaussians are needed."
+            assert model._xyz.shape[1] == 3, f"Expected 3 dimensions, but got {model._xyz.shape[1]}."
+
+            # Save fresh parameters
+            print(f"[INFO] Saving Gaussian parameters to: {file_path}")
+            torch.save({
+                "xyz": model._xyz.detach().cpu(),
+                "cholesky": model._cholesky.detach().cpu(),
+                "features_dc": model._features_dc.detach().cpu(),
+            }, file_path)
+        
+        print(f"[INFO] Loading Gaussian parameters from: {file_path}")
+        data = torch.load(file_path, map_location="cpu")
+    except Exception as e:
+        print(f"[ERROR] Failed to save/load {file_path}. Reason: {e}\nPlease run GaussianVideo model with 500k Gaussians to generate the parameters.")
+
+    # select the subset of Gaussians based on the model's requirements, number of Gaussians and dimensions
+    required_gaussians = model._xyz.shape[0]
+    assert data["xyz"].shape[0] >= required_gaussians, "Loaded Gaussians are less than the required Gaussians."
+    if dim == 2:
+        data["xyz"] = data["xyz"][:required_gaussians, :2]
+        data["cholesky"] = data["cholesky"][:required_gaussians, :2, :2]
+    elif dim == 3:
+        data["xyz"] = data["xyz"][:required_gaussians]
+        data["cholesky"] = data["cholesky"][:required_gaussians]
+    else:
+        raise ValueError(f"Unsupported dimension: {dim}. Only 2D and 3D are supported.") 
+    data["features_dc"] = data["features_dc"][:required_gaussians]
+
+    # Check the loaded data, xyz must be within the range of -1 to 1, cholesky and features_dc must be within range of 0 to 1
+    assert torch.all(data["xyz"] >= -1.0) and torch.all(data["xyz"] <= 1.0), "xyz values are out of range [-1, 1]."
+    assert torch.all(data["cholesky"] >= 0.0) and torch.all(data["cholesky"] <= 1.0), "Cholesky values are out of range [0, 1]."
+    assert torch.all(data["features_dc"] >= 0.0) and torch.all(data["features_dc"] <= 1.0), "Features DC values are out of range [0, 1]."
+    assert data["xyz"].shape[0] == required_gaussians, "Loaded Gaussians do not match the required number."
+
+    print(f"[INFO] Gaussian parameters loaded successfully with parameter xyz with size of {data['xyz'].shape}, cholesky with size of {data['cholesky'].shape} and color with size of {data['features_dc'].shape}.")
+    return data
 
 
 if __name__ == "__main__":

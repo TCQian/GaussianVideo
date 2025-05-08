@@ -27,6 +27,7 @@ def rasterize_gaussians_sum_video(
     BLOCK_T: int=1,
     background: Optional[Float[Tensor, "channels"]] = None,
     return_alpha: Optional[bool] = False,
+    to_print: Optional[bool] = False,
 ) -> Tensor:
     """Rasterizes 2D gaussians by sorting and binning gaussian intersections for each tile and returns an N-dimensional output using alpha-compositing.
 
@@ -87,6 +88,7 @@ def rasterize_gaussians_sum_video(
         BLOCK_T,
         background.contiguous(),
         return_alpha,
+        to_print
     )
 
 
@@ -111,6 +113,7 @@ class _RasterizeGaussiansSumVideo(Function):
         BLOCK_T: int=1,
         background: Optional[Float[Tensor, "channels"]] = None,
         return_alpha: Optional[bool] = False,
+        to_print: Optional[bool] = False,
     ) -> Tensor:
         num_points = xys.size(0)
         BLOCK_X, BLOCK_Y, BLOCK_Z = BLOCK_W, BLOCK_H, BLOCK_T
@@ -121,6 +124,10 @@ class _RasterizeGaussiansSumVideo(Function):
         ) # tile_bounds (120, 68, 50)
         block = (BLOCK_X, BLOCK_Y, BLOCK_Z) # (16, 16, 1)
         img_size = (img_width, img_height, video_length) # (1920, 1080, 50)
+
+        # print the conic shape
+        if to_print:
+            print(f"[Iteration] In rasterization, conic shape: {conics[:3].detach().cpu().numpy().tolist()}")
 
         # Computes the cumulative intersects and total number of tile intersections
         # For example, if there are 2 gaussians, where the first intersect 100 tiles,
@@ -153,6 +160,7 @@ class _RasterizeGaussiansSumVideo(Function):
                 radii,
                 cum_tiles_hit,
                 tile_bounds,
+                to_print
             )
             rasterize_fn = _C.rasterize_sum_forward_video
             

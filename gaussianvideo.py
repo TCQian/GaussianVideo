@@ -1,6 +1,7 @@
 from gsplat.project_gaussians_video import project_gaussians_video
 from gsplat.rasterize_sum_video import rasterize_gaussians_sum_video
 from utils import *
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -34,14 +35,25 @@ class GaussianVideo(nn.Module):
 
         # Covariance
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 6))
+
+        # Color
+        self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
+
+        data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
+
+        if data is not None:
+            self._xyz.data = data["xyz"].to(self.device)
+            self._cholesky.data = data["cholesky"].to(self.device)
+            self._features_dc.data = data["features_dc"].to(self.device)
+        else:
+            raise ValueError("Failed to load Gaussian parameters.")
+
         self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
         with torch.no_grad():
             self._cholesky.data[:, 5] += self.T  # adjust the constant as needed
         
-        # Color
-        self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
         self.last_size = (self.H, self.W, self.T)
         self.quantize = kwargs["quantize"]
         self.register_buffer('background', torch.ones(3))
@@ -90,7 +102,7 @@ class GaussianVideo(nn.Module):
             self.xys, depths, self.radii, conics, num_tiles_hit,
             self.get_features, self._opacity, self.H, self.W, self.T,
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
-            background=self.background, return_alpha=False
+            background=self.background, return_alpha=False, to_print=self.debug_mode
         )
         # if self.debug_mode:
             # radii_np = self.radii.detach().cpu().numpy()
@@ -119,11 +131,11 @@ class GaussianVideo(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
-        print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        for name, param in self.named_parameters():
-            if param.grad is not None:
-                grad_norm = param.grad.data.norm().item()
-                print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        # for name, param in self.named_parameters():
+        #     if param.grad is not None:
+        #         grad_norm = param.grad.data.norm().item()
+        #         print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
@@ -196,11 +208,11 @@ class GaussianVideo(nn.Module):
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
         
         # Log loss and PSNR
-        print(f"[Loss-Quantized] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        for name, param in self.named_parameters():
-            if param.grad is not None:
-                grad_norm = param.grad.data.norm().item()
-                print(f"[Gradient Norm - Quantized] {name}: {grad_norm:.6e}")
+        # print(f"[Loss-Quantized] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        # for name, param in self.named_parameters():
+        #     if param.grad is not None:
+        #         grad_norm = param.grad.data.norm().item()
+        #         print(f"[Gradient Norm - Quantized] {name}: {grad_norm:.6e}")
         
         # Step the learning rate scheduler.
         self.scheduler.step()

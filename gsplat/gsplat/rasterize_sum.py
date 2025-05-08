@@ -25,6 +25,7 @@ def rasterize_gaussians_sum(
     BLOCK_W: int=16, 
     background: Optional[Float[Tensor, "channels"]] = None,
     return_alpha: Optional[bool] = False,
+    to_print: Optional[bool] = False,
 ) -> Tensor:
     """Rasterizes 2D gaussians by sorting and binning gaussian intersections for each tile and returns an N-dimensional output using alpha-compositing.
 
@@ -83,6 +84,7 @@ def rasterize_gaussians_sum(
         BLOCK_W,
         background.contiguous(),
         return_alpha,
+        to_print
     )
 
 
@@ -105,6 +107,7 @@ class _RasterizeGaussiansSum(Function):
         BLOCK_W: int=16, 
         background: Optional[Float[Tensor, "channels"]] = None,
         return_alpha: Optional[bool] = False,
+        to_print: Optional[bool] = False,
     ) -> Tensor:
         num_points = xys.size(0)
         BLOCK_X, BLOCK_Y = BLOCK_W, BLOCK_H
@@ -115,6 +118,10 @@ class _RasterizeGaussiansSum(Function):
         )
         block = (BLOCK_X, BLOCK_Y, 1)
         img_size = (img_width, img_height, 1)
+
+        # print the conic shape
+        if to_print:
+            print(f"[Iteration] In rasterization, conic shape: {conics[:3].detach().cpu().numpy().tolist()}")
 
         num_intersects, cum_tiles_hit = compute_cumulative_intersects(num_tiles_hit)
 
@@ -142,6 +149,7 @@ class _RasterizeGaussiansSum(Function):
                 radii,
                 cum_tiles_hit,
                 tile_bounds,
+                to_print
             )
             if colors.shape[-1] == 3:
                 rasterize_fn = _C.rasterize_sum_forward

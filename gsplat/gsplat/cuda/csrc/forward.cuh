@@ -96,6 +96,7 @@ __global__ void map_gaussian_to_intersects(
     const int* __restrict__ radii,
     const int32_t* __restrict__ cum_tiles_hit,
     const dim3 tile_bounds,
+    bool print,
     int64_t* __restrict__ isect_ids,
     int32_t* __restrict__ gaussian_ids
 );
@@ -192,6 +193,7 @@ __global__ void map_gaussian_to_intersects_video(
     const int* __restrict__ radii,
     const int32_t* __restrict__ cum_tiles_hit,
     const dim3 tile_bounds,
+    bool print,
     int64_t* __restrict__ isect_ids,
     int32_t* __restrict__ gaussian_ids
 );

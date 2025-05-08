@@ -95,7 +95,8 @@ std::tuple<torch::Tensor, torch::Tensor> map_gaussian_to_intersects_tensor(
     const torch::Tensor &depths,
     const torch::Tensor &radii,
     const torch::Tensor &cum_tiles_hit,
-    const std::tuple<int, int, int> tile_bounds
+    const std::tuple<int, int, int> tile_bounds,
+    bool print
 );
 
 torch::Tensor get_tile_bin_edges_tensor(
@@ -352,7 +353,8 @@ std::tuple<torch::Tensor, torch::Tensor> map_gaussian_to_intersects_video_tensor
     const torch::Tensor &depths,
     const torch::Tensor &radii,
     const torch::Tensor &cum_tiles_hit,
-    const std::tuple<int, int, int> tile_bounds
+    const std::tuple<int, int, int> tile_bounds,
+    bool print
 );
 
 std::tuple<

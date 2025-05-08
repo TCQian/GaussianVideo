@@ -295,7 +295,7 @@ def project_gaussians_forward(
 
 
 def map_gaussian_to_intersects(
-    num_points, xys, depths, radii, cum_tiles_hit, tile_bounds
+    num_points, xys, depths, radii, cum_tiles_hit, tile_bounds, print
 ):
     num_intersects = cum_tiles_hit[-1]
     isect_ids = torch.zeros(num_intersects, dtype=torch.int64, device=xys.device)

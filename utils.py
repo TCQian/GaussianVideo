@@ -240,7 +240,7 @@ def save_frames(frames: list[np.ndarray], save_dir: str):
 
 
 ## Create pt file to record the predefined parameters
-def save_and_load_gaussian(model, dim=3, file_path: str):
+def save_and_load_gaussian(model, dim=3, file_path: str=""):
     try:
         if not os.path.exists(file_path):
             print(f"[INFO] Gaussian parameters not found at {file_path}, generating new ones.")
@@ -274,7 +274,7 @@ def save_and_load_gaussian(model, dim=3, file_path: str):
     data["features_dc"] = data["features_dc"][:required_gaussians]
 
     # Check the loaded data, xyz must be within the range of -1 to 1, cholesky and features_dc must be within range of 0 to 1
-    assert torch.all(data["xyz"] >= -1.0) and torch.all(data["xyz"] <= 1.0), "xyz values are out of range [-1, 1]."
+    # assert torch.all(data["xyz"] >= -1.0) and torch.all(data["xyz"] <= 1.0), "xyz values are out of range [-1, 1]." # this was map by arctanh so it is not in the range of -1 to 1
     assert torch.all(data["cholesky"] >= 0.0) and torch.all(data["cholesky"] <= 1.0), "Cholesky values are out of range [0, 1]."
     assert torch.all(data["features_dc"] >= 0.0) and torch.all(data["features_dc"] <= 1.0), "Features DC values are out of range [0, 1]."
     assert data["xyz"].shape[0] == required_gaussians, "Loaded Gaussians do not match the required number."

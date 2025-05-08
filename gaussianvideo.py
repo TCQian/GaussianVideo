@@ -39,12 +39,13 @@ class GaussianVideo(nn.Module):
         # Color
         self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
 
-        data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
+        with torch.no_grad():
+            data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
 
         if data is not None:
-            self._xyz.data = data["xyz"].to(self.device)
-            self._cholesky.data = data["cholesky"].to(self.device)
-            self._features_dc.data = data["features_dc"].to(self.device)
+            self._xyz = nn.Parameter(data["xyz"])
+            self._cholesky = nn.Parameter(data["cholesky"])
+            self._features_dc = nn.Parameter(data["features_dc"])
         else:
             raise ValueError("Failed to load Gaussian parameters.")
 

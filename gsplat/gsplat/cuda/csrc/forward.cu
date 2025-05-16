@@ -106,7 +106,7 @@ __global__ void map_gaussian_to_intersects(
     const int* __restrict__ radii,
     const int32_t* __restrict__ cum_tiles_hit,
     const dim3 tile_bounds,
-    bool print // printf or not
+    const bool print, // printf or not
     int64_t* __restrict__ isect_ids,
     int32_t* __restrict__ gaussian_ids,
 ) {
@@ -950,7 +950,7 @@ __global__ void map_gaussian_to_intersects_video(
     const int* __restrict__ radii, // (9000, 1) (radius of gaussians)
     const int32_t* __restrict__ cum_tiles_hit, // (the cumulative tiles hit array)
     const dim3 tile_bounds, // (120, 68, 50)
-    bool print, // printf or not
+    const bool print, // printf or not
     // Outputs
     int64_t* __restrict__ isect_ids,
     int32_t* __restrict__ gaussian_ids

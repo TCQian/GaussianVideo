@@ -108,7 +108,7 @@ __global__ void map_gaussian_to_intersects(
     const dim3 tile_bounds,
     const bool print, // printf or not
     int64_t* __restrict__ isect_ids,
-    int32_t* __restrict__ gaussian_ids,
+    int32_t* __restrict__ gaussian_ids
 ) {
     unsigned idx = cg::this_grid().thread_rank();
     if (idx >= num_points)

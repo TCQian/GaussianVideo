@@ -265,7 +265,7 @@ def save_and_load_gaussian(model, dim=3, file_path: str=""):
     assert data["xyz"].shape[0] >= required_gaussians, "Loaded Gaussians are less than the required Gaussians."
     if dim == 2:
         data["xyz"] = data["xyz"][:required_gaussians, :2]
-        data["cholesky"] = data["cholesky"][:required_gaussians, :2, :2]
+        data["cholesky"] = data["cholesky"][:required_gaussians, [0, 1, 3]]
     elif dim == 3:
         data["xyz"] = data["xyz"][:required_gaussians]
         data["cholesky"] = data["cholesky"][:required_gaussians]

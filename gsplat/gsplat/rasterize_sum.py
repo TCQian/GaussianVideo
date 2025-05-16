@@ -258,4 +258,5 @@ class _RasterizeGaussiansSum(Function):
             None,  # block_h
             None,  # background
             None,  # return_alpha
+            None,  # to_print
         )

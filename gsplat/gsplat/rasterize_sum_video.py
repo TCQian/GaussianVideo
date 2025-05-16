@@ -272,4 +272,5 @@ class _RasterizeGaussiansSumVideo(Function):
             None,  # block_t
             None,  # background
             None,  # return_alpha
+            None,  # to_print
         )

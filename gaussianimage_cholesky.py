@@ -29,7 +29,7 @@ class GaussianImage_Cholesky(nn.Module):
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 3))
         self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
 
-        data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
+        data = save_and_load_gaussian(self, dim=2, file_path="params_500k.pth")
 
         if data is not None:
             self._xyz.data = data["xyz"].to(self.device)

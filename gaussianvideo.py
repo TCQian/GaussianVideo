@@ -97,12 +97,17 @@ class GaussianVideo(nn.Module):
     
     def forward(self):
         # print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(xyz=self.get_xyz, cholesky=self.get_cholesky_elements))
+        if self.debug_mode:
+            for i in range(3):
+                xys = self._xyz[i].detach().cpu().numpy()
+                cholesky = self.get_cholesky_elements[i].detach().cpu().numpy()
+                print(f"[Iteration] Before projection, Gaussian {i} at xyz: {xys.tolist()}, cholesky: {cholesky.tolist()}")
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
         if self.debug_mode:
             for i in range(3):
-                xys = self.get_xyz[i].detach().cpu().numpy()
+                xys = self._xyz[i].detach().cpu().numpy()
                 conic = conics[i].detach().cpu().numpy()
                 cholesky = self.get_cholesky_elements[i].detach().cpu().numpy()
                 print(f"[Iteration] In projection, Gaussian {i} at xyz: {xys.tolist()}, conic: {conic.tolist()}, cholesky: {cholesky.tolist()}")

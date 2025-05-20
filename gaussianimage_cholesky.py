@@ -79,11 +79,6 @@ class GaussianImage_Cholesky(nn.Module):
         return self._cholesky+self.cholesky_bound
 
     def forward(self):
-        if self.debug_mode:
-            for i in range(3):
-                xys = self._xyz[i].detach().cpu().numpy()
-                cholesky = self.get_cholesky_elements[i].detach().cpu().numpy()
-                print(f"[Iteration] Before projection, Gaussian {i} at xyz: {xys.tolist()}, cholesky: {cholesky.tolist()}")
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_2d(self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.tile_bounds)
         if self.debug_mode:
             for i in range(3):

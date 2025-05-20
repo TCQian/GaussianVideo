@@ -46,6 +46,7 @@ class GaussianVideo(nn.Module):
             self._xyz = nn.Parameter(data["xyz"])
             self._cholesky = nn.Parameter(data["cholesky"])
             self._features_dc = nn.Parameter(data["features_dc"])
+            print(f"Loaded Gaussian 0, xyz: {self._xyz[0].tolist()}, cholesky: {self._cholesky[0].tolist()}, features_dc: {self._features_dc[0].tolist()}")
         else:
             raise ValueError("Failed to load Gaussian parameters.")
 

@@ -32,9 +32,10 @@ class GaussianImage_Cholesky(nn.Module):
         data = save_and_load_gaussian(self, dim=2, file_path="params_500k.pth")
 
         if data is not None:
-            self._xyz.data = data["xyz"].to(self.device)
-            self._cholesky.data = data["cholesky"].to(self.device)
-            self._features_dc.data = data["features_dc"].to(self.device)
+            self._xyz = nn.Parameter(data["xyz"])
+            self._cholesky = nn.Parameter(data["cholesky"])
+            self._features_dc = nn.Parameter(data["features_dc"])
+            print(f"Loaded Gaussian 0, xyz: {self._xyz[0].tolist()}, cholesky: {self._cholesky[0].tolist()}, features_dc: {self._features_dc[0].tolist()}")
         else:
             raise ValueError("Failed to load Gaussian parameters.")
 

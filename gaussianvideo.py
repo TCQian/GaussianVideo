@@ -102,9 +102,10 @@ class GaussianVideo(nn.Module):
         )
         if self.debug_mode:
             for i in range(3):
+                xys = self.xys[i].detach().cpu().numpy()
                 conic = conics[i].detach().cpu().numpy()
                 cholesky = self.get_cholesky_elements[i].detach().cpu().numpy()
-                print(f"[Iteration] In projection, Gaussian {i}, conic: {conic.tolist()}, cholesky: {cholesky.tolist()}")
+                print(f"[Iteration] In projection, Gaussian {i} at xyz: {xys.tolist()}, conic: {conic.tolist()}, cholesky: {cholesky.tolist()}")
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,
             self.get_features, self._opacity, self.H, self.W, self.T,

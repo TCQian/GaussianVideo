@@ -125,10 +125,6 @@ class _RasterizeGaussiansSumVideo(Function):
         block = (BLOCK_X, BLOCK_Y, BLOCK_Z) # (16, 16, 1)
         img_size = (img_width, img_height, video_length) # (1920, 1080, 50)
 
-        # print the conic shape
-        if to_print:
-            print(f"[Iteration] In rasterization, conic shape: {conics[:3].detach().cpu().numpy().tolist()}")
-
         # Computes the cumulative intersects and total number of tile intersections
         # For example, if there are 2 gaussians, where the first intersect 100 tiles,
         # and the second tile intersects 50 tiles, then the final output would be:

@@ -79,6 +79,11 @@ class GaussianImage_Cholesky(nn.Module):
 
     def forward(self):
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_2d(self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.tile_bounds)
+        if self.debug_mode:
+            for i in range(3):
+                conic = conics[i].detach().cpu().numpy()
+                cholesky = self.get_cholesky_elements[i].detach().cpu().numpy()
+                print(f"[Iteration] In projection, Gaussian {i}, conic: {conic.tolist()}, cholesky: {cholesky.tolist()}")
         out_img = rasterize_gaussians_sum(self.xys, depths, self.radii, conics, num_tiles_hit,
                 self.get_features, self._opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False, to_print=self.debug_mode)
         out_img = torch.clamp(out_img, 0, 1) #[H, W, 3]

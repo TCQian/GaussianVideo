@@ -119,10 +119,6 @@ class _RasterizeGaussiansSum(Function):
         block = (BLOCK_X, BLOCK_Y, 1)
         img_size = (img_width, img_height, 1)
 
-        # print the conic shape
-        if to_print:
-            print(f"[Iteration] In rasterization, conic shape: {conics[:3].detach().cpu().numpy().tolist()}")
-
         num_intersects, cum_tiles_hit = compute_cumulative_intersects(num_tiles_hit)
 
         if num_intersects < 1:

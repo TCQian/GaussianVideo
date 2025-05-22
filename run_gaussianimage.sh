@@ -7,13 +7,13 @@
 #SBATCH --mail-user=e0407638@u.nus.edu   # Email for notifications
 
 source ~/.bashrc
-conda activate gv_h100
+conda activate gv
 cd gsplat
 pip install .[dev]
 cd ..
 
 # Define variables for easy updating.
-DATA_NAME="Beauty"
+DATA_NAME="HoneyBee"
 MODEL_NAME="GaussianImage_Cholesky"
 NUM_POINTS=2250
 TRAIN_ITERATIONS=20000

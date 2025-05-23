@@ -642,7 +642,7 @@ __global__ void rasterize_forward_sum(
         final_color.x = pix_out.x; //+ T * background.x;
         final_color.y = pix_out.y; //+ T * background.y;
         final_color.z = pix_out.z; //+ T * background.z;
-        printf(pix_id, out_img[pix_id]);
+        printf("pix_id: %d, out_img: (%f, %f, %f)\n", pix_id, out_img[pix_id].x, out_img[pix_id].y, out_img[pix_id].z);
         out_img[pix_id] = final_color;
     }
 }
@@ -1116,7 +1116,7 @@ __global__ void rasterize_forward_sum_video(
         final_color.x = pix_out.x;
         final_color.y = pix_out.y;
         final_color.z = pix_out.z;
-        printf(pix_id, out_img[pix_id]);
+        printf("pix_id: %d, out_img: (%f, %f, %f)\n", pix_id, out_img[pix_id].x, out_img[pix_id].y, out_img[pix_id].z);
         out_img[pix_id] = final_color;
         // printf("[DEBUG] Inside voxel (i=%u, j=%u, k=%u), color=(%.2f, %.2f, %.2f)\n",
         //        i, j, k, final_color.x, final_color.y, final_color.z);

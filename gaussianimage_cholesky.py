@@ -80,13 +80,13 @@ class GaussianImage_Cholesky(nn.Module):
 
     def forward(self):
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_2d(self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.tile_bounds)
-        if self.debug_mode:
-            for i in range(3):
-                # xys = self._xyz[i].detach().cpu().numpy()
-                conic = conics[i].detach().cpu().numpy()
-                cholesky = self.get_cholesky_elements[i].detach().cpu().numpy()
-                color = self.get_features[i].detach().cpu().numpy()
-                print(f"[Iteration] In projection, Gaussian {i} at xyz: {[0, 0, 0]}, conic: {conic.tolist()}, cholesky: {cholesky.tolist()}, color: {color.tolist()}")
+        # if self.debug_mode:
+        #     for i in range(3):
+        #         # xys = self._xyz[i].detach().cpu().numpy()
+        #         conic = conics[i].detach().cpu().numpy()
+        #         cholesky = self.get_cholesky_elements[i].detach().cpu().numpy()
+        #         color = self.get_features[i].detach().cpu().numpy()
+        #         print(f"[Iteration] In projection, Gaussian {i} at xyz: {[0, 0, 0]}, conic: {conic.tolist()}, cholesky: {cholesky.tolist()}, color: {color.tolist()}")
         out_img = rasterize_gaussians_sum(self.xys, depths, self.radii, conics, num_tiles_hit,
                 self.get_features, self._opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False, to_print=self.debug_mode)
         out_img = torch.clamp(out_img, 0, 1) #[H, W, 3]
@@ -102,6 +102,15 @@ class GaussianImage_Cholesky(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / mse_loss.item())
 
+        with torch.no_grad():
+            grad = self._cholesky.grad  # shape: [num_points, 6]
+            for i in range(min(3, self._cholesky.shape[0])):  # print first 3 Gaussians
+                grad_i = grad[i]
+                cholesky_bef_i = self._cholesky[i]
+                cholesky_aft_i = self.get_cholesky_elements[i]
+                print(f"Gaussian {i} grad: l11={cholesky_bef_i[0]} + {self.cholesky_bound[0]} = {cholesky_aft_i[0]}, v_l11={grad_i[0].item():.4e}, "
+                        f"l12={cholesky_bef_i[1]} + {self.cholesky_bound[1]} = {cholesky_aft_i[1]}, v_l12={grad_i[1].item():.4e}, "
+                        f"l22={cholesky_bef_i[2]} + {self.cholesky_bound[2]} = {cholesky_aft_i[2]}, v_l22={grad_i[2].item():.4e}, ")
         # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
         # for name, param in self.named_parameters():
         #     if param.grad is not None:

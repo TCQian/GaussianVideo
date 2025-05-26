@@ -121,11 +121,11 @@ __global__ void map_gaussian_to_intersects(
     get_tile_bbox(center, radii[idx], tile_bounds, tile_min, tile_max);
     
     // print first 3 gaussian's info
-    // if (print && (idx < 3)) {
-    //     printf("Gaussian %d: center (%f, %f), radius %d, tile_min (%d, %d), tile_max (%d, %d)\n",
-    //            idx, center.x, center.y, radii[idx], tile_min.x, tile_min.y,
-    //            tile_max.x, tile_max.y);
-    // }
+    if (print && (idx < 3)) {
+        printf("Gaussian %d: center (%f, %f), radius %d, tile_min (%d, %d), tile_max (%d, %d)\n",
+               idx, center.x, center.y, radii[idx], tile_min.x, tile_min.y,
+               tile_max.x, tile_max.y);
+    }
     
     // update the intersection info for all tiles this gaussian hits
     int32_t cur_idx = (idx == 0) ? 0 : cum_tiles_hit[idx - 1];
@@ -967,11 +967,11 @@ __global__ void map_gaussian_to_intersects_video(
     get_tile_3d_bbox(center, radii[idx], tile_bounds, tile_min, tile_max);
 
     // print first 3 gaussian's info
-    // if (print && (idx < 3)) {
-    //     printf("Gaussian %d: center (%f, %f, %f), radius %d, tile_min (%d, %d, %d), tile_max (%d, %d, %d)\n",
-    //            idx, center.x, center.y, center.z, radii[idx], tile_min.x, tile_min.y, tile_min.z,
-    //            tile_max.x, tile_max.y, tile_max.z);
-    // }
+    if (print && (idx < 3)) {
+        printf("Gaussian %d: center (%f, %f, %f), radius %d, tile_min (%d, %d, %d), tile_max (%d, %d, %d)\n",
+               idx, center.x, center.y, center.z, radii[idx], tile_min.x, tile_min.y, tile_min.z,
+               tile_max.x, tile_max.y, tile_max.z);
+    }
     
    // Update the intersection info for all tiles this Gaussian hits
     int32_t cur_idx = (idx == 0) ? 0 : cum_tiles_hit[idx - 1];

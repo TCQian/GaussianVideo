@@ -67,17 +67,6 @@ __global__ void project_gaussians_video_backward_kernel(
     v_L_elements[idx].u = grad_l_32; // for l32
     v_L_elements[idx].v = grad_l_33; // for l33
 
-    if (idx < 3) // Print only the first 3 for debugging
-        printf("L_elements[%d]: %f, %f, %f, %f, %f, %f\n", idx, 
-            L_elements[idx].x, L_elements[idx].y, L_elements[idx].z,
-            L_elements[idx].w, L_elements[idx].u, L_elements[idx].v);
-        printf("v_cov2d[%d]: %f, %f, %f, %f, %f, %f\n", idx, 
-            v_cov2d[idx].x, v_cov2d[idx].y, v_cov2d[idx].z,
-            v_cov2d[idx].w, v_cov2d[idx].u, v_cov2d[idx].v);
-        printf("v_L_elements[%d]: %f, %f, %f, %f, %f, %f\n", idx, 
-            v_L_elements[idx].x, v_L_elements[idx].y, v_L_elements[idx].z,
-            v_L_elements[idx].w, v_L_elements[idx].u, v_L_elements[idx].v);
-
     v_mean2d[idx].x = v_xy[idx].x * (0.5f * img_size.x);
     v_mean2d[idx].y = v_xy[idx].y * (0.5f * img_size.y);
     v_mean2d[idx].z = v_xy[idx].z * (0.5f * img_size.z);

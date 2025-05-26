@@ -45,11 +45,6 @@ __global__ void project_gaussians_2d_backward_kernel(
     v_L_elements[idx].y = grad_l_21;
     v_L_elements[idx].z = grad_l_22;
 
-    if (idx < 3) // Print only the first 3 for debugging
-        printf("l_elements[%d]: %f, %f, %f\n", idx, L_elements[idx].x, L_elements[idx].y, L_elements[idx].z);
-        printf("v_cov2d[%d]: %f, %f, %f\n", idx, v_cov2d[idx].x, v_cov2d[idx].y, v_cov2d[idx].z);
-        printf("v_L_elements[%d]: %f, %f, %f\n", idx, v_L_elements[idx].x, v_L_elements[idx].y, v_L_elements[idx].z);
-
     v_mean2d[idx].x = v_xy[idx].x * (0.5f * img_size.x);
     v_mean2d[idx].y = v_xy[idx].y * (0.5f * img_size.y);
 

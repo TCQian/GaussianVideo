@@ -100,13 +100,13 @@ class GaussianVideo(nn.Module):
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
-        # if self.debug_mode:
-        #     for i in range(3):
-        #         # xys = self._xyz[i].detach().cpu().numpy()
-        #         conic = conics[i].detach().cpu().numpy()
-        #         cholesky = self.get_cholesky_elements[i].detach().cpu().numpy()
-        #         color = self.get_features[i].detach().cpu().numpy()
-        #         print(f"[Iteration] In projection, Gaussian {i} at xyz: {[0, 0, 0]}, conic: {conic.tolist()}, cholesky: {cholesky.tolist()}, color: {color.tolist()}")
+        if self.debug_mode:
+            for i in range(3):
+                # xys = self._xyz[i].detach().cpu().numpy()
+                conic = conics[i].detach().cpu().numpy()
+                cholesky = self.get_cholesky_elements[i].detach().cpu().numpy()
+                color = self.get_features[i].detach().cpu().numpy()
+                print(f"[Iteration] In projection, Gaussian {i} at xyz: {[0, 0, 0]}, conic: {conic.tolist()}, cholesky: {cholesky.tolist()}, color: {color.tolist()}")
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,
             self.get_features, self._opacity, self.H, self.W, self.T,
@@ -140,19 +140,18 @@ class GaussianVideo(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
-        with torch.no_grad():
-            grad = self._cholesky.grad  # shape: [num_points, 6]
-            for i in range(min(3, self._cholesky.shape[0])):  # print first 3 Gaussians
-                grad_i = grad[i]
-                cholesky_bef_i = self._cholesky[i]
-                cholesky_aft_i = self.get_cholesky_elements[i]
-                print(f"Gaussian {i} grad: l11={cholesky_bef_i[0]} + {self.cholesky_bound[0]} = {cholesky_aft_i[0]}, v_l11={grad_i[0].item():.4e}, "
-                        f"l12={cholesky_bef_i[1]} + {self.cholesky_bound[1]} = {cholesky_aft_i[1]}, v_l12={grad_i[1].item():.4e}, "
-                        f"l13={cholesky_bef_i[2]} + {self.cholesky_bound[2]} = {cholesky_aft_i[2]}, v_l13={grad_i[2].item():.4e}, "
-                        f"l21={cholesky_bef_i[3]} + {self.cholesky_bound[3]} = {cholesky_aft_i[3]}, v_l21={grad_i[3].item():.4e}, "
-                        f"l22={cholesky_bef_i[4]} + {self.cholesky_bound[4]} = {cholesky_aft_i[4]}, v_l22={grad_i[4].item():.4e}, "
-                        f"l23={cholesky_bef_i[5]} + {self.cholesky_bound[5]} = {cholesky_aft_i[5]}, v_l23={grad_i[5].item():.4e}, "
-                        f"l33={cholesky_bef_i[5]} + {self.cholesky_bound[5]} = {cholesky_aft_i[5]}, v_l33={grad_i[5].item():.4e}")
+        # with torch.no_grad():
+        #     grad = self._cholesky.grad  # shape: [num_points, 6]
+        #     for i in range(min(3, self._cholesky.shape[0])):  # print first 3 Gaussians
+        #         grad_i = grad[i]
+        #         cholesky_bef_i = self._cholesky[i]
+        #         cholesky_aft_i = self.get_cholesky_elements[i]
+        #         print(f"Gaussian {i} grad: l11={cholesky_bef_i[0]} + {self.cholesky_bound[0][0]} = {cholesky_aft_i[0]}, v_l11={grad_i[0].item():.4e}, "
+        #                 f"l12={cholesky_bef_i[1]} + {self.cholesky_bound[0][1]} = {cholesky_aft_i[1]}, v_l12={grad_i[1].item():.4e}, "
+        #                 f"l13={cholesky_bef_i[2]} + {self.cholesky_bound[0][2]} = {cholesky_aft_i[2]}, v_l13={grad_i[2].item():.4e}, "
+        #                 f"l22={cholesky_bef_i[3]} + {self.cholesky_bound[0][3]} = {cholesky_aft_i[3]}, v_l21={grad_i[3].item():.4e}, "
+        #                 f"l23={cholesky_bef_i[4]} + {self.cholesky_bound[0][4]} = {cholesky_aft_i[4]}, v_l22={grad_i[4].item():.4e}, "
+        #                 f"l33={cholesky_bef_i[5]} + {self.cholesky_bound[0][5]} = {cholesky_aft_i[5]}, v_l23={grad_i[5].item():.4e}, ")
 
         # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
         # for name, param in self.named_parameters():

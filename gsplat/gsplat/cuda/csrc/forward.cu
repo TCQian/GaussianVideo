@@ -1093,10 +1093,10 @@ __global__ void rasterize_forward_sum_video(
             // }
 
             if (sigma < 0.f || alpha < 1.f / 255.f) {
-                if (print) {
-                    // Print debug info for skipped Gaussians
-                    printf("[Skipped] Gaussian are skipped due to sigma=%.6f or alpha=%.6f\n", sigma, alpha);
-                }
+                // if (print) {
+                //     // Print debug info for skipped Gaussians
+                //     printf("[Skipped] Gaussian are skipped due to sigma=%.6f or alpha=%.6f\n", sigma, alpha);
+                // }
                 // printf("[DEBUG] Gaussians at i=%u, j=%u, k=%u are skipped due to sigma=%.6f or alpha=%.6f\n", i, j, k, sigma, alpha);
                 continue;
             }

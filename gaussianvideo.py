@@ -115,7 +115,7 @@ class GaussianVideo(nn.Module):
             self.xys, depths, self.radii, conics, num_tiles_hit,
             self.get_features, self._opacity, self.H, self.W, self.T,
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
-            background=self.background, return_alpha=False, to_print=False#self.debug_mode
+            background=self.background, return_alpha=False, to_print=self.debug_mode
         )
         # if self.debug_mode:
             # radii_np = self.radii.detach().cpu().numpy()

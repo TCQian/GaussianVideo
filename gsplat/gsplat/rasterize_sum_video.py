@@ -156,7 +156,7 @@ class _RasterizeGaussiansSumVideo(Function):
                 radii,
                 cum_tiles_hit,
                 tile_bounds,
-                to_print
+                False # to_print
             )
             rasterize_fn = _C.rasterize_sum_forward_video
             

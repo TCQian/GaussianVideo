@@ -1157,7 +1157,7 @@ __global__ void rasterize_forward_sum_video(
         //        i, j, k, final_color.x, final_color.y, final_color.z);
     } else {
         if (print && tile_id == 670) {
-            total_skipped = local_skipped_sigma + local_skipped_alpha;
+            int total_skipped = local_skipped_sigma + local_skipped_alpha;
             // print n/total for sigma<0 and m/total for alpha<1/255 and the average deltas and conics
             printf("Tile %d: i=%u, j=%u, k=%u, total=%d, skipped_sigma=%d, skipped_alpha=%d\n, avg_delta=(%.6f, %.6f, %.6f), avg_conic=(%.6f, %.6f, %.6f, %.6f, %.6f, %.6f)\n",
                    tile_id, i, j, k, local_total, local_skipped_sigma, local_skipped_alpha, 

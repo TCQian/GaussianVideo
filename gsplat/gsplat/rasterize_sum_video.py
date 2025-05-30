@@ -171,6 +171,7 @@ class _RasterizeGaussiansSumVideo(Function):
                 colors,
                 opacity,
                 background,
+                to_print
             )
             
         ctx.img_width = img_width

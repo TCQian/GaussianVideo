@@ -1004,6 +1004,7 @@ __global__ void rasterize_forward_sum_video(
     int* __restrict__ final_index,       // Index of the last Gaussian affecting each voxel
     float3* __restrict__ out_img,        // Output 3D image colors
     const float3& __restrict__ background // Background color
+    const bool print // printf or not
 ) {
     // printf("Starting rasterize_forward_sum_video\n");
     // Map each thread to a specific voxel within a tile
@@ -1039,6 +1040,22 @@ __global__ void rasterize_forward_sum_video(
     int cur_idx = 0;
     int tr = block.thread_rank();
     float3 pix_out = {0.f, 0.f, 0.f};
+
+    // Initialize counter for skipped Gaussians
+    int local_total = 0;
+    int local_skipped_sigma = 0;
+    int local_skipped_alpha = 0;
+
+    // average of delta_x, delta_y, delta_z, and conic parameters
+    float avg_delta_x = 0.f;
+    float avg_delta_y = 0.f;
+    float avg_delta_z = 0.f;
+    float avg_conic_x = 0.f;
+    float avg_conic_y = 0.f;
+    float avg_conic_z = 0.f;
+    float avg_conic_w = 0.f;
+    float avg_conic_u = 0.f;
+    float avg_conic_v = 0.f;
 
     // Loop through Gaussian batches for this tile
     for (int b = 0; b < num_batches; ++b) {
@@ -1091,8 +1108,28 @@ __global__ void rasterize_forward_sum_video(
             //         sigma, alpha);
             // }
 
+            local_total++;
+
+            if (sigma < 0.f) {
+                local_skipped_sigma++;
+                // continue;
+            }
+            if (alpha < 1.f / 255.f) {
+                local_skipped_alpha++;
+                // continue;
+            }
+
             if (sigma < 0.f || alpha < 1.f / 255.f) {
                 // printf("[DEBUG] Gaussians at i=%u, j=%u, k=%u are skipped due to sigma=%.6f or alpha=%.6f\n", i, j, k, sigma, alpha);
+                avg_delta_x += delta.x;
+                avg_delta_y += delta.y;
+                avg_delta_z += delta.z;
+                avg_conic_x += conic.x;
+                avg_conic_y += conic.y;
+                avg_conic_z += conic.z;
+                avg_conic_w += conic.w;
+                avg_conic_u += conic.u;
+                avg_conic_v += conic.v;
                 continue;
             }
 
@@ -1119,6 +1156,21 @@ __global__ void rasterize_forward_sum_video(
         // printf("[DEBUG] Inside voxel (i=%u, j=%u, k=%u), color=(%.2f, %.2f, %.2f)\n",
         //        i, j, k, final_color.x, final_color.y, final_color.z);
     } else {
+        if (print && tile_id == 670) {
+            total_skipped = local_skipped_sigma + local_skipped_alpha;
+            // print n/total for sigma<0 and m/total for alpha<1/255 and the average deltas and conics
+            printf("Tile %d: i=%u, j=%u, k=%u, total=%d, skipped_sigma=%d, skipped_alpha=%d\n, avg_delta=(%.6f, %.6f, %.6f), avg_conic=(%.6f, %.6f, %.6f, %.6f, %.6f, %.6f)\n",
+                   tile_id, i, j, k, local_total, local_skipped_sigma, local_skipped_alpha, 
+                   avg_delta_x / total_skipped,
+                   avg_delta_y / total_skipped,
+                   avg_delta_z / total_skipped,
+                   avg_conic_x / total_skipped,
+                   avg_conic_y / total_skipped,
+                   avg_conic_z / total_skipped,
+                   avg_conic_w / total_skipped,
+                   avg_conic_u / total_skipped,
+                   avg_conic_v / total_skipped); 
+        }
         // printf("Outside voxel (i=%u, j=%u, k=%u)\n", i, j, k);
     }
 }

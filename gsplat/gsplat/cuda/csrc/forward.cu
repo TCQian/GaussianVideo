@@ -1003,7 +1003,7 @@ __global__ void rasterize_forward_sum_video(
     float* __restrict__ final_Ts,        // Final transmittance for each voxel
     int* __restrict__ final_index,       // Index of the last Gaussian affecting each voxel
     float3* __restrict__ out_img,        // Output 3D image colors
-    const float3& __restrict__ background // Background color
+    const float3& __restrict__ background, // Background color
     const bool print // printf or not
 ) {
     // printf("Starting rasterize_forward_sum_video\n");

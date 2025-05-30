@@ -72,6 +72,9 @@ __global__ void project_gaussians_video_forward_kernel(
     // radius is in pixel space
     bool ok = compute_cov3d_bounds(cov3d, conic, radius);
     if (!ok) {
+        printf("Gaussian %d with L_elements (%.2f, %.2f, %.2f, %.2f, %.2f, %.2f) has zero determinant.\n",
+               idx, L_elements[idx].x, L_elements[idx].y, L_elements[idx].z,
+               L_elements[idx].w, L_elements[idx].u, L_elements[idx].v);
         return; // zero determinant
     }
 

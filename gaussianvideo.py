@@ -102,7 +102,7 @@ class GaussianVideo(nn.Module):
         )
         
         if self.debug_mode:
-            avg_radius = self.radii.mean().item()
+            avg_radius = self.radii.float().mean().item()
             avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
             print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average conic: {avg_conic.tolist()}")
             # for i in range(3):

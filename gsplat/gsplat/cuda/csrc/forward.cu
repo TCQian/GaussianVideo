@@ -1153,9 +1153,7 @@ __global__ void rasterize_forward_sum_video(
         final_color.y = pix_out.y;
         final_color.z = pix_out.z;
         out_img[pix_id] = final_color;
-        // printf("[DEBUG] Inside voxel (i=%u, j=%u, k=%u), color=(%.2f, %.2f, %.2f)\n",
-        //        i, j, k, final_color.x, final_color.y, final_color.z);
-    } else {
+
         if (print && tile_id == 670) {
             int total_skipped = local_skipped_sigma + local_skipped_alpha;
             // print n/total for sigma<0 and m/total for alpha<1/255 and the average deltas and conics
@@ -1171,6 +1169,9 @@ __global__ void rasterize_forward_sum_video(
                    avg_conic_u / total_skipped,
                    avg_conic_v / total_skipped); 
         }
+        // printf("[DEBUG] Inside voxel (i=%u, j=%u, k=%u), color=(%.2f, %.2f, %.2f)\n",
+        //        i, j, k, final_color.x, final_color.y, final_color.z);
+    } else {
         // printf("Outside voxel (i=%u, j=%u, k=%u)\n", i, j, k);
     }
 }

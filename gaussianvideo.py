@@ -103,8 +103,9 @@ class GaussianVideo(nn.Module):
         
         if self.debug_mode:
             avg_radius = self.radii.float().mean().item()
+            avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
             avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
-            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average conic: {avg_conic.tolist()}")
+            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}")
             # for i in range(3):
             #     # xys = self._xyz[i].detach().cpu().numpy()
             #     conic = conics[i].detach().cpu().numpy()

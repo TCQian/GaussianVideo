@@ -497,10 +497,10 @@ inline __device__ void cov3d_to_conic_vjp(
     glm::mat3 v_Sigma = -X * G * X;
 
     // Store the results in v_cov3d
-    v_cov3d.x = v_Sigma[0][0];                      // d/dCxx
-    v_cov3d.y = v_Sigma[1][0] + v_Sigma[0][1];        // d/dCxy
-    v_cov3d.z = v_Sigma[2][0] + v_Sigma[0][2];        // d/dCxz
-    v_cov3d.w = v_Sigma[1][1];                        // d/dCyy
-    v_cov3d.u = v_Sigma[2][1] + v_Sigma[1][2];        // d/dCyz
-    v_cov3d.v = v_Sigma[2][2];                        // d/dCzz
+    v_cov3d.x = 1.5*(v_Sigma[0][0]);                      // d/dCxx
+    v_cov3d.y = (v_Sigma[1][0] + v_Sigma[0][1]);        // d/dCxy
+    v_cov3d.z = (v_Sigma[2][0] + v_Sigma[0][2]);        // d/dCxz
+    v_cov3d.w = 1.5*(v_Sigma[1][1]);                        // d/dCyy
+    v_cov3d.u = (v_Sigma[2][1] + v_Sigma[1][2]);        // d/dCyz
+    v_cov3d.v = 1.5*(v_Sigma[2][2]);                        // d/dCzz
 }

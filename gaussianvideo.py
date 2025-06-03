@@ -145,6 +145,16 @@ class GaussianVideo(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
+        if self.debug_mode:
+            # average_grad across all Gaussians, 6 average gradients
+            avg_cholesky = self._cholesky.grad.mean(dim=0)
+            print("[Gradient] Average gradient for cholesky parameters: {avg_cholesky}".format(avg_cholesky=avg_cholesky.tolist()))
+            avg_xyz = self._xyz.grad.mean(dim=0)
+            print("[Gradient] Average gradient for xyz parameters: {avg_xyz}".format(avg_xyz=avg_xyz.tolist()))
+            avg_features = self._features_dc.grad.mean(dim=0)
+            print("[Gradient] Average gradient for features: {avg_features}".format(avg_features=avg_features.tolist()))
+            avg_opacity = self._opacity.grad.mean(dim=0)
+            print("[Gradient] Average gradient for opacity: {avg_opacity}".format(avg_opacity=avg_opacity.tolist()))
         # with torch.no_grad():
         #     grad = self._cholesky.grad  # shape: [num_points, 6]
         #     for i in range(min(3, self._cholesky.shape[0])):  # print first 3 Gaussians

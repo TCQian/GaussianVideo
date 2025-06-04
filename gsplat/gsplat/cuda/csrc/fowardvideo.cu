@@ -57,12 +57,12 @@ __global__ void project_gaussians_video_forward_kernel(
 
     // Construct the 3x3 covariance matrix
     float6 cov3d = {
-        (l11*l11) * 1.5,                            // Cxx
+        (l11*l11), //* 1.5,                            // Cxx
         l11*l21,                            // Cxy
         l11*l31,                            // Cxz
-        (l21*l21 + l22*l22) * 1.5,                // Cyy
+        (l21*l21 + l22*l22), //* 1.5,                // Cyy
         (l21*l31 + l22*l32),                // Cyz
-        (l31*l31 + l32*l32 + l33*l33) * 1.5       // Czz
+        (l31*l31 + l32*l32 + l33*l33) //* 1.5       // Czz
     };
     
     float6 conic;

@@ -63,7 +63,7 @@ class GaussianVideo(nn.Module):
         self.rgb_activation = torch.sigmoid
         self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))
         # self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5]).view(1, 3))
-        self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
+        # self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
         
         if self.quantize:
             self.xyz_quantizer = FakeQuantizationHalf.apply 
@@ -167,10 +167,11 @@ class GaussianVideo(nn.Module):
         #                 f"l33={cholesky_bef_i[5]} + {self.cholesky_bound[0][5]} = {cholesky_aft_i[5]}, v_l23={grad_i[5].item():.4e}, ")
 
         # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        for name, param in self.named_parameters():
-            if param.grad is not None:
-                grad_norm = param.grad.data.norm().item()
-                print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        # if self.debug_mode:
+        #     for name, param in self.named_parameters():
+        #         if param.grad is not None:
+        #             grad_norm = param.grad.data.norm().item()
+        #             print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

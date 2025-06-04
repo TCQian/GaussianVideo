@@ -53,8 +53,8 @@ class GaussianVideo(nn.Module):
         self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
-        with torch.no_grad():
-            self._cholesky.data[:, 5] += self.T  # adjust the constant as needed
+        #with torch.no_grad():
+        #    self._cholesky.data[:, 5] += self.T  # adjust the constant as needed
         
         self.last_size = (self.H, self.W, self.T)
         self.quantize = kwargs["quantize"]
@@ -93,7 +93,7 @@ class GaussianVideo(nn.Module):
     
     @property
     def get_cholesky_elements(self):
-        return self._cholesky + self.cholesky_bound
+        return self._cholesky #+ self.cholesky_bound
     
     def forward(self):
         # print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(xyz=self.get_xyz, cholesky=self.get_cholesky_elements))
@@ -145,16 +145,14 @@ class GaussianVideo(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
-        if self.debug_mode:
-            # average_grad across all Gaussians, 6 average gradients
-            avg_cholesky = self._cholesky.grad.mean(dim=0)
-            print("[Gradient] Average gradient for cholesky parameters: {avg_cholesky}".format(avg_cholesky=avg_cholesky.tolist()))
-            avg_xyz = self._xyz.grad.mean(dim=0)
-            print("[Gradient] Average gradient for xyz parameters: {avg_xyz}".format(avg_xyz=avg_xyz.tolist()))
-            avg_features = self._features_dc.grad.mean(dim=0)
-            print("[Gradient] Average gradient for features: {avg_features}".format(avg_features=avg_features.tolist()))
-            avg_opacity = self._opacity.grad.mean(dim=0)
-            print("[Gradient] Average gradient for opacity: {avg_opacity}".format(avg_opacity=avg_opacity.tolist()))
+        # if self.debug_mode:
+        #     # average_grad across all Gaussians, 6 average gradients
+        #     avg_cholesky = self._cholesky.grad.mean(dim=0)
+        #     print("[Gradient] Average gradient for cholesky parameters: {avg_cholesky}".format(avg_cholesky=avg_cholesky.tolist()))
+        #     avg_xyz = self._xyz.grad.mean(dim=0)
+        #     print("[Gradient] Average gradient for xyz parameters: {avg_xyz}".format(avg_xyz=avg_xyz.tolist()))
+        #     avg_features = self._features_dc.grad.mean(dim=0)
+        #     print("[Gradient] Average gradient for features: {avg_features}".format(avg_features=avg_features.tolist()))
         # with torch.no_grad():
         #     grad = self._cholesky.grad  # shape: [num_points, 6]
         #     for i in range(min(3, self._cholesky.shape[0])):  # print first 3 Gaussians
@@ -169,10 +167,10 @@ class GaussianVideo(nn.Module):
         #                 f"l33={cholesky_bef_i[5]} + {self.cholesky_bound[0][5]} = {cholesky_aft_i[5]}, v_l23={grad_i[5].item():.4e}, ")
 
         # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        # for name, param in self.named_parameters():
-        #     if param.grad is not None:
-        #         grad_norm = param.grad.data.norm().item()
-        #         print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        for name, param in self.named_parameters():
+            if param.grad is not None:
+                grad_norm = param.grad.data.norm().item()
+                print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

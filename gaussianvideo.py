@@ -86,6 +86,12 @@ class GaussianVideo(nn.Module):
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
+        if self.debug_mode:
+            avg_radius = self.radii.float().mean().item()
+            avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}")
+            
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,
             self.get_features, self._opacity, self.H, self.W, self.T,
@@ -119,11 +125,11 @@ class GaussianVideo(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
-        print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        for name, param in self.named_parameters():
-            if param.grad is not None:
-                grad_norm = param.grad.data.norm().item()
-                print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        # for name, param in self.named_parameters():
+        #     if param.grad is not None:
+        #         grad_norm = param.grad.data.norm().item()
+        #         print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

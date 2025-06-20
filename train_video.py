@@ -75,14 +75,14 @@ class VideoTrainer:
         self.gaussian_model.train()
         start_time = time.time()
         for iter in range(1, self.iterations+1):
-            if iter == self.iterations:
-                self.gaussian_model.debug_mode = True  # enable kernel logging
+            self.gaussian_model.debug_mode = ((iter == 1) or (iter % 10 == 0))  # enable kernel logging
 
             loss, psnr = self.gaussian_model.train_iter(self.gt_image)
             psnr_list.append(psnr)
             iter_list.append(iter)
             with torch.no_grad():
                 if iter % 10 == 0:
+                    print(f"iter:{iter}, loss:{loss.item()}, psnr:{psnr:.4f}")
                     progress_bar.set_postfix({f"Loss":f"{loss.item():.{7}f}", "PSNR":f"{psnr:.{4}f},"})
                     progress_bar.update(10)
         end_time = time.time() - start_time

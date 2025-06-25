@@ -103,7 +103,7 @@ class GaussianVideo(nn.Module):
             avg_radius = self.radii.float().mean().item()
             avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
             avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
-            avg_opacity = self.get_opacity.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            avg_opacity = self._opacity.float().mean().item()
             print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}, average opacity: {avg_opacity:.4f}")
             
         out_img = rasterize_gaussians_sum_video(

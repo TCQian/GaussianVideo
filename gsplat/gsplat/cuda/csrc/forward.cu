@@ -1092,7 +1092,7 @@ __global__ void rasterize_forward_sum_video(
             }
 
             int32_t g = id_batch[t];
-            const float vis = alpha;
+            const float vis = alpha * T;
             const float3 c = colors[g];
             pix_out.x = pix_out.x + c.x * vis;
             pix_out.y = pix_out.y + c.y * vis;

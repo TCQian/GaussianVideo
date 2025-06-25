@@ -1083,21 +1083,12 @@ __global__ void rasterize_forward_sum_video(
                 continue;
             }
 
-            const float next_T = T * (1.f - alpha);
-            if (next_T <= 1e-4f) { // this pixel is done
-                // we want to render the last gaussian that contributes and note
-                // that here idx > range.x so we don't underflow
-                done = true;
-                break;
-            }
-
             int32_t g = id_batch[t];
             const float vis = alpha;
             const float3 c = colors[g];
             pix_out.x = pix_out.x + c.x * vis;
             pix_out.y = pix_out.y + c.y * vis;
             pix_out.z = pix_out.z + c.z * vis;
-            T = next_T;
             cur_idx = batch_start + t;
         }
         done = true;

@@ -98,7 +98,7 @@ __global__ void project_gaussians_video_forward_kernel(
     num_tiles_hit[idx] = tile_volume; // Update to track 3D tiles
 
     // Useless value
-    depths[idx] = center.z;
+    depths[idx] = 0.0f;
 
     // printf("[DEBUG] Gaussian %d: center=(%.2f, %.2f, %.2f), radius=%d, conic=(%.2f, %.2f, %.2f, %.2f, %.2f, %.2f), num_tiles_hit=%d\n",
     //    idx, center.x, center.y, center.z, radii[idx], 

@@ -34,7 +34,8 @@ class GaussianVideo(nn.Module):
 
         # Covariance
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 6))
-        self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
+        self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
+        # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
         with torch.no_grad():
@@ -90,7 +91,8 @@ class GaussianVideo(nn.Module):
             avg_radius = self.radii.float().mean().item()
             avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
             avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
-            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}")
+            avg_opacity = self.get_opacity.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}, average opacity: {avg_opacity:.4f}")
             
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,

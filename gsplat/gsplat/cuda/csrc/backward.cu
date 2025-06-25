@@ -1379,6 +1379,12 @@ __global__ void rasterize_backward_sum_kernel_video(
                                img_size.x * img_size.y * img_size.z - 1);
     const bool inside = (i < img_size.y && j < img_size.x && k < img_size.z);
 
+    // this is the T AFTER the last gaussian in this pixel
+    float T_final = final_Ts[pix_id];
+    float T = T_final;
+    // the contribution from gaussians behind the current one
+    float3 buffer = {0.f, 0.f, 0.f};
+
     // Get the Gaussian range for this tile:
     const int2 range = tile_bins[tile_id];
     const int num_batches = (range.y - range.x + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -1389,8 +1395,9 @@ __global__ void rasterize_backward_sum_kernel_video(
     __shared__ float6 conic_batch[BLOCK_SIZE];          // Full conics (float6)
     __shared__ float3 rgbs_batch[BLOCK_SIZE];
 
-    // df/d_out for this voxel:
+    // df/d_out for this pixel
     const float3 v_out = v_output[pix_id];
+    const float v_out_alpha = v_output_alpha[pix_id];
 
     // Determine final Gaussian index affecting this voxel:
     int bin_final = inside ? final_index[pix_id] : 0;
@@ -1457,12 +1464,30 @@ __global__ void rasterize_backward_sum_kernel_video(
             float3 v_xy_local = { 0.f, 0.f, 0.f };
             float v_opacity_local = 0.f;
             if (valid) {
-                const float fac = alpha;
+                 // compute the current T for this gaussian
+                float ra = 1.f / (1.f - alpha);
+                T *= ra;
+                // update v_rgb for this gaussian
+                const float fac = alpha * T;
+                float v_ alpha = 0.f;
                 v_rgb_local = { fac * v_out.x, fac * v_out.y, fac * v_out.z };
-                // Compute scalar contribution from the pixel:
-                float v_alpha = rgbs_batch[t].x * v_out.x +
-                                rgbs_batch[t].y * v_out.y +
-                                rgbs_batch[t].z * v_out.z;
+
+                const float3 rgb = rgbs_batch[t];
+                // contribution from this pixel
+                v_alpha += (rgb.x * T - buffer.x * ra) * v_out.x;
+                v_alpha += (rgb.y * T - buffer.y * ra) * v_out.y;
+                v_alpha += (rgb.z * T - buffer.z * ra) * v_out.z;
+
+                v_alpha += T_final * ra * v_out_alpha;
+                // contribution from background pixel
+                v_alpha += -T_final * ra * background.x * v_out.x;
+                v_alpha += -T_final * ra * background.y * v_out.y;
+                v_alpha += -T_final * ra * background.z * v_out.z;
+                // update the running sum
+                buffer.x += rgb.x * fac;
+                buffer.y += rgb.y * fac;
+                buffer.z += rgb.z * fac;
+                
                 float v_sigma = -opac * vis * v_alpha;
                 // Compute gradients for each conic component:
                 // d sigma/d(conic.x) = 0.5 * delta.x^2

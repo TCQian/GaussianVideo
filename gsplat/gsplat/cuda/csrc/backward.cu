@@ -1469,7 +1469,7 @@ __global__ void rasterize_backward_sum_kernel_video(
                 T *= ra;
                 // update v_rgb for this gaussian
                 const float fac = alpha * T;
-                float v_ alpha = 0.f;
+                float v_alpha = 0.f;
                 v_rgb_local = { fac * v_out.x, fac * v_out.y, fac * v_out.z };
 
                 const float3 rgb = rgbs_batch[t];
@@ -1487,7 +1487,7 @@ __global__ void rasterize_backward_sum_kernel_video(
                 buffer.x += rgb.x * fac;
                 buffer.y += rgb.y * fac;
                 buffer.z += rgb.z * fac;
-                
+
                 float v_sigma = -opac * vis * v_alpha;
                 // Compute gradients for each conic component:
                 // d sigma/d(conic.x) = 0.5 * delta.x^2

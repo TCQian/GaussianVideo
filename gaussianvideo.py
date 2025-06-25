@@ -36,6 +36,18 @@ class GaussianVideo(nn.Module):
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 6))
         self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
+
+        # Initialize the parameters based on predefined set.
+        with torch.no_grad():
+            data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
+
+        if data is not None:
+            self._xyz = nn.Parameter(data["xyz"])
+            self._cholesky = nn.Parameter(data["cholesky"])
+            self._features_dc = nn.Parameter(data["features_dc"])
+            print(f"Loaded Gaussian 0, xyz: {self._xyz[0].tolist()}, cholesky: {self._cholesky[0].tolist()}, features_dc: {self._features_dc[0].tolist()}")
+        else:
+            raise ValueError("Failed to load Gaussian parameters.")
         
         # Increase L33 (the last element in each row) to boost temporal variance.
         with torch.no_grad():

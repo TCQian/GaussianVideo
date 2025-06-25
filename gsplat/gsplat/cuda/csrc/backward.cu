@@ -1449,7 +1449,7 @@ __global__ void rasterize_backward_sum_kernel_video(
                     conic.v * delta.z * delta.z
                 );
                 vis = __expf(-sigma);
-                alpha = min(1.f, opac * vis);
+                alpha = min(0.99f, opac * vis);
                 if (sigma < 0.f || alpha < 1.f / 255.f) {
                     valid = 0;
                 }
@@ -1542,7 +1542,7 @@ __global__ void rasterize_backward_sum_kernel_video(
                 atomicAdd(&(v_xy[g].y), v_xy_local.y);
                 atomicAdd(&(v_xy[g].z), v_xy_local.z);
                 // Update gradient for v_opacity:
-                atomicAdd(v_opacity + g, v_opacity_local);
+                atomicAdd(&(v_opacity[g]), v_opacity_local);
             }
         }
     }

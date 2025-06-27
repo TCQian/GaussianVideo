@@ -37,6 +37,9 @@ class GaussianVideo(nn.Module):
         self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
 
+        # Color
+        self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
+        
         # Initialize the parameters based on predefined set.
         with torch.no_grad():
             data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
@@ -53,8 +56,6 @@ class GaussianVideo(nn.Module):
         with torch.no_grad():
             self._cholesky.data[:, 5] += self.T  # adjust the constant as needed
         
-        # Color
-        self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
         self.last_size = (self.H, self.W, self.T)
         self.quantize = kwargs["quantize"]
         self.register_buffer('background', torch.ones(3))
@@ -84,7 +85,7 @@ class GaussianVideo(nn.Module):
     
     @property
     def get_features(self):
-        return self._features_dc
+        return self.rgb_activation(self._features_dc)
     
     @property
     def get_opacity(self):

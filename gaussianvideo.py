@@ -85,7 +85,7 @@ class GaussianVideo(nn.Module):
     
     @property
     def get_features(self):
-        return self._features_dc
+        return self.rgb_activation(self._features_dc)
     
     @property
     def get_opacity(self):

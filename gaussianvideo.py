@@ -85,7 +85,7 @@ class GaussianVideo(nn.Module):
     
     @property
     def get_features(self):
-        return self.rgb_activation(self._features_dc)
+        return self._features_dc
     
     @property
     def get_opacity(self):
@@ -105,7 +105,8 @@ class GaussianVideo(nn.Module):
             avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
             avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
             avg_opacity = self.get_opacity.float().mean().item()
-            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}, average opacity: {avg_opacity:.4f}")
+            avg_color = self.get_features.float().mean(dim=0, keepdim=True).detach().cpu().numpy()
+            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}, average opacity: {avg_opacity:.4f}, average color: {avg_color.tolist()}")
             
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,

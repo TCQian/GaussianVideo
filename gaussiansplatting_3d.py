@@ -109,11 +109,11 @@ class Gaussian3D(nn.Module):
 
         if self.debug_mode:
             avg_radius = self.radii.float().mean().item()
-            avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            # avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
             avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
             avg_opacity = self.get_opacity.float().mean().item()
             avg_color = self.get_features.float().mean(dim=0, keepdim=True).detach().cpu().numpy()
-            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}, average opacity: {avg_opacity:.4f}, average color: {avg_color.tolist()}")
+            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average conic: {avg_conic.tolist()}, average opacity: {avg_opacity:.4f}, average color: {avg_color.tolist()}")
             
         if self.active_sh_degree > 0:
             viewdirs = self.get_xyz.detach() - self.translation  # (N, 3)
@@ -146,7 +146,7 @@ class Gaussian3D(nn.Module):
                 if param.grad is not None:
                     grad_norm = param.grad.data.norm().item()
                     print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
-                    
+
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none = True)
         self.scheduler.step()

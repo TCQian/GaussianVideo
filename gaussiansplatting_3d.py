@@ -28,6 +28,8 @@ def random_quat_tensor(N):
 class Gaussian3D(nn.Module):
     def __init__(self, loss_type="Fusion2", **kwargs):
         super().__init__()
+        self.debug_mode = False  # enable kernel logging
+
         self.loss_type = loss_type
         self.init_num_points = kwargs["num_points"]
         self.H, self.W = kwargs["H"], kwargs["W"]
@@ -105,6 +107,14 @@ class Gaussian3D(nn.Module):
         self.xys, depths, self.radii, conics, num_tiles_hit, cov3d = project_gaussians(self.get_xyz, self.get_scaling, 1, quats, 
             self.viewmat, self.viewmat, self.focal, self.focal, self.W / 2, self.H / 2, self.H, self.W, self.tile_bounds)
 
+        if self.debug_mode:
+            avg_radius = self.radii.float().mean().item()
+            avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            avg_opacity = self.get_opacity.float().mean().item()
+            avg_color = self.get_features.float().mean(dim=0, keepdim=True).detach().cpu().numpy()
+            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}, average opacity: {avg_opacity:.4f}, average color: {avg_color.tolist()}")
+            
         if self.active_sh_degree > 0:
             viewdirs = self.get_xyz.detach() - self.translation  # (N, 3)
             viewdirs = viewdirs / viewdirs.norm(dim=-1, keepdim=True)
@@ -129,6 +139,14 @@ class Gaussian3D(nn.Module):
         with torch.no_grad():
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / mse_loss.item())
+
+        # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        if self.debug_mode:
+            for name, param in self.named_parameters():
+                if param.grad is not None:
+                    grad_norm = param.grad.data.norm().item()
+                    print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+                    
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none = True)
         self.scheduler.step()

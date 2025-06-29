@@ -53,8 +53,8 @@ class GaussianVideo(nn.Module):
         self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
-        #with torch.no_grad():
-        #    self._cholesky.data[:, 5] += self.T  # adjust the constant as needed
+        with torch.no_grad():
+           self._cholesky.data[:, 5] += self.T  # adjust the constant as needed
         
         self.last_size = (self.H, self.W, self.T)
         self.quantize = kwargs["quantize"]
@@ -63,7 +63,7 @@ class GaussianVideo(nn.Module):
         self.rgb_activation = torch.sigmoid
         self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))
         # self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5]).view(1, 3))
-        # self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
+        self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
         
         if self.quantize:
             self.xyz_quantizer = FakeQuantizationHalf.apply 
@@ -93,7 +93,7 @@ class GaussianVideo(nn.Module):
     
     @property
     def get_cholesky_elements(self):
-        return self._cholesky #+ self.cholesky_bound
+        return self._cholesky + self.cholesky_bound
     
     def forward(self):
         # print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(xyz=self.get_xyz, cholesky=self.get_cholesky_elements))
@@ -105,7 +105,8 @@ class GaussianVideo(nn.Module):
             avg_radius = self.radii.float().mean().item()
             avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
             avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
-            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}")
+            avg_color = self.get_features.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}, average color: {avg_color.tolist()}")
             # for i in range(3):
             #     # xys = self._xyz[i].detach().cpu().numpy()
             #     conic = conics[i].detach().cpu().numpy()
@@ -167,11 +168,11 @@ class GaussianVideo(nn.Module):
         #                 f"l33={cholesky_bef_i[5]} + {self.cholesky_bound[0][5]} = {cholesky_aft_i[5]}, v_l23={grad_i[5].item():.4e}, ")
 
         # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        # if self.debug_mode:
-        #     for name, param in self.named_parameters():
-        #         if param.grad is not None:
-        #             grad_norm = param.grad.data.norm().item()
-        #             print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        if self.debug_mode:
+            for name, param in self.named_parameters():
+                if param.grad is not None:
+                    grad_norm = param.grad.data.norm().item()
+                    print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

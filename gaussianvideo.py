@@ -35,13 +35,27 @@ class GaussianVideo(nn.Module):
         # Covariance
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 6))
         self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
+
+        # color
+        self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
+
+         # Initialize the parameters based on predefined set.
+        with torch.no_grad():
+            data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
+            
+        if data is not None:
+            self._xyz = nn.Parameter(data["xyz"])
+            self._cholesky = nn.Parameter(data["cholesky"])
+            self._features_dc = nn.Parameter(data["features_dc"])
+            print(f"Loaded Gaussian 0, xyz: {self._xyz[0].tolist()}, cholesky: {self._cholesky[0].tolist()}, features_dc: {self._features_dc[0].tolist()}")
+        else:
+            raise ValueError("Failed to load Gaussian parameters.")
         
         # Increase L33 (the last element in each row) to boost temporal variance.
         with torch.no_grad():
             self._cholesky.data[:, 5] += self.T  # adjust the constant as needed
         
         # Color
-        self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
         self.last_size = (self.H, self.W, self.T)
         self.quantize = kwargs["quantize"]
         self.register_buffer('background', torch.ones(3))
@@ -86,6 +100,15 @@ class GaussianVideo(nn.Module):
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
+
+        if self.debug_mode:
+            avg_radius = self.radii.float().mean().item()
+            avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            avg_opacity = self.get_opacity.float().mean().item()
+            avg_color = self.get_features.float().mean(dim=0, keepdim=True).detach().cpu().numpy()
+            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}, average opacity: {avg_opacity:.4f}, average color: {avg_color.tolist()}")
+            
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,
             self.get_features, self._opacity, self.H, self.W, self.T,
@@ -119,11 +142,12 @@ class GaussianVideo(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
-        print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        for name, param in self.named_parameters():
-            if param.grad is not None:
-                grad_norm = param.grad.data.norm().item()
-                print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
+        if self.debug_mode:
+            for name, param in self.named_parameters():
+                if param.grad is not None:
+                    grad_norm = param.grad.data.norm().item()
+                    print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

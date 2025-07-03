@@ -143,6 +143,18 @@ class _RasterizeGaussiansSum(Function):
                 cum_tiles_hit,
                 tile_bounds,
             )
+
+            for i in range(len(tile_bins)):
+                assert (tile_bins[i, 0] >= 0 and tile_bins[i, 1] <= num_intersects), (
+                    f"tile_bins[{i}] = {tile_bins[i]} is invalid, "
+                    "the start index must be non-negative and the end index must be less than or equal to num_intersects."
+                )
+            
+            for i in range(len(gaussian_ids_sorted)):
+                assert (
+                    gaussian_ids_sorted[i] >= 0 and gaussian_ids_sorted[i] < num_points
+                ), f"gaussian_ids_sorted[{i}] = {gaussian_ids_sorted[i]} is invalid, it should be in range [0, {num_points})"
+
             if colors.shape[-1] == 3:
                 rasterize_fn = _C.rasterize_sum_forward
             else:

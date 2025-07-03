@@ -1061,15 +1061,15 @@ project_gaussians_video_forward_tensor(
 
     // Allocate output tensors.
     torch::Tensor xys_d =
-        torch::zeros({num_points, 2}, means2d.options().dtype(torch::kFloat32));
+        torch::zeros({num_points, 2}, means3d.options().dtype(torch::kFloat32));
     torch::Tensor depths_d =
-        torch::zeros({num_points}, means2d.options().dtype(torch::kFloat32));
+        torch::zeros({num_points}, means3d.options().dtype(torch::kFloat32));
     torch::Tensor radii_d =
-        torch::zeros({num_points}, means2d.options().dtype(torch::kInt32));
+        torch::zeros({num_points}, means3d.options().dtype(torch::kInt32));
     torch::Tensor conics_d =
-        torch::zeros({num_points, 3}, means2d.options().dtype(torch::kFloat32));
+        torch::zeros({num_points, 3}, means3d.options().dtype(torch::kFloat32));
     torch::Tensor num_tiles_hit_d =
-        torch::zeros({num_points}, means2d.options().dtype(torch::kInt32));
+        torch::zeros({num_points}, means3d.options().dtype(torch::kInt32));
 
     // Launch the kernel.
     project_gaussians_video_forward_kernel<<<
@@ -1121,11 +1121,11 @@ project_gaussians_video_backward_tensor(
 
     // Triangular covariance.
     torch::Tensor v_cov3d =
-        torch::zeros({num_points, 6}, means2d.options().dtype(torch::kFloat32));
+        torch::zeros({num_points, 6}, means3d.options().dtype(torch::kFloat32));
     torch::Tensor v_L_elements =
-        torch::zeros({num_points, 6}, means2d.options().dtype(torch::kFloat32));
+        torch::zeros({num_points, 6}, means3d.options().dtype(torch::kFloat32));
     torch::Tensor v_mean3d =
-        torch::zeros({num_points, 3}, means2d.options().dtype(torch::kFloat32));
+        torch::zeros({num_points, 3}, means3d.options().dtype(torch::kFloat32));
 
     project_gaussians_video_backward_kernel<<<
         (num_points + N_THREADS - 1) / N_THREADS,

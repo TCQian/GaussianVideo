@@ -26,15 +26,15 @@ __global__ void project_gaussians_video_backward_kernel(
     }
     // get v_cov2d
     float3 v_cov2d;
-    cov2d_to_conic_vjp(conics[idx], v_conic[idx], &v_cov2d);
-    float G_11 = v_cov2d.x; // dL/dcov2d_11
-    float G_12 = v_cov2d.y; // dL/dcov2d_12, which is the same as dL/dcov2d_21
-    float G_22 = v_cov2d.z; // dL/dcov2d_22
+    cov2d_to_conic_vjp(conics[idx], v_conic[idx], v_cov2d);
+    float v_11 = v_cov2d.x; // dL/dcov2d_11
+    float v_12 = v_cov2d.y; // dL/dcov2d_12, which is the same as dL/dcov2d_21
+    float v_22 = v_cov2d.z; // dL/dcov2d_22
 
     float3 center = {
-        0.5f * img_size.x * means2d[idx].x + 0.5f * img_size.x,
-        0.5f * img_size.y * means2d[idx].y + 0.5f * img_size.y,
-        0.5f * img_size.z * means2d[idx].z + 0.5f * img_size.z
+        0.5f * img_size.x * means3d[idx].x + 0.5f * img_size.x,
+        0.5f * img_size.y * means3d[idx].y + 0.5f * img_size.y,
+        0.5f * img_size.z * means3d[idx].z + 0.5f * img_size.z
     };
 
     // Corrected ordering to match forward kernel
@@ -45,14 +45,14 @@ __global__ void project_gaussians_video_backward_kernel(
     float l_32 = L_elements[idx].u; // l32 // l5
     float l_33 = L_elements[idx].v; // l33 // l6
 
-    / Construct the 3x3 covariance matrix
+    // Construct the 3x3 covariance matrix
     float6 cov3d = {
-        l11*l11,                            // Cxx
-        l11*l21,                            // Cxy
-        l11*l31,                            // Cxz
-        (l21*l21 + l22*l22),                // Cyy
-        (l21*l31 + l22*l32),                // Cyz
-        (l31*l31 + l32*l32 + l33*l33)       // Czz
+        l_11 * l_11,                            // Cxx
+        l_11 * l_21,                            // Cxy
+        l_11 * l_31,                            // Cxz
+        (l_21 * l_21 + l_22 * l_22),            // Cyy
+        (l_21 * l_31 + l_22 * l_32),            // Cyz
+        (l_31 * l_31 + l_32 * l_32 + l_33 * l_33) // Czz
     };
 
     float cov_xyt_0 = cov3d.z;
@@ -73,8 +73,8 @@ __global__ void project_gaussians_video_backward_kernel(
     // d(cov_xyt^T * v_cov2d * cov_xyt)/dcov_xyt =  2 * v_cov2d * cov_xyt //quadratic form
     // Thus, dL/dcov_xyt =  -1/cov_t * 2 * v_cov2d * cov_xyt
     float3 v_cov_xyt = {
-        (G_11 * cov_xyt_0 + G_12 * cov_xyt_1 * 0.5) * -2.0f / cov_t,
-        (G_12 * cov_xyt_0 * 0.5 + G_22 * cov_xyt_1) * -2.0f / cov_t,
+        (v_11 * cov_xyt_0 + v_12 * cov_xyt_1 * 0.5f) * -2.0f / cov_t,
+        (v_12 * cov_xyt_0 * 0.5f + v_22 * cov_xyt_1) * -2.0f / cov_t,
     };
 
     // Compute dL/dcov_t = dL/dcov2d * dcov2d/dcov_t
@@ -82,9 +82,9 @@ __global__ void project_gaussians_video_backward_kernel(
     // dL/dcov_t = (v_cov2d * cov_xyt * cov_xyt^T) / (cov_t * cov_t)
     //           = (cov_xyt^T * v_cov2d * cov_xyt) / (cov_t * cov_t) 
     float v_cov_t = (
-        cov_xyt_0 * G11 * cov_xyt_0 +
-        2 * cov_xyt_0 * G12 * cov_xyt_1 +
-        cov_xyt_1 * G22 * cov_xyt_1
+        cov_xyt_0 * v_11 * cov_xyt_0 +
+        2 * cov_xyt_0 * v_12 * cov_xyt_1 +
+        cov_xyt_1 * v_22 * cov_xyt_1
     ) / (cov_t * cov_t);
 
     // mean2d = center_xy + (cov_xyt / cov_t * dt)
@@ -102,11 +102,11 @@ __global__ void project_gaussians_video_backward_kernel(
     float v_mean_t = - (v_xy[idx].x * cov_xyt_0 + v_xy[idx].y * cov_xyt_1) / cov_t;
 
     // gradient of the 3D covariance matrix
-    float6 v_cov3d[idx] = {
-        G_11, // dL/dcov2d_11
-        G_12, // dL/dcov2d_12
+    v_cov3d[idx] = {
+        v_11, // dL/dcov2d_11
+        v_12, // dL/dcov2d_12
         v_cov_xyt.x, // dL/dcov2d_13
-        G_22, // dL/dcov2d_22
+        v_22, // dL/dcov2d_22
         v_cov_xyt.y, // dL/dcov2d_23
         v_cov_t  // dL/dcov2d_33
     };

@@ -78,13 +78,15 @@ class VideoTrainer:
             if iter == self.iterations:
                 self.gaussian_model.debug_mode = True  # enable kernel logging
 
+            loss_per_iter = []
             psnr_per_iter = []
             for i in range(self.T): 
                 gt_at_t = self.gt_image[:, :, :, :, i]  # [1, C, H, W]
                 loss, psnr = self.gaussian_model.train_iter(gt_at_t, timestamp=i)
                 psnr_per_iter.append(psnr)
+                loss_per_iter.append(loss)
             psnr = sum(psnr_per_iter) / self.T
-            loss = sum(loss) / self.T  
+            loss = sum(loss_per_iter) / self.T
 
             psnr_list.append(psnr)
             iter_list.append(iter)

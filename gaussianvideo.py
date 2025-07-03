@@ -1,5 +1,6 @@
 from gsplat.project_gaussians_video import project_gaussians_video
 from gsplat.rasterize_sum_video import rasterize_gaussians_sum_video
+from gsplat.rasterize_sum import rasterize_gaussians_sum
 from utils import *
 import torch
 import torch.nn as nn
@@ -25,7 +26,8 @@ class GaussianVideo(nn.Module):
         self.tile_bounds = (
             (self.W + self.BLOCK_W - 1) // self.BLOCK_W, # (1920 + 16 - 1) // 16 = 120
             (self.H + self.BLOCK_H - 1) // self.BLOCK_H, # (1080 + 16 - 1) // 16 = 68
-            (self.T + self.BLOCK_T - 1) // self.BLOCK_T, # (50 + 1 - 1) // 1 = 50
+            1,
+            # (self.T + self.BLOCK_T - 1) // self.BLOCK_T, # (50 + 1 - 1) // 1 = 50
         ) # tile_bounds (120, 68, 50)
         self.device = kwargs["device"]
 
@@ -52,18 +54,18 @@ class GaussianVideo(nn.Module):
             raise ValueError("Failed to load Gaussian parameters.")
         
         # Increase L33 (the last element in each row) to boost temporal variance.
-        with torch.no_grad():
-            self._cholesky.data[:, 5] += self.T  # adjust the constant as needed
+        # with torch.no_grad():
+        #     self._cholesky.data[:, 5] += self.T  # adjust the constant as needed
         
         # Color
         self.last_size = (self.H, self.W, self.T)
         self.quantize = kwargs["quantize"]
         self.register_buffer('background', torch.ones(3))
-        self.opacity_activation = torch.sigmoid
-        self.rgb_activation = torch.sigmoid
-        self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))
+        # self.opacity_activation = torch.sigmoid
+        # self.rgb_activation = torch.sigmoid
+        # self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))
         # self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5]).view(1, 3))
-        self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
+        # self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
         
         if self.quantize:
             self.xyz_quantizer = FakeQuantizationHalf.apply 
@@ -93,15 +95,15 @@ class GaussianVideo(nn.Module):
     
     @property
     def get_cholesky_elements(self):
-        return self._cholesky + self.cholesky_bound
-    
-    def forward(self):
+        return self._cholesky #+ self.cholesky_bound
+
+    def forward(self, timestamp=0):
         # print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(xyz=self.get_xyz, cholesky=self.get_cholesky_elements))
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
-            self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
+            self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds, timestamp=timestamp
         )
 
-        if self.debug_mode:
+        if self.debug_mode and timestamp == (self.T - 1):
             avg_radius = self.radii.float().mean().item()
             avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
             avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
@@ -109,32 +111,25 @@ class GaussianVideo(nn.Module):
             avg_color = self.get_features.float().mean(dim=0, keepdim=True).detach().cpu().numpy()
             print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}, average opacity: {avg_opacity:.4f}, average color: {avg_color.tolist()}")
             
-        out_img = rasterize_gaussians_sum_video(
-            self.xys, depths, self.radii, conics, num_tiles_hit,
-            self.get_features, self._opacity, self.H, self.W, self.T,
-            self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
-            background=self.background, return_alpha=False
-        )
-        # if self.debug_mode:
-            # radii_np = self.radii.detach().cpu().numpy()
-            # max_radius = np.ceil(radii_np.max() / 5) * 5
-            # bins = np.arange(0, max_radius + 5, 5)  # e.g., [0, 5, 10, ..., max]
-
-            # hist, bin_edges = np.histogram(radii_np, bins=bins)
-
-            # # Print histogram nicely
-            # print("Gaussian Radius Histogram (bin size = 5)")
-            # for i in range(len(hist)):
-            #     print(f"[{bin_edges[i]:>2.0f} - {bin_edges[i+1]:>2.0f}) : {hist[i]} Gaussians")
-            # self.debug_mode = False
-        out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
-        out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
+        # out_img = rasterize_gaussians_sum_video(
+        #     self.xys, depths, self.radii, conics, num_tiles_hit,
+        #     self.get_features, self._opacity, self.H, self.W, self.T,
+        #     self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
+        #     background=self.background, return_alpha=False
+        # )
+        out_img = rasterize_gaussians_sum(self.xys, depths, self.radii, conics, num_tiles_hit,
+            self.get_features, self._opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False)
+        
+        out_img = torch.clamp(out_img, 0, 1) #[H, W, 3]
+        out_img = out_img.view(-1, self.H, self.W, 3).permute(0, 3, 1, 2).contiguous()
         return {"render": out_img}
 
-
-    def train_iter(self, gt_image):
-        render_pkg = self.forward()
+    def train_iter(self, gt_image, timestamp=0):
+        render_pkg = self.forward(timestamp=timestamp)
         image = render_pkg["render"]
+
+        assert image.shape == gt_image.shape, f"Shape mismatch: {image.shape} vs {gt_image.shape}"
+        
         loss = loss_fn(image, gt_image, self.loss_type, lambda_value=0.7)
         loss.backward()
 
@@ -143,7 +138,7 @@ class GaussianVideo(nn.Module):
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
         # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        if self.debug_mode:
+        if self.debug_mode and timestamp == (self.T - 1):
             for name, param in self.named_parameters():
                 if param.grad is not None:
                     grad_norm = param.grad.data.norm().item()

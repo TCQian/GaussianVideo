@@ -10,12 +10,13 @@ import gsplat.cuda as _C
 
 
 def project_gaussians_video(
-    means2d: Float[Tensor, "*batch 2"],
+    means3d: Float[Tensor, "*batch 2"],
     L_elements: Float[Tensor, "*batch 3"],
     img_height: int,
     img_width: int,
     video_length: int,
     tile_bounds: Tuple[int, int, int],
+    timestamp: int = 0,
     clip_thresh: float = 0.01,
 ) -> Tuple[Tensor, Tensor, Tensor, Tensor, int]:
     """This function projects 3D gaussians to 2D using the EWA splatting method for gaussian splatting.
@@ -49,12 +50,13 @@ def project_gaussians_video(
         - **num_tiles_hit** (Tensor): number of tiles hit per gaussian.
     """
     return _ProjectGaussiansVideo.apply(
-        means2d.contiguous(),
+        means3d.contiguous(),
         L_elements.contiguous(),
         img_height,
         img_width,
         video_length,
         tile_bounds,
+        timestamp,
         clip_thresh,
     )
 
@@ -64,17 +66,18 @@ class _ProjectGaussiansVideo(Function):
     @staticmethod
     def forward(
         ctx,
-        means2d: Float[Tensor, "*batch 2"],
+        means3d: Float[Tensor, "*batch 2"],
         L_elements: Float[Tensor, "*batch 3"],
         img_height: int,
         img_width: int,
         video_length: int,
         tile_bounds: Tuple[int, int, int],
+        timestamp: int = 0,
         clip_thresh: float = 0.01,
     ):
         # means2d.shape is (9000, 3)
         # num_points = 9000 (number of gaussians)
-        num_points = means2d.shape[-2]
+        num_points = means3d.shape[-2]
 
         (
             xys,
@@ -84,12 +87,13 @@ class _ProjectGaussiansVideo(Function):
             num_tiles_hit,
         ) = _C.project_gaussians_video_forward(
             num_points,
-            means2d,
+            means3d,
             L_elements,
             img_height,
             img_width,
             video_length,
             tile_bounds,
+            timestamp,
             clip_thresh,
         )
         
@@ -98,10 +102,11 @@ class _ProjectGaussiansVideo(Function):
         ctx.img_width = img_width
         ctx.video_length = video_length
         ctx.num_points = num_points
+        ctx.timestamp = timestamp
 
         # Save tensors.
         ctx.save_for_backward(
-            means2d,
+            means3d,
             L_elements,
             radii,
             conics,
@@ -112,19 +117,20 @@ class _ProjectGaussiansVideo(Function):
     @staticmethod
     def backward(ctx, v_xys, v_depths, v_radii, v_conics, v_num_tiles_hit):
         (
-            means2d,
+            means3d,
             L_elements,
             radii,
             conics,
         ) = ctx.saved_tensors
 
-        (v_cov2d, v_mean2d, v_L_elements) = _C.project_gaussians_video_backward(
+        (v_cov3d, v_mean3d, v_L_elements) = _C.project_gaussians_video_backward(
             ctx.num_points,
-            means2d,
+            means3d,
             L_elements,
             ctx.img_height,
             ctx.img_width,
             ctx.video_length,
+            ctx.timestamp,
             radii,
             conics,
             v_xys,
@@ -135,7 +141,7 @@ class _ProjectGaussiansVideo(Function):
         # Return a gradient for each input.
         return (
             # means3d: Float[Tensor, "*batch 3"],
-            v_mean2d,
+            v_mean3d,
             # scales: Float[Tensor, "*batch 3"],
             v_L_elements,
             # img_height: int,
@@ -145,6 +151,8 @@ class _ProjectGaussiansVideo(Function):
             # video_length: int,
             None,
             # tile_bounds: Tuple[int, int, int],
+            None,
+            # timestamp: int,
             None,
             # clip_thresh,
             None,

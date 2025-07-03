@@ -1040,12 +1040,13 @@ std::tuple<
     torch::Tensor>
 project_gaussians_video_forward_tensor(
     const int num_points,
-    torch::Tensor &means2d,
+    torch::Tensor &means3d,
     torch::Tensor &L_elements,
     const unsigned img_height,
     const unsigned img_width,
     const unsigned video_length,
     const std::tuple<int, int, int> tile_bounds,
+    const int timestamp,
     const float clip_thresh
 ) {
     dim3 img_size_dim3;
@@ -1060,13 +1061,13 @@ project_gaussians_video_forward_tensor(
 
     // Allocate output tensors.
     torch::Tensor xys_d =
-        torch::zeros({num_points, 3}, means2d.options().dtype(torch::kFloat32));
+        torch::zeros({num_points, 2}, means2d.options().dtype(torch::kFloat32));
     torch::Tensor depths_d =
         torch::zeros({num_points}, means2d.options().dtype(torch::kFloat32));
     torch::Tensor radii_d =
         torch::zeros({num_points}, means2d.options().dtype(torch::kInt32));
     torch::Tensor conics_d =
-        torch::zeros({num_points, 6}, means2d.options().dtype(torch::kFloat32));
+        torch::zeros({num_points, 3}, means2d.options().dtype(torch::kFloat32));
     torch::Tensor num_tiles_hit_d =
         torch::zeros({num_points}, means2d.options().dtype(torch::kInt32));
 
@@ -1075,16 +1076,17 @@ project_gaussians_video_forward_tensor(
         (num_points + N_THREADS - 1) / N_THREADS,
         N_THREADS>>>(
         num_points,
-        (float3 *)means2d.contiguous().data_ptr<float>(),
+        (float3 *)means3d.contiguous().data_ptr<float>(),
         (float6 *)L_elements.contiguous().data_ptr<float>(),
         img_size_dim3,
         tile_bounds_dim3,
+        timestamp,
         clip_thresh,
         // Output pointers.
-        (float3 *)xys_d.contiguous().data_ptr<float>(),
+        (float2 *)xys_d.contiguous().data_ptr<float>(),
         depths_d.contiguous().data_ptr<float>(),
         radii_d.contiguous().data_ptr<int>(),
-        (float6 *)conics_d.contiguous().data_ptr<float>(),
+        (float3 *)conics_d.contiguous().data_ptr<float>(),
         num_tiles_hit_d.contiguous().data_ptr<int32_t>()
     );
 
@@ -1100,11 +1102,12 @@ std::tuple<
     torch::Tensor>
 project_gaussians_video_backward_tensor(
     const int num_points,
-    torch::Tensor &means2d,
+    torch::Tensor &means3d,
     torch::Tensor &L_elements,
     const unsigned img_height,
     const unsigned img_width,
     const unsigned video_length,
+    const int timestamp,
     torch::Tensor &radii,
     torch::Tensor &conics,
     torch::Tensor &v_xy,
@@ -1117,32 +1120,33 @@ project_gaussians_video_backward_tensor(
     img_size_dim3.z = video_length;
 
     // Triangular covariance.
-    torch::Tensor v_cov2d =
+    torch::Tensor v_cov3d =
         torch::zeros({num_points, 6}, means2d.options().dtype(torch::kFloat32));
     torch::Tensor v_L_elements =
         torch::zeros({num_points, 6}, means2d.options().dtype(torch::kFloat32));
-    torch::Tensor v_mean2d =
+    torch::Tensor v_mean3d =
         torch::zeros({num_points, 3}, means2d.options().dtype(torch::kFloat32));
 
     project_gaussians_video_backward_kernel<<<
         (num_points + N_THREADS - 1) / N_THREADS,
         N_THREADS>>>(
         num_points,
-        (float3 *)means2d.contiguous().data_ptr<float>(),
+        (float3 *)means3d.contiguous().data_ptr<float>(),
         (float6 *)L_elements.contiguous().data_ptr<float>(),
         img_size_dim3,
+        timestamp,
         radii.contiguous().data_ptr<int32_t>(),
-        (float6 *)conics.contiguous().data_ptr<float>(),
-        (float3 *)v_xy.contiguous().data_ptr<float>(),
+        (float3 *)conics.contiguous().data_ptr<float>(),
+        (float2 *)v_xy.contiguous().data_ptr<float>(),
         v_depth.contiguous().data_ptr<float>(),
-        (float6 *)v_conic.contiguous().data_ptr<float>(),
+        (float3 *)v_conic.contiguous().data_ptr<float>(),
         // Outputs.
-        (float6 *)v_cov2d.contiguous().data_ptr<float>(),
-        (float3 *)v_mean2d.contiguous().data_ptr<float>(),
+        (float6 *)v_cov3d.contiguous().data_ptr<float>(),
+        (float3 *)v_mean3d.contiguous().data_ptr<float>(),
         (float6 *)v_L_elements.contiguous().data_ptr<float>()
     );
 
-    return std::make_tuple(v_cov2d, v_mean2d, v_L_elements);
+    return std::make_tuple(v_cov3d, v_mean3d, v_L_elements);
 }
 
 std::tuple<torch::Tensor, torch::Tensor> map_gaussian_to_intersects_video_tensor(

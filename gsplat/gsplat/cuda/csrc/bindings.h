@@ -317,12 +317,13 @@ std::
     >
     project_gaussians_video_forward_tensor(
         const int num_points,
-        torch::Tensor &means2d,
+        torch::Tensor &means3d,
         torch::Tensor &L_elements,
         const unsigned img_height,
         const unsigned img_width,
         const unsigned video_length,
         const std::tuple<int, int, int> tile_bounds,
+        const int timestamp,
         const float clip_thresh
     );
 
@@ -333,11 +334,12 @@ std::tuple<
     >
     project_gaussians_video_backward_tensor(
         const int num_points,
-        torch::Tensor &means2d,
+        torch::Tensor &means3d,
         torch::Tensor &L_elements,
         const unsigned img_height,
         const unsigned img_width,
         const unsigned video_length,
+        const int timestamp,
         torch::Tensor &radii,
         torch::Tensor &conics,
         torch::Tensor &v_xy,

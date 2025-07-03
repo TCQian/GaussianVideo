@@ -78,7 +78,14 @@ class VideoTrainer:
             if iter == self.iterations:
                 self.gaussian_model.debug_mode = True  # enable kernel logging
 
-            loss, psnr = self.gaussian_model.train_iter(self.gt_image)
+            psnr_per_iter = []
+            for i in range(self.T): 
+                gt_at_t = self.gt_image[:, :, :, :, i]  # [1, C, H, W]
+                loss, psnr = self.gaussian_model.train_iter(gt_at_t, timestamp=i)
+                psnr_per_iter.append(psnr)
+            psnr = sum(psnr_per_iter) / self.T
+            loss = sum(loss) / self.T  
+
             psnr_list.append(psnr)
             iter_list.append(iter)
             with torch.no_grad():
@@ -92,63 +99,60 @@ class VideoTrainer:
             self.gaussian_model.eval()
             test_start_time = time.time()
             for i in range(100):
-                _ = self.gaussian_model()
+                for t in range(self.T):
+                    _ = self.gaussian_model(timestamp=t)
             test_end_time = (time.time() - test_start_time)/100
 
-        self.logwriter.write("Training Complete in {:.4f}s, Eval time:{:.8f}s, FPS:{:.4f}".format(end_time, test_end_time, 1/test_end_time))
+        self.logwriter.write("Training Complete in {:.4f}s, Eval time:{:.8f}s, FPS:{:.4f}".format(end_time, test_end_time, self.T/test_end_time))
         torch.save(self.gaussian_model.state_dict(), self.log_dir / "gaussian_model.pth.tar")
         np.save(self.log_dir / "training.npy", {"iterations": iter_list, "training_psnr": psnr_list, "training_time": end_time, 
-        "psnr": psnr_value, "ms-ssim": ms_ssim_value, "rendering_time": test_end_time, "rendering_fps": 1/test_end_time})
-        return psnr_value, ms_ssim_value, end_time, test_end_time, 1/test_end_time
+        "psnr": psnr_value, "ms-ssim": ms_ssim_value, "rendering_time": test_end_time, "rendering_fps": self.T/test_end_time})
+        return psnr_value, ms_ssim_value, end_time, test_end_time, self.T/test_end_time
 
     def test(self):
         self.gaussian_model.eval()
-        with torch.no_grad():
-            out = self.gaussian_model()
-        mse_loss = F.mse_loss(out["render"].float(), self.gt_image.float())
-        psnr = 10 * math.log10(1.0 / mse_loss.item())
-        
-        # Assuming out["render"] is of shape [1, C, H, W, T]
-        render_tensor = out["render"].float()  # Ensure the tensor is in float format
+        psnr_values = []
+        ms_ssim_values = []
 
-        # Get the number of time steps (T)
-        num_time_steps = render_tensor.size(-1)  # T dimension
+        with torch.no_grad():
+            for i in range(self.T):
+                gt_at_t = self.gt_image[:, :, :, :, i]
+                out = self.gaussian_model(timestamp=i)
+                
+                # Assuming out["render"] is of shape [1, C, H, W]
+                render_tensor = out["render"].float()
+
+                assert render_tensor.shape == gt_at_t.shape, f"Shape mismatch: {render_tensor.shape} vs {gt_at_t.shape}"
+
+                mse_loss = F.mse_loss(render_tensor, gt_at_t.float())
+                psnr = 10 * math.log10(1.0 / mse_loss.item())
+                psnr_values.append(psnr)
         
-        ms_ssim_value = 0.0
-        try:
-            ms_ssim_values = []
-            for t in range(num_time_steps):
-                # Extract the t-th frame from both render and ground truth
-                frame = render_tensor[..., t]  # e.g. shape: [1, 3, H, W]
-                gt_frame = self.gt_image[..., t] # e.g. shape: [1, 3, H, W]
-                # Attempt to compute MS-SSIM for this frame
                 ms_ssim_values.append(
-                    ms_ssim(frame, gt_frame, data_range=1, size_average=True).item()
+                    ms_ssim(render_tensor, gt_at_t, data_range=1, size_average=True).item()
                 )
+
+                if self.save_imgs:
+                    transform = transforms.ToPILImage()
+        
+                    # Extract the image for the current time step
+                    img = render_tensor.squeeze(0)  # Shape: [C, H, W]
+
+                    # Convert the image tensor to a PIL Image
+                    pil_image = transform(img)  # Convert to PIL Image
+                    
+                    # Define the filename based on the time step
+                    name = f"{self.video_name}_fitting_t{t}.png"  # e.g., "_fitting_t0.png"
+                    
+                    # Save the image to the specified directory
+                    pil_image.save(str(self.log_dir / name))
+            
             ms_ssim_value = sum(ms_ssim_values) / len(ms_ssim_values)
-        except AssertionError as e:
-            # In case the image is too small for ms-ssim, log the error and continue.
-            self.logwriter.write("MS-SSIM could not be computed: " + str(e))
+            psnr = sum(psnr_values) / len(psnr_values)
         
         # Log the results based on whether MS-SSIM was computed
         self.logwriter.write("Test PSNR:{:.4f}, MS_SSIM:{:.6f}".format(psnr, ms_ssim_value))
         
-        if self.save_imgs:
-            transform = transforms.ToPILImage()
-    
-            # Loop through each time step
-            for t in range(num_time_steps):
-                # Extract the image for the current time step
-                img = render_tensor[0, :, :, :, t]  # Shape: [C, H, W]
-                
-                # Convert the image tensor to a PIL Image
-                pil_image = transform(img)  # Convert to PIL Image
-                
-                # Define the filename based on the time step
-                name = f"{self.video_name}_fitting_t{t}.png"  # e.g., "_fitting_t0.png"
-                
-                # Save the image to the specified directory
-                pil_image.save(str(self.log_dir / name))
         return psnr, ms_ssim_value
     
 def images_paths_to_tensor(images_paths: list[Path]):
@@ -218,7 +222,7 @@ def parse_args(argv):
     parser.add_argument(
         "--lr",
         type=float,
-        default=1e-2,
+        default=1e-3,
         help="Learning rate (default: %(default)s)",
     )
     args = parser.parse_args(argv)

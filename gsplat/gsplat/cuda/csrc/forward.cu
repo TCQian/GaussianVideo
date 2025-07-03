@@ -6,6 +6,7 @@
 #include <iostream>
 #include "float6.h"
 #include <cstdio>
+#include <assert.h>
 
 namespace cg = cooperative_groups;
 
@@ -562,6 +563,16 @@ __global__ void rasterize_forward_sum(
     // which gaussians to look through in this tile
     int2 range = tile_bins[tile_id];
     int num_batches = (range.y - range.x + BLOCK_SIZE - 1) / BLOCK_SIZE;
+
+    assert(tile_id >= 0 && tile_id < tile_bounds.x * tile_bounds.y);
+    printf("no error with tile_id %d", tile_id);
+
+    assert(i < img_size.y);
+    assert(j < img_size.x);
+    printf("no error with i %d, j %d", i, j);
+
+    assert(range.y >= range.x);                         // sanity check on the range
+    printf("no error with range %d %d", range.x, range.y);
 
     __shared__ int32_t id_batch[BLOCK_SIZE];
     __shared__ float3 xy_opacity_batch[BLOCK_SIZE];

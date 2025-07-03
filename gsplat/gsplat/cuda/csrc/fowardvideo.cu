@@ -116,13 +116,17 @@ __global__ void project_gaussians_video_forward_kernel(
     conics[idx] = conic;
     xys[idx] = center_xy;
     radii[idx] = (int)radius;
+    if radius <= 0 {
+        // printf("%d point radius <= 0\n", idx);
+        return;
+    }
     uint2 tile_min, tile_max;
     get_tile_bbox(center_xy, radius, tile_bounds, tile_min, tile_max);
     int32_t tile_area = (tile_max.x - tile_min.x) * (tile_max.y - tile_min.y);
-    if (tile_area <= 0) {
-        // printf("%d point bbox outside of bounds\n", idx);
-        return;
-    }
+    // if (tile_area <= 0) {
+    //     // printf("%d point bbox outside of bounds\n", idx);
+    //     return;
+    // }
     num_tiles_hit[idx] = tile_area;
     depths[idx] = 0.0f;
 }

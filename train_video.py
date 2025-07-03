@@ -144,7 +144,7 @@ class VideoTrainer:
                     pil_image = transform(img)  # Convert to PIL Image
                     
                     # Define the filename based on the time step
-                    name = f"{self.video_name}_fitting_t{t}.png"  # e.g., "_fitting_t0.png"
+                    name = f"{self.video_name}_fitting_t{i}.png"  # e.g., "_fitting_t0.png"
                     
                     # Save the image to the specified directory
                     pil_image.save(str(self.log_dir / name))

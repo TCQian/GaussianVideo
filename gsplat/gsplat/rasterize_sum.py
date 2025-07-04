@@ -149,6 +149,11 @@ class _RasterizeGaussiansSum(Function):
                     f"tile_bins[{i}] = {tile_bins[i]} is invalid, "
                     "the start index must be non-negative and the end index must be less than or equal to num_intersects."
                 )
+                # check the range is valid
+                assert (tile_bins[i, 1] >= tile_bins[i, 0]), (
+                    f"tile_bins[{i}] = {tile_bins[i]} is invalid, "
+                    "the end index must be greater than or equal to the start index."
+                )
             
             for i in range(len(gaussian_ids_sorted)):
                 assert (

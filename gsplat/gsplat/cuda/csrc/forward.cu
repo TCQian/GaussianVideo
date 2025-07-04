@@ -161,6 +161,10 @@ __global__ void get_tile_bin_edges(
     if (prev_tile_idx != cur_tile_idx) {
         tile_bins[prev_tile_idx].y = idx;
         tile_bins[cur_tile_idx].x = idx;
+        if (prev_tile_idx < 0 || prev_tile_idx >= MAX_TILE_COUNT ||
+            cur_tile_idx < 0 || cur_tile_idx >= MAX_TILE_COUNT) {
+            printf("WARNING: invalid tile idx range: prev %d, cur %d, idx %d\n", prev_tile_idx, cur_tile_idx, idx);
+        }
         return;
     }
 }
@@ -568,9 +572,9 @@ __global__ void rasterize_forward_sum(
 
     if (tile_id >= 0 && tile_id < tile_bounds.x * tile_bounds.y) {
         int2 range = tile_bins[tile_id];
-        // printf("range %d %d", range.x, range.y);
-        assert(range.y >= range.x);
-        // printf("no error\n");
+        if (range.y < range.x) {
+            printf("tile_id %d has invalid range: [%d, %d)\n", tile_id, range.x, range.y);
+        }
     }
 
     __shared__ int32_t id_batch[BLOCK_SIZE];

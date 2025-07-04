@@ -565,12 +565,12 @@ __global__ void rasterize_forward_sum(
     int num_batches = (range.y - range.x + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
     assert(tile_id >= 0 && tile_id < tile_bounds.x * tile_bounds.y);
-    printf("no error with tile_id %d", tile_id);
 
+    // printf("tile_id %d, range %d %d\n", tile_id, range.x, range.y);
     if (tile_id >= 0 && tile_id < tile_bounds.x * tile_bounds.y) {
         int2 range = tile_bins[tile_id];
         assert(range.y >= range.x);
-        printf("no error with range %d %d", range.x, range.y);
+        // printf("no error with tile_id %d, range %d %d\n", tile_id, range.x, range.y);
     }
 
     __shared__ int32_t id_batch[BLOCK_SIZE];

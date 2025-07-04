@@ -41,7 +41,7 @@ class GaussianVideo(nn.Module):
         # color
         self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
 
-         # Initialize the parameters based on predefined set.
+        # Initialize the parameters based on predefined set.
         with torch.no_grad():
             data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
             

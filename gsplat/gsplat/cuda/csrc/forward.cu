@@ -161,10 +161,6 @@ __global__ void get_tile_bin_edges(
     if (prev_tile_idx != cur_tile_idx) {
         tile_bins[prev_tile_idx].y = idx;
         tile_bins[cur_tile_idx].x = idx;
-        if (prev_tile_idx < 0 || prev_tile_idx >= MAX_TILE_COUNT ||
-            cur_tile_idx < 0 || cur_tile_idx >= MAX_TILE_COUNT) {
-            printf("WARNING: invalid tile idx range: prev %d, cur %d, idx %d\n", prev_tile_idx, cur_tile_idx, idx);
-        }
         return;
     }
 }

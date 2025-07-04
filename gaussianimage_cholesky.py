@@ -29,7 +29,7 @@ class GaussianImage_Cholesky(nn.Module):
 
         # Initialize the parameters based on predefined set.
         with torch.no_grad():
-            data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
+            data = save_and_load_gaussian(self, dim=2, file_path="params_500k.pth")
 
         if data is not None:
             self._xyz = nn.Parameter(data["xyz"])

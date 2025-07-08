@@ -76,7 +76,7 @@ class GaussianVideo(nn.Module):
             # self.optimizer = Adan(self.parameters(), lr=kwargs["lr"])
             self.optimizer = Adan([
                     {'params': self._xyz, 'lr': kwargs["lr"]},
-                    {'params': self._cholesky, 'lr': (kwargs["lr"] / 10)},
+                    {'params': self._cholesky, 'lr': (kwargs["lr"] * 10)},
                     {'params': self._features_dc, 'lr': kwargs["lr"]}
                 ])
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20000, gamma=0.5)

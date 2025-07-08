@@ -193,7 +193,7 @@ def bin_and_sort_gaussians(
     )
     isect_ids_sorted, sorted_indices = torch.sort(isect_ids)
     gaussian_ids_sorted = torch.gather(gaussian_ids, 0, sorted_indices)
-    tile_bins = get_tile_bin_edges(num_intersects, isect_ids_sorted)
+    tile_bins = get_tile_bin_edges_video(num_intersects, isect_ids_sorted, tile_bounds)
     return isect_ids, gaussian_ids, isect_ids_sorted, gaussian_ids_sorted, tile_bins
 
 

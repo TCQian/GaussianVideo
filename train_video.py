@@ -39,7 +39,7 @@ class VideoTrainer:
         self.H, self.W, self.T = self.gt_image.shape[2], self.gt_image.shape[3], self.gt_image.shape[4]
         self.iterations = iterations
         self.save_imgs = args.save_imgs
-        self.log_dir = Path(f"./checkpoints/{args.data_name}/{model_name}_i{args.iterations}_g{num_points}_f{num_frames}_s{start_frame}/{video_name}")
+        self.log_dir = Path(f"./checkpoints/{args.data_name}/{model_name}_i{args.iterations_3d}_g{num_points}_f{num_frames}_s{start_frame}/{video_name}")
             
         if model_name == "GaussianVideo":
             from gaussianvideo import GaussianVideo
@@ -54,7 +54,7 @@ class VideoTrainer:
                 BLOCK_W=BLOCK_W, 
                 BLOCK_T=BLOCK_T, 
                 device=self.device, 
-                lr=args.lr, 
+                lr=args.lr_3d, 
                 quantize=False
             ).to(self.device)
 
@@ -186,16 +186,13 @@ def parse_args(argv):
         "--data_name", type=str, default='Jockey', help="Training dataset"
     )
     parser.add_argument(
-        "--iterations", type=int, default=50000, help="number of training epochs (default: %(default)s)"
+        "--model_name_3d", type=str, default="GaussianVideo", help="model selection for 3D: GaussianVideo"
     )
     parser.add_argument(
-        "--model_name", type=str, default="GaussianVideo", help="model selection: GaussianVideo"
+        "--iterations_3d", type=int, default=50000, help="number of training epochs for 3D GaussianVideo (default: %(default)s)"
     )
     parser.add_argument(
-        "--sh_degree", type=int, default=3, help="SH degree (default: %(default)s)"
-    )
-    parser.add_argument(
-        "--num_points",
+        "--num_points_3d",
         type=int,
         default=50000,
         help="2D+T GS points (default: %(default)s)",
@@ -212,14 +209,14 @@ def parse_args(argv):
         default=0,
         help="Start frame (default: %(default)s)",
     )
-    parser.add_argument("--model_path", type=str, default=None, help="Path to a checkpoint")
+    parser.add_argument("--model_path_3d", type=str, default=None, help="Path to a 3D GaussianVideo's checkpoint")
     parser.add_argument("--seed", type=float, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--save_imgs", action="store_true", help="Save image", default=True)
     parser.add_argument(
-        "--lr",
+        "--lr_3d",
         type=float,
         default=1e-2,
-        help="Learning rate (default: %(default)s)",
+        help="Learning rate of 3D GaussianVideo (default: %(default)s)",
     )
     args = parser.parse_args(argv)
     return args
@@ -237,7 +234,7 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         np.random.seed(args.seed)
 
-    logwriter = LogWriter(Path(f"./checkpoints/{args.data_name}/{args.model_name}_i{args.iterations}_g{args.num_points}_f{args.num_frames}_s{args.start_frame}"))
+    logwriter = LogWriter(Path(f"./checkpoints/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_f{args.num_frames}_s{args.start_frame}"))
     psnrs, ms_ssims, training_times, eval_times, eval_fpses = [], [], [], [], []
     image_h, image_w = 0, 0
     image_length, start = args.num_frames, args.start_frame
@@ -246,9 +243,8 @@ def main(argv):
     for i in range(start, start+image_length):
         image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
         images_paths.append(image_path)
-        
-    trainer = VideoTrainer(images_paths=images_paths, num_points=args.num_points,
-        iterations=args.iterations, model_name=args.model_name, args=args, model_path=args.model_path, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name)
+    trainer = VideoTrainer(images_paths=images_paths, num_points=args.num_points_3d,
+        iterations=args.iterations_3d, model_name=args.model_name_3d, args=args, model_path=args.model_path_3d, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name)
     psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
     psnrs.append(psnr)
     ms_ssims.append(ms_ssim)

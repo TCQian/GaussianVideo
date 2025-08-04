@@ -218,7 +218,7 @@ def main(argv):
     logwriter.write("Final PSNR:{:.4f}, Final MS-SSIM:{:.4f}".format(avg_psnr, avg_ms_ssim))
 
     # move the folder into the final directory
-    if os.path.join(final_dir_path, os.path.basename(gaussianimage_rendered_path)).exists():
+    if os.path.exists(os.path.join(final_dir_path, os.path.basename(gaussianimage_rendered_path))):
         logwriter.write(f"Folder {os.path.basename(gaussianimage_rendered_path)} already exists in {final_dir_path}, removing it.")
         shutil.rmtree(os.path.join(final_dir_path, os.path.basename(gaussianimage_rendered_path)))
     shutil.copytree(os.path.dirname(gaussianvideo_rendered_path), final_dir_path / gaussianvideo_rendered_path.split('/')[-2], dirs_exist_ok=True)

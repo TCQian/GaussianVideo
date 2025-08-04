@@ -146,7 +146,7 @@ def main(argv):
         print(f"Processing {gt_img_path} and {rendered_img_path}")
         gt_image = cv2.imread(str(gt_img_path), cv2.IMREAD_UNCHANGED)
         rendered_image = cv2.imread(rendered_img_path, cv2.IMREAD_UNCHANGED)
-        delta_image = cv2.substract(gt_image, rendered_image)
+        delta_image = cv2.subtract(gt_image, rendered_image)
         # Save the delta image
         delta_image_path = os.path.join(output_delta_path, os.path.basename(gt_img_path))
         cv2.imwrite(delta_image_path, delta_image)
@@ -189,6 +189,7 @@ def main(argv):
     final_rendered_path = os.path.join(final_dir_path, "final_rendered")
     os.makedirs(final_rendered_path, exist_ok=True)
     for layer1_img, layer2_img in zip(gaussianvideo_rendered_images, gaussianimage_rendered_images):
+        print(f"Combining {layer1_img} and {layer2_img}")
         layer1_image = cv2.imread(layer1_img, cv2.IMREAD_UNCHANGED)
         layer2_image = cv2.imread(layer2_img, cv2.IMREAD_UNCHANGED)
         final_image = cv2.add(layer1_image, layer2_image)
@@ -201,8 +202,7 @@ def main(argv):
     gt_images_tensor = images_paths_to_tensor(images_paths)
     final_rendered_images_tensor = images_paths_to_tensor([os.path.join(final_rendered_path, f"frame_{i+1:04}_fitting.png") for i in range(image_length)])
     mse_loss = F.mse_loss(final_rendered_images_tensor.float(), gt_images_tensor.float())
-    psnr = 10 * math.log10(1.0 / mse_loss.item())
-    avg_psnr = psnr / image_length
+    avg_psnr = 10 * math.log10(1.0 / mse_loss.item())
 
     num_time_steps = final_rendered_images_tensor.size(-1)  # T dimension
 
@@ -218,7 +218,10 @@ def main(argv):
     logwriter.write("Final PSNR:{:.4f}, Final MS-SSIM:{:.4f}".format(avg_psnr, avg_ms_ssim))
 
     # move the folder into the final directory
-    shutil.copytree(os.path.dirname(gaussianvideo_rendered_path), final_dir_path / gaussianvideo_rendered_path.name, dirs_exist_ok=True)
+    if os.path.join(final_dir_path, os.path.basename(gaussianimage_rendered_path)).exists():
+        logwriter.write(f"Folder {os.path.basename(gaussianimage_rendered_path)} already exists in {final_dir_path}, removing it.")
+        shutil.rmtree(os.path.join(final_dir_path, os.path.basename(gaussianimage_rendered_path)))
+    shutil.copytree(os.path.dirname(gaussianvideo_rendered_path), final_dir_path / gaussianvideo_rendered_path.split('/')[-2], dirs_exist_ok=True)
     shutil.move(gaussianimage_rendered_path, final_dir_path)
     logwriter.write(f"Moved GaussianVideo and GaussianImage folders to {final_dir_path}")
 

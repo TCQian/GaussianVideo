@@ -1,6 +1,7 @@
 import math
 from pathlib import Path
 import argparse
+import shutil
 import yaml
 import numpy as np
 import torch
@@ -211,7 +212,7 @@ def main(argv):
 
     # Compare the final rendered images with the ground truth
     gt_images_tensor = images_paths_to_tensor(images_paths)
-    final_rendered_images_tensor = images_paths_to_tensor([os.path.join(final_rendered_path, f"{args.data_name}_fitting_t{i+1:04}.png") for i in range(image_length)])
+    final_rendered_images_tensor = images_paths_to_tensor([os.path.join(final_rendered_path, f"frame_{i+1:04}_fitting.png") for i in range(image_length)])
     mse_loss = F.mse_loss(final_rendered_images_tensor.float(), gt_images_tensor.float())
     psnr = 10 * math.log10(1.0 / mse_loss.item())
     avg_psnr = psnr / image_length
@@ -228,6 +229,11 @@ def main(argv):
         )
     avg_ms_ssim = sum(ms_ssim_values) / len(ms_ssim_values)
     logwriter.write("Final PSNR:{:.4f}, Final MS-SSIM:{:.4f}".format(avg_psnr, avg_ms_ssim))
+
+    # move the folder into the final directory
+    shutil.move(gaussianvideo_rendered_path, final_dir_path)
+    shutil.move(gaussianimage_rendered_path, final_dir_path)
+    logwriter.write(f"Moved GaussianVideo and GaussianImage folders to {final_dir_path}")
 
 if __name__ == "__main__":
     main(sys.argv[1:])

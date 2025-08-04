@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 import argparse
 import yaml
@@ -6,9 +7,13 @@ import torch
 import sys
 import random
 import glob
+import os
+import cv2
+import torch.nn.functional as F
+from pytorch_msssim import ms_ssim as MS_SSIM
 
 from utils import *
-from train_video import VideoTrainer
+from train_video import VideoTrainer, images_paths_to_tensor
 from train import SimpleTrainer2d
 
 def parse_args(argv):
@@ -185,6 +190,44 @@ def main(argv):
 
     logwriter.write("Average: {}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training for 2D GaussianImage:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
         avg_h, avg_w, avg_psnr, avg_ms_ssim, avg_training_time, avg_eval_time, avg_eval_fps))
+
+    # Combine the layers
+    gaussianimage_rendered_path = Path(f"./checkpoints/{args.data_name}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}")
+    gaussianimage_rendered_images = glob.glob(os.path.join(gaussianimage_rendered_path, '*', f"{args.data_name}_fitting_t*.png"))
+    gaussianimage_rendered_images.sort(key=lambda x: int(x.split('_')[-1].split('.')[0][1:]))  # Sort by frame number
+    assert gaussianimage_rendered_path.exists(), "GaussianImage rendered images not found. Please check the training of 2D GaussianImage."
+    assert len(gaussianimage_rendered_images) == image_length, "Number of rendered images does not match the number of frames."
+    
+    final_rendered_path = os.path.join(final_dir_path, "final_rendered")
+    os.makedirs(final_rendered_path, exist_ok=True)
+    for layer1_img, layer2_img in zip(gaussianvideo_rendered_images, gaussianimage_rendered_images):
+        layer1_image = cv2.imread(layer1_img, cv2.IMREAD_UNCHANGED)
+        layer2_image = cv2.imread(layer2_img, cv2.IMREAD_UNCHANGED)
+        final_image = cv2.add(layer1_image, layer2_image)
+        final_image_name = os.path.basename(layer1_img)
+        final_image_path = os.path.join(final_rendered_path, final_image_name)
+        cv2.imwrite(final_image_path, final_image)
+    logwriter.write(f"Final rendered images saved to {final_rendered_path}")
+
+    # Compare the final rendered images with the ground truth
+    gt_images_tensor = images_paths_to_tensor(images_paths)
+    final_rendered_images_tensor = images_paths_to_tensor([os.path.join(final_rendered_path, f"{args.data_name}_fitting_t{i+1:04}.png") for i in range(image_length)])
+    mse_loss = F.mse_loss(final_rendered_images_tensor.float(), gt_images_tensor.float())
+    psnr = 10 * math.log10(1.0 / mse_loss.item())
+    avg_psnr = psnr / image_length
+
+    num_time_steps = final_rendered_images_tensor.size(-1)  # T dimension
+
+    ms_ssim_values = []
+    for t in range(num_time_steps):
+        # Extract the t-th frame from both render and ground truth
+        frame = final_rendered_images_tensor[..., t]  # e.g. shape: [1, 3, H, W]
+        gt_frame = gt_images_tensor[..., t] # e.g. shape: [1, 3, H, W]
+        ms_ssim_values.append(
+            MS_SSIM(frame, gt_frame, data_range=1, size_average=True).item()
+        )
+    avg_ms_ssim = sum(ms_ssim_values) / len(ms_ssim_values)
+    logwriter.write("Final PSNR:{:.4f}, Final MS-SSIM:{:.4f}".format(avg_psnr, avg_ms_ssim))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -106,8 +106,6 @@ def main(argv):
     logwriter = LogWriter(final_dir_path)
     
     # Training 3D GaussianVideo as Layer 1
-    psnrs, ms_ssims, training_times, eval_times, eval_fpses = [], [], [], [], []
-    image_h, image_w = 0, 0
     image_length, start = args.num_frames, args.start_frame
 
     images_paths = []
@@ -115,34 +113,26 @@ def main(argv):
         image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
         images_paths.append(image_path)
         
-    trainer = VideoTrainer(images_paths=images_paths, num_points=args.num_points_3d,
-        iterations=args.iterations_3d, model_name=args.model_name_3d, args=args, model_path=args.model_path_3d, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name)
-    
-    psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
-    psnrs.append(psnr)
-    ms_ssims.append(ms_ssim)
-    training_times.append(training_time) 
-    eval_times.append(eval_time)
-    eval_fpses.append(eval_fps)
-    image_h += trainer.H
-    image_w += trainer.W
-    image_name = image_path.stem
-    logwriter.write("{}: {}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training GaussianVideo as Layer 1:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
-        image_name, trainer.H, trainer.W, psnr, ms_ssim, training_time, eval_time, eval_fps))
+    gaussianvideo_rendered_path = Path(f"./checkpoints/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_f{args.num_frames}_s{args.start_frame}/{args.data_name}")
+    gv_done = os.path.exists(gaussianvideo_rendered_path) and len(glob.glob(os.path.join(gaussianvideo_rendered_path, f"{args.data_name}_fitting_t*.png"))) == image_length:
+    if not gv_done:
+        logwriter.write(f"Training 3D GaussianVideo as Layer 1 with {args.num_frames} frames, {args.num_points_3d} points, {args.iterations_3d} iterations, model name: {args.model_name_3d}")
+        
+        trainer = VideoTrainer(images_paths=images_paths, num_points=args.num_points_3d,
+            iterations=args.iterations_3d, model_name=args.model_name_3d, args=args, model_path=args.model_path_3d, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name)
+        
+        psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
+        image_h, image_w = trainer.H, trainer.W
+        avg_psnr = psnr / image_length
+        avg_ms_ssim = ms_ssim / image_length
+        avg_training_time = training_time / image_length
+        avg_eval_time = eval_time / image_length
+        avg_eval_fps = eval_fps / image_length
 
-    avg_psnr = torch.tensor(psnrs).mean().item()
-    avg_ms_ssim = torch.tensor(ms_ssims).mean().item()
-    avg_training_time = torch.tensor(training_times).mean().item()
-    avg_eval_time = torch.tensor(eval_times).mean().item()
-    avg_eval_fps = torch.tensor(eval_fpses).mean().item()
-    # avg_h = image_h//image_length
-    # avg_w = image_w//image_length
-
-    logwriter.write("Average: {}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training GaussianVideo as Layer 1:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
-        image_h, image_w, avg_psnr, avg_ms_ssim, avg_training_time, avg_eval_time, avg_eval_fps))    
+        logwriter.write("Average: {}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training GaussianVideo as Layer 1:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
+            image_h, image_w, avg_psnr, avg_ms_ssim, avg_training_time, avg_eval_time, avg_eval_fps))    
     
     # Collect delta image for 2D GaussianImage training
-    gaussianvideo_rendered_path = Path(f"./checkpoints/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_f{args.num_frames}_s{args.start_frame}/{args.data_name}")
     gaussianvideo_rendered_images = glob.glob(os.path.join(gaussianvideo_rendered_path, f"{args.data_name}_fitting_t*.png"))
     gaussianvideo_rendered_images.sort(key=lambda x: int(x.split('_')[-1].split('.')[0][1:]))  # Sort by frame number
     assert gaussianvideo_rendered_path.exists(), "GaussianVideo rendered images not found. Please check the training of 3D GaussianVideo."
@@ -177,9 +167,6 @@ def main(argv):
         eval_fpses.append(eval_fps)
         image_h += trainer.H
         image_w += trainer.W
-        image_name = image_path.stem
-        logwriter.write("{}: {}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training for 2D GaussianImage:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
-            image_name, trainer.H, trainer.W, psnr, ms_ssim, training_time, eval_time, eval_fps))
 
     avg_psnr = torch.tensor(psnrs).mean().item()
     avg_ms_ssim = torch.tensor(ms_ssims).mean().item()
@@ -205,7 +192,7 @@ def main(argv):
         layer1_image = cv2.imread(layer1_img, cv2.IMREAD_UNCHANGED)
         layer2_image = cv2.imread(layer2_img, cv2.IMREAD_UNCHANGED)
         final_image = cv2.add(layer1_image, layer2_image)
-        final_image_name = os.path.basename(layer1_img)
+        final_image_name = os.path.basename(layer2_img)
         final_image_path = os.path.join(final_rendered_path, final_image_name)
         cv2.imwrite(final_image_path, final_image)
     logwriter.write(f"Final rendered images saved to {final_rendered_path}")
@@ -231,7 +218,7 @@ def main(argv):
     logwriter.write("Final PSNR:{:.4f}, Final MS-SSIM:{:.4f}".format(avg_psnr, avg_ms_ssim))
 
     # move the folder into the final directory
-    shutil.move(gaussianvideo_rendered_path, final_dir_path)
+    shutil.copytree(gaussianvideo_rendered_path, final_dir_path / gaussianvideo_rendered_path.name, dirs_exist_ok=True)
     shutil.move(gaussianimage_rendered_path, final_dir_path)
     logwriter.write(f"Moved GaussianVideo and GaussianImage folders to {final_dir_path}")
 

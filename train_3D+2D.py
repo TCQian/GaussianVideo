@@ -114,7 +114,7 @@ def main(argv):
         images_paths.append(image_path)
         
     gaussianvideo_rendered_path = Path(f"./checkpoints/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_f{args.num_frames}_s{args.start_frame}/{args.data_name}")
-    gv_done = os.path.exists(gaussianvideo_rendered_path) and len(glob.glob(os.path.join(gaussianvideo_rendered_path, f"{args.data_name}_fitting_t*.png"))) == image_length:
+    gv_done = os.path.exists(gaussianvideo_rendered_path) and len(glob.glob(os.path.join(gaussianvideo_rendered_path, f"{args.data_name}_fitting_t*.png"))) == image_length
     if not gv_done:
         logwriter.write(f"Training 3D GaussianVideo as Layer 1 with {args.num_frames} frames, {args.num_points_3d} points, {args.iterations_3d} iterations, model name: {args.model_name_3d}")
         
@@ -146,7 +146,7 @@ def main(argv):
         print(f"Processing {gt_img_path} and {rendered_img_path}")
         gt_image = cv2.imread(str(gt_img_path), cv2.IMREAD_UNCHANGED)
         rendered_image = cv2.imread(rendered_img_path, cv2.IMREAD_UNCHANGED)
-        delta_image = cv2.absdiff(gt_image, rendered_image)
+        delta_image = cv2.substract(gt_image, rendered_image)
         # Save the delta image
         delta_image_path = os.path.join(output_delta_path, os.path.basename(gt_img_path))
         cv2.imwrite(delta_image_path, delta_image)
@@ -218,7 +218,7 @@ def main(argv):
     logwriter.write("Final PSNR:{:.4f}, Final MS-SSIM:{:.4f}".format(avg_psnr, avg_ms_ssim))
 
     # move the folder into the final directory
-    shutil.copytree(gaussianvideo_rendered_path, final_dir_path / gaussianvideo_rendered_path.name, dirs_exist_ok=True)
+    shutil.copytree(os.path.dirname(gaussianvideo_rendered_path), final_dir_path / gaussianvideo_rendered_path.name, dirs_exist_ok=True)
     shutil.move(gaussianimage_rendered_path, final_dir_path)
     logwriter.write(f"Moved GaussianVideo and GaussianImage folders to {final_dir_path}")
 

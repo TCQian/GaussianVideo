@@ -193,11 +193,11 @@ def main(argv):
 
     # Combine the layers
     gaussianimage_rendered_path = Path(f"./checkpoints/{args.data_name}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}")
-    gaussianimage_rendered_images = glob.glob(os.path.join(gaussianimage_rendered_path, '*', f"{args.data_name}_fitting_t*.png"))
-    gaussianimage_rendered_images.sort(key=lambda x: int(x.split('_')[-1].split('.')[0][1:]))  # Sort by frame number
+    gaussianimage_rendered_images = glob.glob(os.path.join(gaussianimage_rendered_path, '*', f"frame_*_fitting.png"))
+    gaussianimage_rendered_images.sort(key=lambda x: int(x.split('_')[-2]))  # Sort by frame number
     assert gaussianimage_rendered_path.exists(), "GaussianImage rendered images not found. Please check the training of 2D GaussianImage."
-    assert len(gaussianimage_rendered_images) == image_length, "Number of rendered images does not match the number of frames."
-    
+    assert len(gaussianimage_rendered_images) == image_length, f"Number of rendered images, {len(gaussianimage_rendered_images)} does not match the number of frames, {image_length}."
+
     final_rendered_path = os.path.join(final_dir_path, "final_rendered")
     os.makedirs(final_rendered_path, exist_ok=True)
     for layer1_img, layer2_img in zip(gaussianvideo_rendered_images, gaussianimage_rendered_images):

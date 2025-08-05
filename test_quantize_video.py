@@ -61,7 +61,7 @@ class SimpleTrainerVideoQuantize:
 
         # Incorporate num_frames and start_frame into the log directory name.
         self.log_dir = Path(
-            f"./checkpoints_quant/{args.data_name}/{model_name}_i{args.iterations}_g{num_points}_f{args.num_frames}_s{args.start_frame}/{image_name}"
+            f"./checkpoints_quant/{args.data_name}/{model_name}_i{args.iterations_3d}_g{num_points}_f{args.num_frames}_s{args.start_frame}/{image_name}"
         )
 
         from gaussianvideo import GaussianVideo
@@ -76,7 +76,7 @@ class SimpleTrainerVideoQuantize:
             BLOCK_W=BLOCK_W,
             BLOCK_T=BLOCK_T,
             device=self.device,
-            lr=args.lr,
+            lr=args.lr_3d,
             quantize=True
         ).to(self.device)
         
@@ -132,16 +132,16 @@ def parse_args(argv):
     parser = argparse.ArgumentParser(description="Test quantized GaussianVideo model.")
     parser.add_argument("-d", "--dataset", type=str, default='./dataset/Jockey/', help="Dataset directory containing video frames")
     parser.add_argument("--data_name", type=str, default='Jockey', help="Dataset name")
-    parser.add_argument("--iterations", type=int, default=50000, help="Number of iterations (for logging consistency)")
-    parser.add_argument("--model_name", type=str, default="GaussianVideo", help="Model selection: GaussianVideo")
-    parser.add_argument("--num_points", type=int, default=50000, help="Number of Gaussian points")
+    parser.add_argument("--iterations_3d", type=int, default=50000, help="number of training epochs for 3D GaussianVideo (default: %(default)s)")
+    parser.add_argument("--model_name_3d", type=str, default="GaussianVideo", help="model selection for 3D: GaussianVideo")
+    parser.add_argument("--num_points_3d", type=int, default=50000, help="2D+T GS points (default: %(default)s)")
     parser.add_argument("--num_frames", type=int, default=50, help="Number of frames to use")
     parser.add_argument("--start_frame", type=int, default=0, help="Start frame index")
-    parser.add_argument("--model_path", type=str, default=None, help="Path to a checkpoint")
+    parser.add_argument("--model_path_3d", type=str, default=None, help="Path to a 3D GaussianVideo's checkpoint")
     parser.add_argument("--seed", type=float, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--quantize", action="store_true", help="Enable quantization")
     parser.add_argument("--save_imgs", action="store_true", help="Save rendered frames")
-    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--lr_3d", type=float, default=1e-2, help="Learning rate of 3D GaussianVideo (default: %(default)s)")
     args = parser.parse_args(argv)
     return args
 
@@ -157,7 +157,7 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         np.random.seed(args.seed)
 
-    logwriter = LogWriter(Path(f"./checkpoints_quant/{args.data_name}/{args.model_name}_i{args.iterations}_g{args.num_points}_f{args.num_frames}_s{args.start_frame}"), train=False)
+    logwriter = LogWriter(Path(f"./checkpoints_quant/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_f{args.num_frames}_s{args.start_frame}"), train=False)
     
     # Build the list of image paths for the video frames.
     images_paths = []
@@ -167,11 +167,11 @@ def main(argv):
 
     trainer = SimpleTrainerVideoQuantize(
         images_paths=images_paths,
-        num_points=args.num_points,
-        iterations=args.iterations,
-        model_name=args.model_name,
+        num_points=args.num_points_3d,
+        iterations=args.iterations_3d,
+        model_name=args.model_name_3d,
         args=args,
-        model_path=args.model_path
+        model_path=args.model_path_3d
     )
     
     data_dict = trainer.test()

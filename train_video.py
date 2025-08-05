@@ -262,11 +262,11 @@ def main(argv):
     avg_training_time = torch.tensor(training_times).mean().item()
     avg_eval_time = torch.tensor(eval_times).mean().item()
     avg_eval_fps = torch.tensor(eval_fpses).mean().item()
-    avg_h = image_h//image_length
-    avg_w = image_w//image_length
+    # avg_h = image_h//image_length
+    # avg_w = image_w//image_length
 
     logwriter.write("Average: {}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
-        avg_h, avg_w, avg_psnr, avg_ms_ssim, avg_training_time, avg_eval_time, avg_eval_fps))    
+        image_h, image_w, avg_psnr, avg_ms_ssim, avg_training_time, avg_eval_time, avg_eval_fps))    
 
 if __name__ == "__main__":
     main(sys.argv[1:])

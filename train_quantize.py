@@ -34,18 +34,18 @@ class SimpleTrainer2d:
         BLOCK_H, BLOCK_W = 16, 16
         self.H, self.W = self.gt_image.shape[2], self.gt_image.shape[3]
         self.iterations = iterations
-        self.log_dir = Path(f"./checkpoints_quant/{args.data_name}/{model_name}_{args.iterations}_{num_points}/{self.image_name}")
+        self.log_dir = Path(f"./checkpoints_quant/{args.data_name}/{model_name}_{args.iterations_2d}_{num_points}/{self.image_name}")
         self.save_imgs = args.save_imgs
 
         if model_name == "GaussianImage_Cholesky":
             from gaussianimage_cholesky import GaussianImage_Cholesky
             self.gaussian_model = GaussianImage_Cholesky(loss_type="L2", opt_type="adan", num_points=self.num_points, H=self.H, W=self.W, BLOCK_H=BLOCK_H, BLOCK_W=BLOCK_W, 
-                device=self.device, lr=args.lr, quantize=True).to(self.device)
+                device=self.device, lr=args.lr_2d, quantize=True).to(self.device)
             
         elif model_name == "GaussianImage_RS":
             from gaussianimage_rs import GaussianImage_RS
             self.gaussian_model = GaussianImage_RS(loss_type="L2", opt_type="adan", num_points=self.num_points, H=self.H, W=self.W, BLOCK_H=BLOCK_H, BLOCK_W=BLOCK_W, 
-                device=self.device, lr=args.lr, quantize=True).to(self.device)
+                device=self.device, lr=args.lr_2d, quantize=True).to(self.device)
 
         self.logwriter = LogWriter(self.log_dir)
 
@@ -129,16 +129,16 @@ def image_path_to_tensor(image_path: Path):
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Example training script.")
     parser.add_argument(
-        "-d", "--dataset", type=str, default='./dataset/kodak/', help="Training dataset"
+        "-d", "--dataset", type=str, default='./datasets/kodak/', help="Training dataset"
     )
     parser.add_argument(
         "--data_name", type=str, default='kodak', help="Training dataset"
     )
     parser.add_argument(
-        "--iterations", type=int, default=50000, help="number of training epochs (default: %(default)s)"
+        "--iterations_2d", type=int, default=50000, help="number of training epochs for 2D GaussianImage (default: %(default)s)"
     )
     parser.add_argument(
-        "--model_name", type=str, default="GaussianImage_Cholesky", help="model selection: GaussianImage_Cholesky, GaussianImage_RS, 3DGS"
+        "--model_name_2d", type=str, default="GaussianImage_Cholesky", help="model selection for 2D: GaussianImage_Cholesky, GaussianImage_RS, 3DGS"
     )
     parser.add_argument(
         "--sh_degree", type=int, default=3, help="SH degree (default: %(default)s)"
@@ -156,20 +156,19 @@ def parse_args(argv):
         help="Start frame (default: %(default)s)",
     )
     parser.add_argument(
-        "--num_points",
+        "--num_points_2d",
         type=int,
         default=50000,
         help="2D GS points (default: %(default)s)",
     )
-    parser.add_argument("--model_path", type=str, default=None, help="Path to a checkpoint")
+    parser.add_argument("--model_path_2d", type=str, default=None, help="Path to a 2D GaussianImage's checkpoint")
     parser.add_argument("--seed", type=float, default=1, help="Set random seed for reproducibility")
-    parser.add_argument("--quantize", action="store_true", help="Quantize")
     parser.add_argument("--save_imgs", action="store_true", help="Save image")
     parser.add_argument(
-        "--lr",
+        "--lr_2d",
         type=float,
         default=1e-3,
-        help="Learning rate (default: %(default)s)",
+        help="Learning rate for 2D GaussianImage (default: %(default)s)",
     )
     parser.add_argument("--pretrained", type=str, help="Path to a checkpoint")
     args = parser.parse_args(argv)
@@ -188,7 +187,7 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         np.random.seed(args.seed)
 
-    logwriter = LogWriter(Path(f"./checkpoints_quant/{args.data_name}/{args.model_name}_{args.iterations}_{args.num_points}"))
+    logwriter = LogWriter(Path(f"./checkpoints_quant/{args.data_name}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}"))
     psnrs, ms_ssims, training_times, eval_times, eval_fpses, bpps = [], [], [], [], [], []
     best_psnrs, best_ms_ssims, best_bpps = [], [], []
     image_h, image_w = 0, 0
@@ -202,16 +201,16 @@ def main(argv):
     for i in range(start, start+image_length):
         if args.data_name == "kodak":
             image_path = Path(args.dataset) / f'kodim{i+1:02}.png'
-            model_path = Path(args.model_path) / f'kodim{i+1:02}' / 'gaussian_model.pth.tar'
+            model_path = Path(args.model_path_2d) / f'kodim{i+1:02}' / 'gaussian_model.pth.tar'
         elif args.data_name == "DIV2K_valid_LRX2":
             image_path = Path(args.dataset) /  f'{i+1:04}x2.png'
-            model_path = Path(args.model_path) / f'{i+1:04}x2' / 'gaussian_model.pth.tar'
+            model_path = Path(args.model_path_2d) / f'{i+1:04}x2' / 'gaussian_model.pth.tar'
         else:
             image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
-            model_path = Path(args.model_path) / f'frame_{i+1:04}' / 'gaussian_model.pth.tar'
+            model_path = Path(args.model_path_2d) / f'frame_{i+1:04}' / 'gaussian_model.pth.tar'
         
-        trainer = SimpleTrainer2d(image_path=image_path, num_points=args.num_points, 
-            iterations=args.iterations, model_name=args.model_name, args=args, model_path=model_path)
+        trainer = SimpleTrainer2d(image_path=image_path, num_points=args.num_points_2d, 
+            iterations=args.iterations_2d, model_name=args.model_name_2d, args=args, model_path=model_path)
         psnr, ms_ssim, training_time, eval_time, eval_fps, bpp, best_psnr, best_ms_ssim, best_bpp = trainer.train()
         best_psnrs.append(best_psnr)
         best_ms_ssims.append(best_ms_ssim)

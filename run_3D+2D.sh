@@ -65,8 +65,10 @@ echo "Starting ${MODEL_NAME_3D}_${NUM_POINTS_3D}_${MODEL_NAME_2D}_${NUM_POINTS_2
 # Define dataset and checkpoint paths using the variables.
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
 DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
-CHECKPOINT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME_3D}_i${TRAIN_ITERATIONS_3D}_g${NUM_POINTS_3D}_${MODEL_NAME_2D}_i${TRAIN_ITERATIONS_2D}_g${NUM_POINTS_2D}_f${NUM_FRAMES}_s${START_FRAME}/"
-CHECKPOINT_QUANT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME_3D}_i${QUANT_ITERATIONS_3D}_g${NUM_POINTS_3D}_${MODEL_NAME_2D}_i${QUANT_ITERATIONS_2D}_g${NUM_POINTS_2D}_f${NUM_FRAMES}_s${START_FRAME}/"
+CHECKPOINT_PATH_3D="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME_3D}_i${TRAIN_ITERATIONS_3D}_g${NUM_POINTS_3D}_${MODEL_NAME_2D}_i${TRAIN_ITERATIONS_2D}_g${NUM_POINTS_2D}_f${NUM_FRAMES}_s${START_FRAME}/"
+CHECKPOINT_PATH_2D="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME_2D}_i${TRAIN_ITERATIONS_2D}_g${NUM_POINTS_2D}_f${NUM_FRAMES}_s${START_FRAME}/"
+CHECKPOINT_QUANT_PATH_3D="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME_3D}_i${QUANT_ITERATIONS_3D}_g${NUM_POINTS_3D}_${MODEL_NAME_2D}_i${QUANT_ITERATIONS_2D}_g${NUM_POINTS_2D}_f${NUM_FRAMES}_s${START_FRAME}/"
+CHECKPOINT_QUANT_PATH_2D="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME_2D}_i${QUANT_ITERATIONS_2D}_g${NUM_POINTS_2D}_f${NUM_FRAMES}_s${START_FRAME}/"
 
 python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
 
@@ -86,29 +88,37 @@ python train_3D+2D.py \
     --save_imgs
 
 # Run the quantization training script.
-# python train_quantize_video.py \
-#     --dataset "${DATASET_PATH}" \
-#     --data_name "${DATA_NAME}" \
-#     --iterations "${QUANT_ITERATIONS}" \
-#     --model_name "${MODEL_NAME}" \
-#     --num_points "${NUM_POINTS}" \
-#     --model_path "${CHECKPOINT_PATH}${DATA_NAME}/gaussian_model.pth.tar" \
-#     --start_frame "${START_FRAME}" \
-#     --num_frames "${NUM_FRAMES}" \
-#     --lr "${LEARNING_RATE}" \
-#     --save_imgs
+python train_quantize_3D+2D.py \
+    --dataset "${DATASET_PATH}" \
+    --data_name "${DATA_NAME}" \
+    --iterations_2d "${QUANT_ITERATIONS_2D}" \
+    --model_name_2d "${MODEL_NAME_2D}" \
+    --num_points_2d "${NUM_POINTS_2D}" \
+    --model_path_2d "${CHECKPOINT_PATH}${DATA_NAME}/gaussian_model.pth.tar" \
+    --iterations_3d "${QUANT_ITERATIONS_3D}" \
+    --model_name_3d "${MODEL_NAME_3D}" \
+    --num_points_3d "${NUM_POINTS_3D}" \
+    --model_path_3d "${CHECKPOINT_PATH_3D}${DATA_NAME}/gaussian_model.pth.tar" \
+    --start_frame "${START_FRAME}" \
+    --num_frames "${NUM_FRAMES}" \
+    --lr_3d "${LEARNING_RATE_3D}" \
+    --save_imgs
 
 # # Run the quantization testing script.
-# python test_quantize_video.py \
-#     --dataset "${DATASET_PATH}" \
-#     --data_name "${DATA_NAME}" \
-#     --iterations "${QUANT_ITERATIONS}" \
-#     --model_name "${MODEL_NAME}" \
-#     --num_points "${NUM_POINTS}" \
-#     --model_path "${CHECKPOINT_QUANT_PATH}${DATA_NAME}/gaussian_model.best.pth.tar" \
-#     --start_frame "${START_FRAME}" \
-#     --num_frames "${NUM_FRAMES}" \
-#     --lr "${LEARNING_RATE}" \
-#     --save_imgs
+python test_quantize_3D+2D.py \
+    --dataset "${DATASET_PATH}" \
+    --data_name "${DATA_NAME}" \
+    --iterations_3d "${QUANT_ITERATIONS_3D}" \
+    --model_name_3d "${MODEL_NAME_3D}" \
+    --num_points_3d "${NUM_POINTS_3D}" \
+    --model_path_3d "${CHECKPOINT_QUANT_PATH_3D}${DATA_NAME}/gaussian_model.best.pth.tar" \
+    --iterations_2d "${QUANT_ITERATIONS_2D}" \
+    --model_name_2d "${MODEL_NAME_2D}" \
+    --num_points_2d "${NUM_POINTS_2D}" \
+    --model_path_2d "${CHECKPOINT_PATH_2D}${DATA_NAME}/gaussian_model.best.pth.tar" \
+    --start_frame "${START_FRAME}" \
+    --num_frames "${NUM_FRAMES}" \
+    --lr_3d "${LEARNING_RATE_3D}" \
+    --save_imgs
 
 echo "Done"

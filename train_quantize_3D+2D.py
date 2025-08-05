@@ -16,66 +16,24 @@ from pytorch_msssim import ms_ssim as MS_SSIM
 
 from utils import *
 from train_video import images_paths_to_tensor
+# Import common functions from train_3D+2D.py to avoid redundancy
+import importlib.util
+spec = importlib.util.spec_from_file_location("train_3d_2d", "train_3D+2D.py")
+train_3d_2d = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(train_3d_2d)
 
-def get_delta_images(gt_images_paths, rendered_images_paths, output_path):
-    assert len(rendered_images_paths) == len(gt_images_paths), f"Number of rendered images, {len(rendered_images_paths)}, does not match the number of frames, {len(gt_images_paths)}."
-
-    delta_path = os.path.join(output_path, "delta_images")
-    os.makedirs(delta_path, exist_ok=True)
-
-    for gt_img_path, rendered_img_path in zip(gt_images_paths, rendered_images_paths):
-        print(f"Getting delta image for {gt_img_path} and {rendered_img_path}")
-        gt_image = cv2.imread(str(gt_img_path), cv2.IMREAD_UNCHANGED)
-        rendered_image = cv2.imread(rendered_img_path, cv2.IMREAD_UNCHANGED)
-        delta_image = cv2.subtract(gt_image, rendered_image)
-        # Save the delta image
-        delta_image_path = os.path.join(delta_path, os.path.basename(gt_img_path))
-        cv2.imwrite(delta_image_path, delta_image)
-    return delta_path
-
-def combine_layers(layer1_images_paths, layer2_images_paths, output_path):
-    assert len(layer1_images_paths) == len(layer2_images_paths), f"Number of Layer 1 images, {len(layer1_images_paths)}, does not match the number of Layer 2 images, {len(layer2_images_paths)}."
-
-    final_rendered_path = os.path.join(output_path, "final_rendered")
-    os.makedirs(final_rendered_path, exist_ok=True)
-    for layer1_img, layer2_img in zip(layer1_images_paths, layer2_images_paths):
-        print(f"Combining {layer1_img} and {layer2_img}")
-        layer1_image = cv2.imread(layer1_img, cv2.IMREAD_UNCHANGED)
-        layer2_image = cv2.imread(layer2_img, cv2.IMREAD_UNCHANGED)
-        final_image = cv2.add(layer1_image, layer2_image)
-        final_image_name = os.path.basename(layer2_img)
-        final_image_path = os.path.join(final_rendered_path, final_image_name)
-        cv2.imwrite(final_image_path, final_image)
-    print(f"Final rendered images saved to {final_rendered_path}")
-
-    return final_rendered_path
-
-def evaluate_images(gt_images_paths, output_images_paths):
-    gt_images_tensor = images_paths_to_tensor(gt_images_paths)
-    output_images_tensor = images_paths_to_tensor([os.path.join(output_images_paths, f"frame_{i+1:04}_fitting.png") for i in range(len(gt_images_paths))])
-    mse_loss = F.mse_loss(output_images_tensor.float(), gt_images_tensor.float())
-    avg_psnr = 10 * math.log10(1.0 / mse_loss.item())
-
-    num_time_steps = output_images_tensor.size(-1)  # T dimension
-
-    ms_ssim_values = []
-    for t in range(num_time_steps):
-        # Extract the t-th frame from both render and ground truth
-        frame = output_images_tensor[..., t]  # e.g. shape: [1, 3, H, W]
-        gt_frame = gt_images_tensor[..., t] # e.g. shape: [1, 3, H, W]
-        ms_ssim_values.append(
-            MS_SSIM(frame, gt_frame, data_range=1, size_average=True).item()
-        )
-    avg_ms_ssim = sum(ms_ssim_values) / len(ms_ssim_values)
-
-    return avg_psnr, avg_ms_ssim
+# Import the utility functions
+get_delta_images = train_3d_2d.get_delta_images
+combine_layers = train_3d_2d.combine_layers
+evaluate_images = train_3d_2d.evaluate_images
 
 def parse_args(argv):
-    parser = argparse.ArgumentParser(description="Example training script.")
+    parser = argparse.ArgumentParser(description="Quantized training script for 3D+2D GaussianVideo.")
    
     # Parameters for training
     parser.add_argument("--seed", type=float, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--save_imgs", action="store_true", help="Save image")
+    parser.add_argument("--quantize", action="store_true", help="Enable quantization")
     
     # Parameters for dataset
     parser.add_argument(
@@ -101,7 +59,6 @@ def parse_args(argv):
     parser.add_argument(
         "--model_name_3d", type=str, default="GaussianVideo", help="model selection for 3D: GaussianVideo"
     )
-
     parser.add_argument(
         "--iterations_3d", type=int, default=50000, help="number of training epochs for 3D GaussianVideo (default: %(default)s)"
     )
@@ -112,6 +69,7 @@ def parse_args(argv):
         help="2D+T GS points (default: %(default)s)",
     )
     parser.add_argument("--model_path_3d", type=str, default=None, help="Path to a 3D GaussianVideo's checkpoint")
+    parser.add_argument("--pretrained_3d", type=str, default=None, help="Path to a pretrained 3D checkpoint")
     parser.add_argument(
         "--lr_3d",
         type=float,
@@ -133,6 +91,7 @@ def parse_args(argv):
         help="2D GS points (default: %(default)s)",
     )
     parser.add_argument("--model_path_2d", type=str, default=None, help="Path to a 2D GaussianImage's checkpoint")
+    parser.add_argument("--pretrained_2d", type=str, default=None, help="Path to a pretrained 2D checkpoint")
     parser.add_argument(
         "--lr_2d",
         type=float,
@@ -155,7 +114,7 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         np.random.seed(args.seed)
 
-    final_dir_path = Path(f"./checkpoints/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_{args.model_name_2d}_i{args.iterations_2d}_g{args.num_points_2d}_f{args.num_frames}_s{args.start_frame}")
+    final_dir_path = Path(f"./checkpoints_quant/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_{args.model_name_2d}_i{args.iterations_2d}_g{args.num_points_2d}_f{args.num_frames}_s{args.start_frame}")
     logwriter = LogWriter(final_dir_path)
     
     # Training 3D GaussianVideo as Layer 1
@@ -166,13 +125,13 @@ def main(argv):
         image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
         images_paths.append(image_path)
         
-    gaussianvideo_rendered_path = Path(f"./checkpoints/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_f{args.num_frames}_s{args.start_frame}/{args.data_name}")
+    gaussianvideo_rendered_path = Path(f"./checkpoints_quant/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_f{args.num_frames}_s{args.start_frame}/{args.data_name}")
     gv_done = os.path.exists(gaussianvideo_rendered_path) and len(glob.glob(os.path.join(gaussianvideo_rendered_path, f"{args.data_name}_fitting_t*.png"))) == image_length
     if not gv_done:
-        logwriter.write(f"Training 3D GaussianVideo as Layer 1 with {args.num_frames} frames, {args.num_points_3d} points, {args.iterations_3d} iterations, model name: {args.model_name_3d}")
+        logwriter.write(f"Training quantized 3D GaussianVideo as Layer 1 with {args.num_frames} frames, {args.num_points_3d} points, {args.iterations_3d} iterations, model name: {args.model_name_3d}")
         
         cmd_args = [
-            "python", "train_video.py",
+            "python", "train_quantize_video.py",
             "--dataset", args.dataset,
             "--data_name", args.data_name,
             "--num_frames", str(args.num_frames),
@@ -185,11 +144,15 @@ def main(argv):
         ]
         if args.model_path_3d:
             cmd_args.extend(["--model_path_3d", args.model_path_3d])
+        if args.pretrained_3d:
+            cmd_args.extend(["--pretrained", args.pretrained_3d])
         if args.save_imgs:
             cmd_args.append("--save_imgs")
+        if args.quantize:
+            cmd_args.append("--quantize")
             
         subprocess.run(cmd_args, check=True)
-        logwriter.write("3D GaussianVideo training completed")
+        logwriter.write("Quantized 3D GaussianVideo training completed")
 
     # Collect delta image for 2D GaussianImage training
     gaussianvideo_rendered_images = glob.glob(os.path.join(gaussianvideo_rendered_path, f"{args.data_name}_fitting_t*.png"))
@@ -197,11 +160,11 @@ def main(argv):
     get_delta_images(images_paths, gaussianvideo_rendered_images, final_dir_path)
 
     # Training 2D GaussianImage as Layer 2
-    logwriter.write(f"Training 2D GaussianImage as Layer 2 with {args.num_points_2d} points, {args.iterations_2d} iterations, model name: {args.model_name_2d}")
+    logwriter.write(f"Training quantized 2D GaussianImage as Layer 2 with {args.num_points_2d} points, {args.iterations_2d} iterations, model name: {args.model_name_2d}")
     
-    # Run train.py once to process all delta images
+    # Run train_quantize.py once to process all delta images
     cmd_args = [
-        "python", "train.py",
+        "python", "train_quantize.py",
         "--dataset", os.path.join(final_dir_path, "delta_images"),
         "--data_name", args.data_name,
         "--iterations_2d", str(args.iterations_2d),
@@ -214,14 +177,18 @@ def main(argv):
     ]
     if args.model_path_2d:
         cmd_args.extend(["--model_path_2d", args.model_path_2d])
+    if args.pretrained_2d:
+        cmd_args.extend(["--pretrained", args.pretrained_2d])
     if args.save_imgs:
         cmd_args.append("--save_imgs")
+    if args.quantize:
+        cmd_args.append("--quantize")
         
     subprocess.run(cmd_args, check=True)
-    logwriter.write("2D GaussianImage training completed")
+    logwriter.write("Quantized 2D GaussianImage training completed")
 
     # Combine the layers
-    gaussianimage_rendered_path = Path(f"./checkpoints/{args.data_name}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}")
+    gaussianimage_rendered_path = Path(f"./checkpoints_quant/{args.data_name}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}")
     gaussianimage_rendered_images = glob.glob(os.path.join(gaussianimage_rendered_path, '*', f"frame_*_fitting.png"))
     gaussianimage_rendered_images.sort(key=lambda x: int(x.split('_')[-2]))  # Sort by frame number
     final_rendered_path = combine_layers(gaussianvideo_rendered_images, gaussianimage_rendered_images, final_dir_path)
@@ -236,7 +203,7 @@ def main(argv):
         shutil.rmtree(os.path.join(final_dir_path, os.path.basename(gaussianimage_rendered_path)))
     shutil.copytree(os.path.dirname(gaussianvideo_rendered_path), os.path.join(final_dir_path, str(gaussianvideo_rendered_path).split('/')[-2]), dirs_exist_ok=True)
     shutil.move(gaussianimage_rendered_path, final_dir_path)
-    logwriter.write(f"Moved GaussianVideo and GaussianImage folders to {final_dir_path}")
+    logwriter.write(f"Moved quantized GaussianVideo and GaussianImage folders to {final_dir_path}")
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main(sys.argv[1:]) 

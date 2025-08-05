@@ -148,7 +148,7 @@ def main(argv):
     logwriter.write("Quantized 3D GaussianVideo testing completed")
 
     # Find rendered images from 3D model test
-    gaussianvideo_rendered_path = Path(f"./checkpoints_quant/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_f{args.num_frames}_s{args.start_frame}/{args.data_name}")
+    gaussianvideo_rendered_path = Path(f"{test_dir_path}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_f{args.num_frames}_s{args.start_frame}/{args.data_name}")
     gaussianvideo_rendered_images = glob.glob(os.path.join(gaussianvideo_rendered_path, f"{args.data_name}_fitting_t*.png"))
     gaussianvideo_rendered_images.sort(key=lambda x: int(x.split('_')[-1].split('.')[0][1:]))  # Sort by frame number
 
@@ -181,7 +181,7 @@ def main(argv):
     logwriter.write("Quantized 2D GaussianImage testing completed")
 
     # Find rendered images from 2D model test and combine layers
-    gaussianimage_rendered_path = Path(f"./checkpoints_quant/{args.data_name}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}")
+    gaussianimage_rendered_path = Path(f"{test_dir_path}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}")
     gaussianimage_rendered_images = glob.glob(os.path.join(gaussianimage_rendered_path, '*', f"frame_*_codec_best.png"))
     gaussianimage_rendered_images.sort(key=lambda x: int(x.split('_')[-2]))  # Sort by frame number
     final_rendered_path = combine_layers(gaussianvideo_rendered_images, gaussianimage_rendered_images, test_dir_path)
@@ -194,15 +194,6 @@ def main(argv):
     # Evaluate final combined results
     avg_psnr, avg_ms_ssim = evaluate_images(images_paths, final_rendered_path)
     logwriter.write("Final Test Results - PSNR:{:.4f}, MS-SSIM:{:.4f}".format(avg_psnr, avg_ms_ssim))
-
-    # Copy important result folders for analysis
-    result_3d_path = os.path.join(test_dir_path, "layer1_3d_results")
-    result_2d_path = os.path.join(test_dir_path, "layer2_2d_results")
-    
-    if os.path.exists(gaussianvideo_rendered_path):
-        shutil.copytree(gaussianvideo_rendered_path, result_3d_path, dirs_exist_ok=True)
-    if os.path.exists(gaussianimage_rendered_path):
-        shutil.copytree(gaussianimage_rendered_path, result_2d_path, dirs_exist_ok=True)
         
     logwriter.write(f"Test results saved to {test_dir_path}")
 

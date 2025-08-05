@@ -83,8 +83,9 @@ class SimpleTrainerVideoQuantize:
         self.logwriter = LogWriter(self.log_dir, train=False)
 
         if model_path is not None:
-            print(f"loading model path: {model_path}")
-            checkpoint = torch.load(model_path, map_location=self.device)
+            full_model_path = os.path.join(model_path, args.data_name, "gaussian_model.pth.tar")
+            print(f"loading model path: {full_model_path}")
+            checkpoint = torch.load(full_model_path, map_location=self.device)
             model_dict = self.gaussian_model.state_dict()
             pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict}
             model_dict.update(pretrained_dict)

@@ -81,7 +81,7 @@ python train_quantize_video.py \
     --iterations "${QUANT_ITERATIONS}" \
     --model_name "${MODEL_NAME}" \
     --num_points "${NUM_POINTS}" \
-    --model_path "${CHECKPOINT_PATH}${DATA_NAME}/gaussian_model.pth.tar" \
+    --model_path "${CHECKPOINT_PATH}" \
     --start_frame "${START_FRAME}" \
     --num_frames "${NUM_FRAMES}" \
     --lr "${LEARNING_RATE}" \
@@ -94,7 +94,7 @@ python test_quantize_video.py \
     --iterations "${QUANT_ITERATIONS}" \
     --model_name "${MODEL_NAME}" \
     --num_points "${NUM_POINTS}" \
-    --model_path "${CHECKPOINT_QUANT_PATH}${DATA_NAME}/gaussian_model.best.pth.tar" \
+    --model_path "${CHECKPOINT_QUANT_PATH}" \
     --start_frame "${START_FRAME}" \
     --num_frames "${NUM_FRAMES}" \
     --lr "${LEARNING_RATE}" \

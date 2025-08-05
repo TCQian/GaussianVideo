@@ -187,16 +187,7 @@ def main(argv):
     subprocess.run(cmd_args, check=True)
     logwriter.write("Quantized 2D GaussianImage training completed")
 
-    # Combine the layers
     gaussianimage_rendered_path = Path(f"./checkpoints_quant/{args.data_name}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}")
-    gaussianimage_rendered_images = glob.glob(os.path.join(gaussianimage_rendered_path, '*', f"frame_*_fitting.png"))
-    gaussianimage_rendered_images.sort(key=lambda x: int(x.split('_')[-2]))  # Sort by frame number
-    final_rendered_path = combine_layers(gaussianvideo_rendered_images, gaussianimage_rendered_images, final_dir_path)
-
-    # Compare the final rendered images with the ground truth
-    avg_psnr, avg_ms_ssim = evaluate_images(images_paths, final_rendered_path)
-    logwriter.write("Final PSNR:{:.4f}, Final MS-SSIM:{:.4f}".format(avg_psnr, avg_ms_ssim))
-
     # move the folder into the final directory
     if os.path.exists(os.path.join(final_dir_path, os.path.basename(gaussianimage_rendered_path))):
         logwriter.write(f"Folder {os.path.basename(gaussianimage_rendered_path)} already exists in {final_dir_path}, removing it.")

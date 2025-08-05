@@ -162,7 +162,7 @@ def parse_args(argv):
         help="2D GS points (default: %(default)s)",
     )
     parser.add_argument("--model_path_2d", type=str, default=None, help="Path to a 2D GaussianImage's checkpoint")
-    parser.add_argument("--seed", type=float, default=1, help="Set random seed for reproducibility")
+    parser.add_argument("--seed", type=int, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--save_imgs", action="store_true", help="Save image")
     parser.add_argument(
         "--lr_2d",

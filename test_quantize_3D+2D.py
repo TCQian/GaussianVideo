@@ -31,7 +31,7 @@ def parse_args(argv):
     parser = argparse.ArgumentParser(description="Test quantized 3D+2D GaussianVideo models.")
    
     # Parameters for testing
-    parser.add_argument("--seed", type=float, default=1, help="Set random seed for reproducibility")
+    parser.add_argument("--seed", type=int, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--save_imgs", action="store_true", help="Save image")
     parser.add_argument("--quantize", action="store_true", help="Enable quantization")
     

@@ -210,7 +210,7 @@ def parse_args(argv):
         help="Start frame (default: %(default)s)",
     )
     parser.add_argument("--model_path_3d", type=str, default=None, help="Path to a 3D GaussianVideo's checkpoint")
-    parser.add_argument("--seed", type=float, default=1, help="Set random seed for reproducibility")
+    parser.add_argument("--seed", type=int, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--save_imgs", action="store_true", help="Save image", default=True)
     parser.add_argument(
         "--lr_3d",

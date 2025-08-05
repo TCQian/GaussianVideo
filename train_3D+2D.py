@@ -74,7 +74,7 @@ def parse_args(argv):
     parser = argparse.ArgumentParser(description="Example training script.")
    
     # Parameters for training
-    parser.add_argument("--seed", type=float, default=1, help="Set random seed for reproducibility")
+    parser.add_argument("--seed", type=int, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--save_imgs", action="store_true", help="Save image")
     
     # Parameters for dataset

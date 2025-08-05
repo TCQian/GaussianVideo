@@ -203,7 +203,7 @@ def parse_args(argv):
     parser.add_argument("--num_frames", type=int, default=50, help="Number of frames to use")
     parser.add_argument("--start_frame", type=int, default=0, help="Start frame index")
     parser.add_argument("--model_path_3d", type=str, default=None, help="Path to a 3D GaussianVideo's checkpoint")
-    parser.add_argument("--seed", type=float, default=1, help="Set random seed for reproducibility")
+    parser.add_argument("--seed", type=int, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--quantize", action="store_true", help="Enable quantization")
     parser.add_argument("--save_imgs", default=True, action="store_true", help="Save rendered frames")
     parser.add_argument("--lr_3d", type=float, default=1e-2, help="Learning rate of 3D GaussianVideo (default: %(default)s)")

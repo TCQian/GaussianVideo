@@ -185,7 +185,7 @@ def main(argv):
     gaussianimage_rendered_images = glob.glob(os.path.join(gaussianimage_rendered_path, '*', f"frame_*_codec_best.png"))
 
     # rename the images by replacing the _codec_best.png with _fitting.png
-    for fn in glob.glob(gaussianimage_rendered_images, '*.png'):
+    for fn in gaussianimage_rendered_images:
         new_image_path = fn.replace("_codec_best.png", "_fitting.png")
         os.rename(fn, new_image_path)
 

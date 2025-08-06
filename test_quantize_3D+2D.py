@@ -183,13 +183,15 @@ def main(argv):
     # Find rendered images from 2D model test and combine layers
     gaussianimage_rendered_path = Path(f"{test_dir_path}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}")
     gaussianimage_rendered_images = glob.glob(os.path.join(gaussianimage_rendered_path, '*', f"frame_*_codec_best.png"))
-    gaussianimage_rendered_images.sort(key=lambda x: int(x.split('_')[-2]))  # Sort by frame number
-    final_rendered_path = combine_layers(gaussianvideo_rendered_images, gaussianimage_rendered_images, test_dir_path)
-    
+
     # rename the images by replacing the _codec_best.png with _fitting.png
     for fn in glob.glob(gaussianimage_rendered_images, '*.png'):
         new_image_path = fn.replace("_codec_best.png", "_fitting.png")
         os.rename(fn, new_image_path)
+
+    gaussianimage_rendered_images = glob.glob(os.path.join(gaussianimage_rendered_path, '*', f"frame_*_fitting.png"))
+    gaussianimage_rendered_images.sort(key=lambda x: int(x.split('_')[-2]))  # Sort by frame number
+    final_rendered_path = combine_layers(gaussianvideo_rendered_images, gaussianimage_rendered_images, test_dir_path)
 
     # Evaluate final combined results
     avg_psnr, avg_ms_ssim = evaluate_images(images_paths, final_rendered_path)

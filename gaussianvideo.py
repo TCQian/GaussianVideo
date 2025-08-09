@@ -92,18 +92,13 @@ class GaussianVideo(nn.Module):
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )
-        # if self.debug_mode:
-            # radii_np = self.radii.detach().cpu().numpy()
-            # max_radius = np.ceil(radii_np.max() / 5) * 5
-            # bins = np.arange(0, max_radius + 5, 5)  # e.g., [0, 5, 10, ..., max]
-
-            # hist, bin_edges = np.histogram(radii_np, bins=bins)
-
-            # # Print histogram nicely
-            # print("Gaussian Radius Histogram (bin size = 5)")
-            # for i in range(len(hist)):
-            #     print(f"[{bin_edges[i]:>2.0f} - {bin_edges[i+1]:>2.0f}) : {hist[i]} Gaussians")
-            # self.debug_mode = False
+        if self.debug_mode:
+            avg_radius = self.radii.float().mean().item()
+            avg_cholesky = self.get_cholesky_elements.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            avg_conic = conics.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            avg_color = self.get_features.mean(dim=0, keepdim=True).detach().cpu().numpy()
+            print(f"[Iteration] In projection, average radius: {avg_radius:.4f}, average cholesky: {avg_cholesky.tolist()}, average conic: {avg_conic.tolist()}, average color: {avg_color.tolist()}")
+        
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
         return {"render": out_img}
@@ -120,10 +115,11 @@ class GaussianVideo(nn.Module):
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
         # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        # for name, param in self.named_parameters():
-        #     if param.grad is not None:
-        #         grad_norm = param.grad.data.norm().item()
-        #         print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        if self.debug_mode:
+            for name, param in self.named_parameters():
+                if param.grad is not None:
+                    grad_norm = param.grad.data.norm().item()
+                    print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

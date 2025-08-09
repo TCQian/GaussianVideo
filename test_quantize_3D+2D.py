@@ -196,6 +196,19 @@ def main(argv):
     # Evaluate final combined results
     avg_psnr, avg_ms_ssim = evaluate_images(images_paths, final_rendered_path)
     logwriter.write("Final Test Results - PSNR:{:.4f}, MS-SSIM:{:.4f}".format(avg_psnr, avg_ms_ssim))
+
+    gaussianimage_rendered_path = Path(f"./checkpoints_quant/{args.data_name}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}")
+    # move the folder into the final directory
+    if os.path.exists(os.path.join(test_dir_path, os.path.basename(gaussianimage_rendered_path))):
+        logwriter.write(f"Folder {os.path.basename(gaussianimage_rendered_path)} already exists in {test_dir_path}, copying the unexisitng files into it.")
+        for file in glob.glob(os.path.join(gaussianimage_rendered_path, '**', 'test.txt'), recursive=True):
+            new_fn = file.replace(gaussianimage_rendered_path, test_dir_path)
+            os.makedirs(os.path.dirname(new_fn), exist_ok=True)
+            shutil.copy(file, new_fn)
+    else:
+        shutil.move(gaussianimage_rendered_path, test_dir_path)
+    shutil.copytree(os.path.dirname(gaussianvideo_rendered_path), os.path.join(test_dir_path, str(gaussianvideo_rendered_path).split('/')[-2]), dirs_exist_ok=True)
+    logwriter.write(f"Moved quantized GaussianVideo and GaussianImage folders to {test_dir_path}")
         
     logwriter.write(f"Test results saved to {test_dir_path}")
 

@@ -28,8 +28,13 @@ def get_delta_images(gt_images_paths, rendered_images_paths, output_path):
         gt_image = cv2.imread(str(gt_img_path), cv2.IMREAD_UNCHANGED)
         rendered_image = cv2.imread(rendered_img_path, cv2.IMREAD_UNCHANGED)
         delta_image = cv2.subtract(gt_image, rendered_image)
+        # print the min and max values of the delta image
+        print(f"Delta image min: {np.min(delta_image)}, max: {np.max(delta_image)}")
         # Keep both -ve and +ve values in the delta image
-        delta_image = (delta_image + 255.0) / 2.0
+        # delta_image = (delta_image + 255.0) / 2.0
+        # Keep the information within the range of -127 to 128
+        delta_clipped = np.clip(delta_image, -127, 128)
+        delta_image = (delta_clipped + 127).astype(np.uint8)
         # Save the delta image
         delta_image_path = os.path.join(delta_path, os.path.basename(gt_img_path))
         cv2.imwrite(delta_image_path, delta_image)
@@ -45,7 +50,8 @@ def combine_layers(layer1_images_paths, layer2_images_paths, output_path):
         layer1_image = cv2.imread(layer1_img, cv2.IMREAD_UNCHANGED)
         layer2_image = cv2.imread(layer2_img, cv2.IMREAD_UNCHANGED)
         # restore -ve and +ve values in the delta image
-        layer2_image = (layer2_image * 2.0) - 255.0
+        # layer2_image = (layer2_image * 2.0) - 255.0
+        layer2_image = (layer2_image - 127.0)
         # Combine the two layers
         final_image = layer1_image.astype(np.float32) + layer2_image.astype(np.float32)
         final_image_name = os.path.basename(layer2_img)

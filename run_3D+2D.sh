@@ -90,37 +90,37 @@ python train_3D+2D.py \
     --save_imgs
 
 # Run the quantization training script.
-python train_quantize_3D+2D.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations_2d "${QUANT_ITERATIONS_2D}" \
-    --model_name_2d "${MODEL_NAME_2D}" \
-    --num_points_2d "${NUM_POINTS_2D}" \
-    --model_path_2d "${CHECKPOINT_PATH_2D}" \
-    --iterations_3d "${QUANT_ITERATIONS_3D}" \
-    --model_name_3d "${MODEL_NAME_3D}" \
-    --num_points_3d "${NUM_POINTS_3D}" \
-    --model_path_3d "${CHECKPOINT_PATH_3D}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --lr_3d "${LEARNING_RATE_3D}" \
-    --save_imgs
+# python train_quantize_3D+2D.py \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --iterations_2d "${QUANT_ITERATIONS_2D}" \
+#     --model_name_2d "${MODEL_NAME_2D}" \
+#     --num_points_2d "${NUM_POINTS_2D}" \
+#     --model_path_2d "${CHECKPOINT_PATH_2D}" \
+#     --iterations_3d "${QUANT_ITERATIONS_3D}" \
+#     --model_name_3d "${MODEL_NAME_3D}" \
+#     --num_points_3d "${NUM_POINTS_3D}" \
+#     --model_path_3d "${CHECKPOINT_PATH_3D}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --lr_3d "${LEARNING_RATE_3D}" \
+#     --save_imgs
 
 # # Run the quantization testing script.
-python test_quantize_3D+2D.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations_3d "${QUANT_ITERATIONS_3D}" \
-    --model_name_3d "${MODEL_NAME_3D}" \
-    --num_points_3d "${NUM_POINTS_3D}" \
-    --model_path_3d "${CHECKPOINT_QUANT_PATH_3D}" \
-    --iterations_2d "${QUANT_ITERATIONS_2D}" \
-    --model_name_2d "${MODEL_NAME_2D}" \
-    --num_points_2d "${NUM_POINTS_2D}" \
-    --model_path_2d "${CHECKPOINT_QUANT_PATH_2D}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --lr_3d "${LEARNING_RATE_3D}" \
-    --save_imgs
+# python test_quantize_3D+2D.py \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --iterations_3d "${QUANT_ITERATIONS_3D}" \
+#     --model_name_3d "${MODEL_NAME_3D}" \
+#     --num_points_3d "${NUM_POINTS_3D}" \
+#     --model_path_3d "${CHECKPOINT_QUANT_PATH_3D}" \
+#     --iterations_2d "${QUANT_ITERATIONS_2D}" \
+#     --model_name_2d "${MODEL_NAME_2D}" \
+#     --num_points_2d "${NUM_POINTS_2D}" \
+#     --model_path_2d "${CHECKPOINT_QUANT_PATH_2D}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --lr_3d "${LEARNING_RATE_3D}" \
+#     --save_imgs
 
 echo "Done"

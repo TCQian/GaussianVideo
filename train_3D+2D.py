@@ -37,7 +37,7 @@ def get_delta_images(gt_images_paths, rendered_images_paths, output_path):
         print(f"Delta image min: {min}, max: {max}")
         # Keep both -ve and +ve values in the delta image
         delta_image = (delta_image + 255.0) - min / (max - min) #2.0
-        delta_image = np.clip(delta_image, 0, 255).astype(np.uint8)
+        delta_image = np.clip(delta_image * 255.0, 0, 255).astype(np.uint8)
         # Save the delta image
         delta_image_path = os.path.join(delta_path, os.path.basename(gt_img_path))
         cv2.imwrite(delta_image_path, delta_image)
@@ -54,7 +54,7 @@ def combine_layers(layer1_images_paths, layer2_images_paths, output_path, min_ma
         layer1_image = cv2.imread(layer1_img, cv2.IMREAD_UNCHANGED).astype(np.int16)
         layer2_image = cv2.imread(layer2_img, cv2.IMREAD_UNCHANGED).astype(np.int16)
         # restore -ve and +ve values in the delta image
-        layer2_image = (layer2_image * (max - min)) + min - 255.0
+        layer2_image = (layer2_image / 255 * (max - min)) + min - 255.0
         print(f"Layer 2 image min: {np.min(layer2_image)}, max: {np.max(layer2_image)}")
         # Combine the two layers
         final_image = np.clip(layer1_image + layer2_image, 0, 255).astype(np.uint8)
@@ -209,7 +209,7 @@ def main(argv):
     # Collect delta image for 2D GaussianImage training
     gaussianvideo_rendered_images = glob.glob(os.path.join(gaussianvideo_rendered_path, f"{args.data_name}_fitting_t*.png"))
     gaussianvideo_rendered_images.sort(key=lambda x: int(x.split('_')[-1].split('.')[0][1:]))  # Sort by frame number
-    mins, maxs = get_delta_images(images_paths, gaussianvideo_rendered_images, final_dir_path)
+    delta_path, mins, maxs = get_delta_images(images_paths, gaussianvideo_rendered_images, final_dir_path)
 
     # Training 2D GaussianImage as Layer 2
     logwriter.write(f"Training 2D GaussianImage as Layer 2 with {args.num_points_2d} points, {args.iterations_2d} iterations, model name: {args.model_name_2d}")

@@ -59,7 +59,8 @@ def combine_layers(layer1_images_paths, layer2_images_paths, output_path):
         layer2_image = (layer2_image * 2.0) - 255.0
         print(f"Layer 2 image min: {np.min(layer2_image)}, max: {np.max(layer2_image)}")
         # Combine the two layers
-        final_image = np.clip((layer1_image + layer2_image) * 255.0, 0, 255).astype(np.uint8)
+        final_image = np.clip(layer1_image + layer2_image, 0, 255).astype(np.uint8)
+        # final_image = np.clip((layer1_image + layer2_image) * 255.0, 0, 255).astype(np.uint8)
         final_image_name = os.path.basename(layer2_img)
         final_image_path = os.path.join(final_rendered_path, final_image_name)
         cv2.imwrite(final_image_path, final_image)

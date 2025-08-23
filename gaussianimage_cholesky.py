@@ -10,7 +10,7 @@ from quantize import *
 from optimizer import Adan
 
 class GaussianImage_Cholesky(nn.Module):
-    def __init__(self, loss_type="L2", **kwargs):
+    def __init__(self, background_image=None, loss_type="L2", **kwargs):
         super().__init__()
         self.loss_type = loss_type
         self.init_num_points = kwargs["num_points"]
@@ -30,7 +30,12 @@ class GaussianImage_Cholesky(nn.Module):
         self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
         self.last_size = (self.H, self.W)
         self.quantize = kwargs["quantize"]
-        self.register_buffer('background', torch.ones(3)) # / 2.0)
+
+        if background_image is not None:
+            self.register_buffer('background', background_image)
+        else:
+            self.register_buffer('background', torch.ones(3)) # / 2.0)
+            
         self.opacity_activation = torch.sigmoid
         self.rgb_activation = torch.sigmoid
         self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))

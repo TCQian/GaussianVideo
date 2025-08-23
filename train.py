@@ -19,6 +19,7 @@ class SimpleTrainer2d:
     def __init__(
         self,
         image_path: Path,
+        background_path: Path,
         num_points: int = 2000,
         model_name:str = "GaussianImage_Cholesky",
         iterations:int = 30000,
@@ -27,6 +28,7 @@ class SimpleTrainer2d:
     ):
         self.device = torch.device("cuda:0")
         self.gt_image = image_path_to_tensor(image_path).to(self.device)
+        self.background_image = image_path_to_tensor(background_path).to(self.device) if background_path is not None else None
 
         self.num_points = num_points
         image_path = Path(image_path)
@@ -39,7 +41,7 @@ class SimpleTrainer2d:
 
         if model_name == "GaussianImage_Cholesky":
             from gaussianimage_cholesky import GaussianImage_Cholesky
-            self.gaussian_model = GaussianImage_Cholesky(loss_type="L2", opt_type="adan", num_points=self.num_points, H=self.H, W=self.W, BLOCK_H=BLOCK_H, BLOCK_W=BLOCK_W, 
+            self.gaussian_model = GaussianImage_Cholesky(background_image=self.background_image, loss_type="L2", opt_type="adan", num_points=self.num_points, H=self.H, W=self.W, BLOCK_H=BLOCK_H, BLOCK_W=BLOCK_W, 
                 device=self.device, lr=args.lr_2d, quantize=False).to(self.device)
 
         elif model_name == "GaussianImage_RS":
@@ -118,6 +120,7 @@ def parse_args(argv):
     parser.add_argument(
         "-d", "--dataset", type=str, default='./datasets/kodak/', help="Training dataset"
     )
+    parser.add_argument("--background", type=str, default=None, help="Directory for background images")
     parser.add_argument(
         "--data_name", type=str, default='kodak', help="Training dataset"
     )
@@ -191,7 +194,12 @@ def main(argv):
         else:
             image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
 
-        trainer = SimpleTrainer2d(image_path=image_path, num_points=args.num_points_2d, 
+            if args.background is not None:
+                background_path = Path(args.background) / f'frame_{i+1:04}.png'
+            else:
+                background_path = None
+
+        trainer = SimpleTrainer2d(image_path=image_path, background_path=background_path, num_points=args.num_points_2d, 
             iterations=args.iterations_2d, model_name=args.model_name_2d, args=args, model_path=args.model_path_2d)
         psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
         psnrs.append(psnr)

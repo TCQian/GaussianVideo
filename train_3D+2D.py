@@ -212,7 +212,10 @@ def main(argv):
     # Collect delta image for 2D GaussianImage training
     gaussianvideo_rendered_images = glob.glob(os.path.join(gaussianvideo_rendered_path, f"{args.data_name}_fitting_t*.png"))
     gaussianvideo_rendered_images.sort(key=lambda x: int(x.split('_')[-1].split('.')[0][1:]))  # Sort by frame number
-    get_delta_images(images_paths, gaussianvideo_rendered_images, final_dir_path)
+    os.makedirs(os.path.join(final_dir_path, "background"), exist_ok=True)
+    for i in range(len(gaussianvideo_rendered_images)): # copy rendered image to background folder
+        shutil.copy(gaussianvideo_rendered_images[i], os.path.join(final_dir_path, "background", f"frame_{i+1:04}.png"))
+    # get_delta_images(images_paths, gaussianvideo_rendered_images, final_dir_path)
 
     # Training 2D GaussianImage as Layer 2
     logwriter.write(f"Training 2D GaussianImage as Layer 2 with {args.num_points_2d} points, {args.iterations_2d} iterations, model name: {args.model_name_2d}")
@@ -220,7 +223,8 @@ def main(argv):
     # Run train.py once to process all delta images
     cmd_args = [
         "python", "train.py",
-        "--dataset", os.path.join(final_dir_path, "delta_images"),
+        "--dataset", args.dataset, #os.path.join(final_dir_path, "delta_images"),
+        "--background", os.path.join(final_dir_path, "background"),
         "--data_name", args.data_name,
         "--iterations_2d", str(args.iterations_2d),
         "--model_name_2d", args.model_name_2d,
@@ -242,7 +246,11 @@ def main(argv):
     gaussianimage_rendered_path = Path(f"./checkpoints/{args.data_name}/{args.model_name_2d}_{args.iterations_2d}_{args.num_points_2d}")
     gaussianimage_rendered_images = glob.glob(os.path.join(gaussianimage_rendered_path, '*', f"frame_*_fitting.png"))
     gaussianimage_rendered_images.sort(key=lambda x: int(x.split('_')[-2]))  # Sort by frame number
-    final_rendered_path = combine_layers(gaussianvideo_rendered_images, gaussianimage_rendered_images, final_dir_path)
+    final_rendered_path = os.path.join(final_dir_path, "final_rendered")
+    os.makedirs(final_rendered_path, exist_ok=True)
+    for i in range(len(gaussianimage_rendered_images)): # copy rendered image to final_rendered_path
+        shutil.copy(gaussianimage_rendered_images[i], os.path.join(final_rendered_path, os.path.basename(gaussianimage_rendered_images[i])))
+    # final_rendered_path = combine_layers(gaussianvideo_rendered_images, gaussianimage_rendered_images, final_dir_path)
 
     # Compare the final rendered images with the ground truth
     avg_psnr, avg_ms_ssim = evaluate_images(images_paths, final_rendered_path)

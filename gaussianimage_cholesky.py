@@ -1,6 +1,5 @@
 from gsplat.project_gaussians_2d import project_gaussians_2d
-# from gsplat.rasterize_sum import rasterize_gaussians_sum
-from gsplat.rasterize import rasterize_gaussians
+from gsplat.rasterize_sum import rasterize_gaussians_sum
 from utils import *
 import torch
 import torch.nn as nn
@@ -25,12 +24,11 @@ class GaussianImage_Cholesky(nn.Module):
 
         self._xyz = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 2) - 0.5)))
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 3))
-        # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
-        self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
+        self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
         self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
         self.last_size = (self.H, self.W)
         self.quantize = kwargs["quantize"]
-        self.register_buffer('background', torch.ones(3)) # / 2.0)
+        self.register_buffer('background', torch.ones(3))
         self.opacity_activation = torch.sigmoid
         self.rgb_activation = torch.sigmoid
         self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))
@@ -60,21 +58,16 @@ class GaussianImage_Cholesky(nn.Module):
     
     @property
     def get_opacity(self):
-        # return self._opacity
-        return self.opacity_activation(self._opacity)
+        return self._opacity
 
     @property
     def get_cholesky_elements(self):
         return self._cholesky+self.cholesky_bound
 
     def forward(self):
-        #assert torch.allclose(self.background, torch.ones(3, device=self.background.device) / 2.0), "Currently only support gray background"
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_2d(self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.tile_bounds)
-        # out_img = rasterize_gaussians_sum(self.xys, depths, self.radii, conics, num_tiles_hit,
-        #         self.get_features, self._opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False)
-        out_img, alpha = rasterize_gaussians(self.xys, depths, self.radii, conics, num_tiles_hit,
-            self.get_features, self.get_opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=True)
-        alpha = alpha[..., None]
+        out_img = rasterize_gaussians_sum(self.xys, depths, self.radii, conics, num_tiles_hit,
+                self.get_features, self._opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False)
         out_img = torch.clamp(out_img, 0, 1) #[H, W, 3]
         out_img = out_img.view(-1, self.H, self.W, 3).permute(0, 3, 1, 2).contiguous()
         return {"render": out_img}

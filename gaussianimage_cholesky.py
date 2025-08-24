@@ -34,8 +34,8 @@ class GaussianImage_Cholesky(nn.Module):
         if background_image is not None:
             self.register_buffer('background', background_image)
         else:
-            self.register_buffer('background', torch.ones(3)) # / 2.0)
-            
+            self.register_buffer('background', torch.ones(3) / 2.0)
+
         self.opacity_activation = torch.sigmoid
         self.rgb_activation = torch.sigmoid
         self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))
@@ -73,7 +73,7 @@ class GaussianImage_Cholesky(nn.Module):
         return self._cholesky+self.cholesky_bound
 
     def forward(self):
-        #assert torch.allclose(self.background, torch.ones(3, device=self.background.device) / 2.0), "Currently only support gray background"
+        assert torch.allclose(self.background, torch.ones(3, device=self.background.device) / 2.0), "Currently only support gray background"
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_2d(self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.tile_bounds)
         # out_img = rasterize_gaussians_sum(self.xys, depths, self.radii, conics, num_tiles_hit,
         #         self.get_features, self._opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False)

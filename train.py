@@ -28,7 +28,7 @@ class SimpleTrainer2d:
     ):
         self.device = torch.device("cuda:0")
         self.gt_image = image_path_to_tensor(image_path).to(self.device)
-        self.background_image = image_path_to_tensor(background_path).to(self.device) if background_path is not None else None
+        self.background_image = image_path_to_tensor(background_path).squeeze(0).to(self.device) if background_path is not None else None
 
         self.num_points = num_points
         image_path = Path(image_path)

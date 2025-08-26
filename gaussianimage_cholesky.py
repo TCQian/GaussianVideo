@@ -34,8 +34,8 @@ class GaussianImage_Cholesky(nn.Module):
         if background_image is not None:
             self.register_buffer('background', background_image)
         else:
-            self.register_buffer('background', torch.ones(3)) # / 2.0)
-            
+            self.register_buffer('background', torch.ones(self.H, self.W, 3)) # / 2.0)
+
         self.opacity_activation = torch.sigmoid
         self.rgb_activation = torch.sigmoid
         self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))
@@ -94,10 +94,10 @@ class GaussianImage_Cholesky(nn.Module):
             psnr = 10 * math.log10(1.0 / mse_loss.item())
 
         # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        # for name, param in self.named_parameters():
-        #     if param.grad is not None:
-        #         grad_norm = param.grad.data.norm().item()
-        #         print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        for name, param in self.named_parameters():
+            if param.grad is not None:
+                grad_norm = param.grad.data.norm().item()
+                print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none = True)

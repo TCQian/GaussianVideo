@@ -37,7 +37,7 @@ __global__ void rasterize_forward(
     float* __restrict__ final_Ts,
     int* __restrict__ final_index,
     float3* __restrict__ out_img,
-    const float3& __restrict__ background
+    const float3* __restrict__ background
 );
 
 // compute output color image from binned and sorted gaussians

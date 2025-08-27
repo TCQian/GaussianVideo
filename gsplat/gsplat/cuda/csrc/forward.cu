@@ -536,7 +536,7 @@ __global__ void rasterize_forward_sum(
     float* __restrict__ final_Ts,
     int* __restrict__ final_index,
     float3* __restrict__ out_img,
-    const float3& __restrict__ background
+    const float3* __restrict__ background
 ) {
     // each thread draws one pixel, but also timeshares caching gaussians in a
     // shared tile
@@ -633,10 +633,11 @@ __global__ void rasterize_forward_sum(
         final_Ts[pix_id] = T; // transmittance at last gaussian in this pixel
         final_index[pix_id] =
             cur_idx; // index of in bin of last gaussian in this pixel
+        float3 bg = background[pix_id];
         float3 final_color;
-        final_color.x = pix_out.x; //+ T * background.x;
-        final_color.y = pix_out.y; //+ T * background.y;
-        final_color.z = pix_out.z; //+ T * background.z;
+        final_color.x = pix_out.x + bg.x;
+        final_color.y = pix_out.y + bg.y;
+        final_color.z = pix_out.z + bg.z;
         out_img[pix_id] = final_color;
     }
 }

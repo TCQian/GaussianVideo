@@ -131,7 +131,7 @@ __global__ void rasterize_forward_sum(
     float* __restrict__ final_Ts,
     int* __restrict__ final_index,
     float3* __restrict__ out_img,
-    const float3& __restrict__ background
+    const float3* __restrict__ background
 );
 
 __global__ void rasterize_forward_sum_general(

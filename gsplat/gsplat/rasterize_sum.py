@@ -55,9 +55,10 @@ def rasterize_gaussians_sum(
         colors = colors.float() / 255
 
     if background is not None:
+        # assert shape must be (height, width, channels)
         assert (
-            background.shape[0] == colors.shape[-1]
-        ), f"incorrect shape of background color tensor, expected shape {colors.shape[-1]}"
+            background.shape[0] == img_height and background.shape[1] == img_width and background.shape[2] == colors.shape[-1]
+        ), f"incorrect shape of background color tensor, expected shape {(img_height, img_width, colors.shape[-1])}"
     else:
         background = torch.ones(
             colors.shape[-1], dtype=torch.float32, device=colors.device

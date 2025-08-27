@@ -27,7 +27,7 @@ MODEL_NAME_2D="GaussianImage_Cholesky"
 NUM_POINTS_2D=750
 TRAIN_ITERATIONS_2D=20000
 QUANT_ITERATIONS_2D=10000
-LEARNING_RATE_2D=0.01
+LEARNING_RATE_2D=0.001
 
 # Parse command-line arguments.
 # Usage: ./script.sh --data_name MyData --num_points 30000 --start_frame 40 --num_frames 15

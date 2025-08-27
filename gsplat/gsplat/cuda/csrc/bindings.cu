@@ -408,10 +408,6 @@ rasterize_forward_tensor(
         {img_height, img_width}, xys.options().dtype(torch::kInt32)
     );
 
-    torch::Tensor final_remaining = torch::zeros(
-        {img_height, img_width}, xys.options().dtype(torch::kInt32)
-    );
-
     rasterize_forward<<<tile_bounds_dim3, block_dim3>>>(
         tile_bounds_dim3,
         img_size_dim3,
@@ -423,12 +419,11 @@ rasterize_forward_tensor(
         opacities.contiguous().data_ptr<float>(),
         final_Ts.contiguous().data_ptr<float>(),
         final_idx.contiguous().data_ptr<int>(),
-        final_remaining.contiguous().data_ptr<int>(),
         (float3 *)out_img.contiguous().data_ptr<float>(),
         (float3 *)background.contiguous().data_ptr<float>()
     );
 
-    return std::make_tuple(out_img, final_Ts, final_idx, final_remaining);
+    return std::make_tuple(out_img, final_Ts, final_idx);
 }
 
 std::tuple<

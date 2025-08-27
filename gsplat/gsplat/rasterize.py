@@ -149,7 +149,7 @@ class _RasterizeGaussians(Function):
             else:
                 rasterize_fn = _C.nd_rasterize_forward
 
-            out_img, final_Ts, final_idx, final_remaining = rasterize_fn(
+            out_img, final_Ts, final_idx = rasterize_fn(
                 tile_bounds,
                 block,
                 img_size,
@@ -178,11 +178,7 @@ class _RasterizeGaussians(Function):
             final_Ts,
             final_idx,
         )
-
-        # remaining pixel is number of skipped gaussian in each pixels,
-        # printing the sum of skipped gaussians in all pixels
-        print("Gaussian that are skipped in each pixels", final_remaining.sum().item())
-
+        
         if return_alpha:
             out_alpha = 1 - final_Ts
             return out_img, out_alpha

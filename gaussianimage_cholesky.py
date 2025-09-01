@@ -72,6 +72,10 @@ class GaussianImage_Cholesky(nn.Module):
     def get_cholesky_elements(self):
         return self._cholesky+self.cholesky_bound
 
+    @property
+    def set_background(self, background):
+        self.background = background
+
     def forward(self):
         #assert torch.allclose(self.background, torch.ones(3, device=self.background.device) / 2.0), "Currently only support gray background"
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_2d(self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.tile_bounds)

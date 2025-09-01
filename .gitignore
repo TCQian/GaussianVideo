@@ -8,5 +8,6 @@ slurm-*.out
 dataset/*
 *.txt
 *.out
+*.csv
 *_analysis/
 .DS_Store

@@ -162,23 +162,21 @@ class Gaussian3Dplus2D(nn.Module):
             try:
                 ms_ssim_values = []
                 for t in range(self.num_frames):
-                    # Extract the t-th frame from both render and ground truth
                     frame = render_tensor[..., t]  # e.g. shape: [1, 3, H, W]
                     gt_frame = self.gt_image[..., t] # e.g. shape: [1, 3, H, W]
-                    # Attempt to compute MS-SSIM for this frame
                     ms_ssim_values.append(
                         ms_ssim(frame, gt_frame, data_range=1, size_average=True).item()
                     )
 
                 ms_ssim_per_layer[layer] += sum(ms_ssim_values) / len(ms_ssim_values)
             except AssertionError as e:
-                # In case the image is too small for ms-ssim, log the error and continue.
                 self.logwriter.write("MS-SSIM could not be computed: " + str(e))
             
             if self.save_imgs:
                 transform = transforms.ToPILImage()
                 for t in range(self.num_frames):
                     img = render_tensor[0, :, :, :, t]  
+                    img = torch.clamp(img, 0, 1)
                     pil_image = transform(img) 
                     name = f"{self.data_name}_fitting_t{t}_layer{layer}.png" 
                     pil_image.save(str(self.log_dir / name))

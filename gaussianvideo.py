@@ -104,7 +104,7 @@ class GaussianVideo(nn.Module):
             # for i in range(len(hist)):
             #     print(f"[{bin_edges[i]:>2.0f} - {bin_edges[i+1]:>2.0f}) : {hist[i]} Gaussians")
             # self.debug_mode = False
-        out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
+        # out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
         return {"render": out_img}
 

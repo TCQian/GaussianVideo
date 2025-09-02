@@ -37,10 +37,9 @@ def get_kwargs(kwargs, layer):
     if layer == 0:  # 3D GaussianVideo (Layer 0)
         layer_kwargs = {
             **required_params,
-            "model_name_3d": kwargs.get("model_name_3d", "GaussianVideo"),
-            "iterations_3d": kwargs.get("iterations_3d", 50000),
-            "num_points_3d": kwargs.get("num_points_3d", 50000),
-            "lr_3d": kwargs.get("lr_3d", 1e-2),
+            "iterations": kwargs.get("iterations_3d", 50000),
+            "num_points": kwargs.get("num_points_3d", 50000),
+            "lr": kwargs.get("lr_3d", 1e-2),
             "T": kwargs.get("num_frames", 50),
             "BLOCK_T": kwargs.get("BLOCK_T", 16),
             "quantize": kwargs.get("quantize", False),
@@ -50,10 +49,9 @@ def get_kwargs(kwargs, layer):
     elif layer == 1:  # 2D GaussianImage (Layer 1)
         layer_kwargs = {
             **required_params,
-            "model_name_2d": kwargs.get("model_name_2d", "GaussianImage_Cholesky"),
-            "iterations_2d": kwargs.get("iterations_2d", 50000),
-            "num_points_2d": kwargs.get("num_points_2d", 50000),
-            "lr_2d": kwargs.get("lr_2d", 1e-3),
+            "iterations": kwargs.get("iterations_2d", 50000),
+            "num_points": kwargs.get("num_points_2d", 50000),
+            "lr": kwargs.get("lr_2d", 1e-3),
             "quantize": kwargs.get("quantize", False),
             "opt_type": kwargs.get("opt_type", "adan"),
         }
@@ -89,15 +87,15 @@ class Gaussian3Dplus2D(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
 
+        self.start = kwargs["start_frame"]
+        self.num_frames = kwargs["num_frames"]
+
         self.device = torch.device("cuda:0")
         self.iterations_3d = kwargs["iterations_3d"]
         self.iterations_2d = kwargs["iterations_2d"]
         self.iterations = self.iterations_3d + (self.iterations_2d * self.num_frames)
 
-        self.start = kwargs["start"]
-        self.num_frames = kwargs["num_frames"]
-
-        self.log_dir = Path(f"./checkpoints/{kwargs['data_name']}/{kwargs['model_name_3d']}_i{kwargs['iterations_3d']}_g{kwargs['num_points_3d']}_{kwargs['model_name_2d']}_i{kwargs['iterations_2d']}_g{kwargs['num_points_2d']}_f{kwargs['num_frames']}_s{kwargs['start_frame']}/{kwargs['data_name']}")
+        self.log_dir = Path(f"./checkpoints/{kwargs['data_name']}/GaussianVideo_i{kwargs['iterations_3d']}_g{kwargs['num_points_3d']}_GaussianImage_Cholesky_i{kwargs['iterations_2d']}_g{kwargs['num_points_2d']}_f{kwargs['num_frames']}_s{kwargs['start_frame']}/{kwargs['data_name']}")
         self.logwriter = LogWriter(self.log_dir)
 
         kwargs_0 = get_kwargs(kwargs, layer=0)
@@ -288,11 +286,7 @@ def parse_args(argv):
         config_path = argv[0]
         argv = argv[1:] 
     
-    try:
-        config = load_config(config_path)
-        args.update(config)
-    except:
-        args = {}
+    args = load_config(config_path)
     
     i = 0
     while i < len(argv):

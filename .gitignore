@@ -10,3 +10,4 @@ dataset/*
 *.txt
 *.out
 *_analysis/
+summary.csv

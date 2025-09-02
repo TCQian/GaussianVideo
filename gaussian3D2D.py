@@ -12,7 +12,6 @@ from tqdm import tqdm
 import time
 import torchvision.transforms as transforms
 import json
-import yaml
 import random
 import sys
 
@@ -99,6 +98,7 @@ class Gaussian3Dplus2D(nn.Module):
         self.log_dir = Path(f"./checkpoints/{self.data_name}/GaussianVideo_i{kwargs['iterations_3d']}_g{kwargs['num_points_3d']}_GaussianImage_Cholesky_i{kwargs['iterations_2d']}_g{kwargs['num_points_2d']}_f{kwargs['num_frames']}_s{kwargs['start_frame']}/{self.data_name}")
         self.logwriter = LogWriter(self.log_dir)
         self.save_imgs = kwargs["save_imgs"]
+        print(f"Creating log for {self.log_dir.split("/")[-2]}")
 
         kwargs_0 = get_kwargs(kwargs, layer=0)
         self.layer_0_model = GaussianVideo(**kwargs_0).to(self.device)
@@ -162,17 +162,14 @@ class Gaussian3Dplus2D(nn.Module):
             try:
                 ms_ssim_values = []
                 for t in range(self.num_frames):
-                    # Extract the t-th frame from both render and ground truth
                     frame = render_tensor[..., t]  # e.g. shape: [1, 3, H, W]
                     gt_frame = self.gt_image[..., t] # e.g. shape: [1, 3, H, W]
-                    # Attempt to compute MS-SSIM for this frame
                     ms_ssim_values.append(
                         ms_ssim(frame, gt_frame, data_range=1, size_average=True).item()
                     )
 
                 ms_ssim_per_layer[layer] += sum(ms_ssim_values) / len(ms_ssim_values)
             except AssertionError as e:
-                # In case the image is too small for ms-ssim, log the error and continue.
                 self.logwriter.write("MS-SSIM could not be computed: " + str(e))
             
             if self.save_imgs:
@@ -287,7 +284,6 @@ def load_config(config_path="config/gaussian3D2D.json"):
 
 def parse_args(argv):
     """Parse command line arguments or load from JSON config"""
-    # Check if config file is provided as command line argument
     config_path = "config/gaussian3D2D.json"
     if len(argv) > 0 and argv[0].endswith('.json'):
         config_path = argv[0]
@@ -301,7 +297,6 @@ def parse_args(argv):
             key = argv[i][2:]  # Remove '--'
             if i + 1 < len(argv) and not argv[i + 1].startswith('--'):
                 value = argv[i + 1]
-                # Try to convert to appropriate type
                 if key in ['seed', 'num_frames', 'start_frame', 'iterations_3d', 'num_points_3d', 
                           'iterations_2d', 'num_points_2d', 'H', 'W', 'BLOCK_H', 'BLOCK_W', 'T', 'BLOCK_T']:
                     args[key] = int(value)

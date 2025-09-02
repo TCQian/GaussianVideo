@@ -83,7 +83,7 @@ class GaussianImage_Cholesky(nn.Module):
         out_img, alpha = rasterize_gaussians(self.xys, depths, self.radii, conics, num_tiles_hit,
             self.get_features, self.get_opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=True)
         alpha = alpha[..., None]
-        # out_img = torch.clamp(out_img, 0, 1) #[H, W, 3]
+        out_img = torch.clamp(out_img, 0, 1) #[H, W, 3]
         out_img = out_img.view(-1, self.H, self.W, 3).permute(0, 3, 1, 2).contiguous()
         return {"render": out_img}
 

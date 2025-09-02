@@ -7,7 +7,7 @@
   "num_frames": 5,
   "iterations_3d": 20000,
   "num_points_3d": 2500,
-  "model_path_3d": null,
+  "model_path_3d": "./checkpoints/Beauty/GaussianVideo_i20000_g2500_GaussianImage_Cholesky_i20000_g750_f5_s0/layer_0_model.pth.tar",
   "lr_3d": 0.01,
   "iterations_2d": 20000,
   "num_points_2d": 750,

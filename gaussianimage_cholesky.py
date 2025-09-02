@@ -72,7 +72,6 @@ class GaussianImage_Cholesky(nn.Module):
     def get_cholesky_elements(self):
         return self._cholesky+self.cholesky_bound
 
-    @property
     def set_background(self, background):
         self.background = background
 

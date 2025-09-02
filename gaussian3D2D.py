@@ -41,7 +41,7 @@ def get_kwargs(kwargs, layer):
             "num_points": kwargs.get("num_points_3d", 50000),
             "lr": kwargs.get("lr_3d", 1e-2),
             "T": kwargs.get("num_frames", 50),
-            "BLOCK_T": kwargs.get("BLOCK_T", 16),
+            "BLOCK_T": kwargs.get("BLOCK_T", 1),
             "quantize": kwargs.get("quantize", False),
             "opt_type": kwargs.get("opt_type", "adan"),
         }
@@ -90,7 +90,7 @@ class Gaussian3Dplus2D(nn.Module):
         self.start = kwargs["start_frame"]
         self.num_frames = kwargs["num_frames"]
 
-        self.device = torch.device("cuda:0")
+        self.device = kwargs["device"]
         self.iterations_3d = kwargs["iterations_3d"]
         self.iterations_2d = kwargs["iterations_2d"]
         self.iterations = self.iterations_3d + (self.iterations_2d * self.num_frames)
@@ -99,12 +99,12 @@ class Gaussian3Dplus2D(nn.Module):
         self.logwriter = LogWriter(self.log_dir)
 
         kwargs_0 = get_kwargs(kwargs, layer=0)
-        self.layer_0_model = GaussianVideo(**kwargs_0)
+        self.layer_0_model = GaussianVideo(**kwargs_0).to(self.device)
 
         self.layer_1_models = []
         kwargs_1 = get_kwargs(kwargs, layer=1)
         for _ in range(self.num_frames):
-            self.layer_1_models.append(GaussianImage_Cholesky(**kwargs_1))
+            self.layer_1_models.append(GaussianImage_Cholesky(**kwargs_1).to(self.device))
         
         self.trained_3D = False
         self.trained_2D = False
@@ -112,6 +112,7 @@ class Gaussian3Dplus2D(nn.Module):
             checkpoint = torch.load(kwargs.get("model_path_3d"), map_location=self.device)
             model_dict = self.layer_0_model.state_dict()
             pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict}
+            print(pretrained_dict)
             model_dict.update(pretrained_dict)
             self.layer_0_model.load_state_dict(model_dict)
             self.trained_3D = True
@@ -132,7 +133,7 @@ class Gaussian3Dplus2D(nn.Module):
         self.gt_image = images_paths_to_tensor(images_paths).to(self.device)
 
     def forward(self):
-        assert self.trained_3D and self.trained_2D, "3D is trained: {}, 2D is trained: {}".format(self.trained_3D, self.trained_2D)
+        assert self.trained_3D and self.trained_2D, "To test, 3D is trained: {}, 2D is trained: {}".format(self.trained_3D, self.trained_2D)
         self.layer_0_model.eval()
         for t in range(self.num_frames):
             self.layer_1_models[t].eval()
@@ -208,13 +209,16 @@ class Gaussian3Dplus2D(nn.Module):
             torch.save(self.layer_0_model.state_dict(), self.log_dir / "layer_0_model.pth.tar")
             total_time += time.time() - start_time
             self.trained_3D = True
+        else:
+            with torch.no_grad():
+                progress_bar.update(self.iterations_3d)
         
         if not self.trained_2D:
-            layer_0_img = self.layer_0_model()["render"] # background for L1 training
+            self.layer_0_model.eval()
+            with torch.no_grad():
+                layer_0_img = self.layer_0_model()["render"]
             for t in range(self.num_frames):
                 background = layer_0_img[..., t].squeeze(0).permute(1, 2, 0)
-                if background.device != self.device:
-                    background = background.to(self.device)
                 start_time = time.time()
                 self.layer_1_models[t].set_background(background)
                 self.layer_1_models[t].train()

@@ -18,7 +18,7 @@
   "W": 1920,
   "BLOCK_H": 16,
   "BLOCK_W": 16,
-  "BLOCK_T": 16,
+  "BLOCK_T": 1,
   "quantize": false,
   "opt_type": "adan"
 }

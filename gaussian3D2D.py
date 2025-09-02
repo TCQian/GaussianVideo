@@ -95,8 +95,10 @@ class Gaussian3Dplus2D(nn.Module):
         self.iterations_2d = kwargs["iterations_2d"]
         self.iterations = self.iterations_3d + (self.iterations_2d * self.num_frames)
 
-        self.log_dir = Path(f"./checkpoints/{kwargs['data_name']}/GaussianVideo_i{kwargs['iterations_3d']}_g{kwargs['num_points_3d']}_GaussianImage_Cholesky_i{kwargs['iterations_2d']}_g{kwargs['num_points_2d']}_f{kwargs['num_frames']}_s{kwargs['start_frame']}/{kwargs['data_name']}")
+        self.data_name = kwargs["data_name"]
+        self.log_dir = Path(f"./checkpoints/{self.data_name}/GaussianVideo_i{kwargs['iterations_3d']}_g{kwargs['num_points_3d']}_GaussianImage_Cholesky_i{kwargs['iterations_2d']}_g{kwargs['num_points_2d']}_f{kwargs['num_frames']}_s{kwargs['start_frame']}/{self.data_name}")
         self.logwriter = LogWriter(self.log_dir)
+        self.save_imgs = kwargs["save_imgs"]
 
         kwargs_0 = get_kwargs(kwargs, layer=0)
         self.layer_0_model = GaussianVideo(**kwargs_0).to(self.device)
@@ -112,7 +114,6 @@ class Gaussian3Dplus2D(nn.Module):
             checkpoint = torch.load(kwargs.get("model_path_3d"), map_location=self.device)
             model_dict = self.layer_0_model.state_dict()
             pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict}
-            print(pretrained_dict)
             model_dict.update(pretrained_dict)
             self.layer_0_model.load_state_dict(model_dict)
             self.trained_3D = True
@@ -179,18 +180,20 @@ class Gaussian3Dplus2D(nn.Module):
                 for t in range(self.num_frames):
                     img = render_tensor[0, :, :, :, t]  
                     pil_image = transform(img) 
-                    name = f"{self.video_name}_fitting_t{t}_layer{layer}.png" 
+                    name = f"{self.data_name}_fitting_t{t}_layer{layer}.png" 
                     pil_image.save(str(self.log_dir / name))
         
-            log_str += "layer {}: PSNR:{:.4f}, MS_SSIM:{:.6f}".format(layer, psnr_per_layer[layer], ms_ssim_per_layer[layer])
+            log_str += "layer {}: PSNR:{:.4f}, MS_SSIM:{:.6f}. ".format(layer, psnr_per_layer[layer], ms_ssim_per_layer[layer])
         
         self.logwriter.write(log_str)
             
         return psnr_per_layer, ms_ssim_per_layer
 
     def train(self):
-        assert not self.trained_3D and not self.trained_2D, "3D is trained: {}, 2D is trained: {}".format(self.trained_3D, self.trained_2D)
-
+        if self.trained_3D and self.trained_2D:
+            print("3D and 2D are trained, skipping training")
+            return
+        
         total_time = 0
         psnr_list, iter_list = [], []
         progress_bar = tqdm(range(1, self.iterations+1), desc="Training progress")
@@ -237,7 +240,7 @@ class Gaussian3Dplus2D(nn.Module):
             self.trained_2D = True
         
         progress_bar.close()
-        psnr_value, ms_ssim_value = self.test()
+        psnr_value, ms_ssim_value = self.forward()
         with torch.no_grad():
             self.layer_0_model.eval()
             for t in range(self.num_frames):

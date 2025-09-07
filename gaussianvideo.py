@@ -81,18 +81,20 @@ class GaussianVideo(nn.Module):
     def get_cholesky_elements(self):
         return self._cholesky + self.cholesky_bound
 
-    def prune(self, z_threshold=2.0):
+    def prune(self, tile_threshold=2.0):
         with torch.no_grad():
             _, _, radii, _, num_tiles_hit = project_gaussians_video(
                 self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
             )
+            print(f"min and max radii: {radii.min().item()}, {radii.max().item()}")
+            mask = (radii > tile_threshold * self.BLOCK_W) & (num_tiles_hit > 0)
             
-            mask = (radii > z_threshold) & (num_tiles_hit > 0)
-            
-            self._xyz.data = self._xyz.data[mask]
-            self._cholesky.data = self._cholesky.data[mask]
-            self._features_dc.data = self._features_dc.data[mask]
-            self._opacity.data = self._opacity.data[mask]
+            self._xyz = torch.nn.Parameter(self._xyz[mask])
+            self._cholesky = torch.nn.Parameter(self._cholesky[mask])
+            self._features_dc = torch.nn.Parameter(self._features_dc[mask])
+            self._opacity = torch.nn.Parameter(self._opacity[mask])
+            for param_group in self.optimizer.param_groups:
+                param_group['params'] = [p for p in self.parameters() if p.requires_grad]
             
         print(f"Pruned to {self._xyz.shape[0]} Gaussians.")
     

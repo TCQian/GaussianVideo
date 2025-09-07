@@ -199,8 +199,6 @@ class Gaussian3Dplus2D(nn.Module):
             start_time = time.time()
             self.layer_0_model.train()
             for iter in range(1, self.iterations_3d+1):
-                if iter == 1 or iter % 1000 == 0:
-                    self.layer_0_model.debug_mode = True
                 loss, psnr = self.layer_0_model.train_iter(self.gt_image)
                 psnr_list.append(psnr)
                 iter_list.append(iter)

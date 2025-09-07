@@ -34,8 +34,7 @@ class GaussianVideo(nn.Module):
 
         # Covariance
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 6))
-        # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
-        self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
+        self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
         with torch.no_grad():
@@ -76,8 +75,7 @@ class GaussianVideo(nn.Module):
     
     @property
     def get_opacity(self):
-        # return self._opacity
-        return self.opacity_activation(self._opacity)
+        return self._opacity
     
     @property
     def get_cholesky_elements(self):
@@ -90,11 +88,22 @@ class GaussianVideo(nn.Module):
         )
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,
-            self.get_features, self.get_opacity, self.H, self.W, self.T,
+            self.get_features, self._opacity, self.H, self.W, self.T,
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )
+        # if self.debug_mode:
+            # radii_np = self.radii.detach().cpu().numpy()
+            # max_radius = np.ceil(radii_np.max() / 5) * 5
+            # bins = np.arange(0, max_radius + 5, 5)  # e.g., [0, 5, 10, ..., max]
 
+            # hist, bin_edges = np.histogram(radii_np, bins=bins)
+
+            # # Print histogram nicely
+            # print("Gaussian Radius Histogram (bin size = 5)")
+            # for i in range(len(hist)):
+            #     print(f"[{bin_edges[i]:>2.0f} - {bin_edges[i+1]:>2.0f}) : {hist[i]} Gaussians")
+            # self.debug_mode = False
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
         return {"render": out_img}
@@ -115,12 +124,6 @@ class GaussianVideo(nn.Module):
         #     if param.grad is not None:
         #         grad_norm = param.grad.data.norm().item()
         #         print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
-        if self.debug_mode:
-            # print the distribution of opacity, based on percentiles
-            with torch.no_grad():
-                opacity = self.get_opacity
-                print(f"Opacity - min: {opacity.min().item():.6f}, max: {opacity.max().item():.6f}, mean: {opacity.mean().item():.6f}")
-                print(f"Opacity - 25th percentile: {torch.quantile(opacity, 0.25).item():.6f}, median: {torch.median(opacity).item():.6f}, 75th percentile: {torch.quantile(opacity, 0.75).item():.6f}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

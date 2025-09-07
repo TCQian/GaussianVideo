@@ -98,7 +98,7 @@ class Gaussian3Dplus2D(nn.Module):
         self.log_dir = Path(f"./checkpoints/{self.data_name}/GaussianVideo_i{kwargs['iterations_3d']}_g{kwargs['num_points_3d']}_GaussianImage_Cholesky_i{kwargs['iterations_2d']}_g{kwargs['num_points_2d']}_f{kwargs['num_frames']}_s{kwargs['start_frame']}/{self.data_name}")
         self.logwriter = LogWriter(self.log_dir)
         self.save_imgs = kwargs["save_imgs"]
-        print(f"Creating log for {self.log_dir.split("/")[-2]}")
+        print(f"Creating log for {str(self.log_dir).split('/')[-2]}")
 
         kwargs_0 = get_kwargs(kwargs, layer=0)
         self.layer_0_model = GaussianVideo(**kwargs_0).to(self.device)

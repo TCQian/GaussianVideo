@@ -82,21 +82,27 @@ class GaussianVideo(nn.Module):
         return self._cholesky + self.cholesky_bound
 
     def prune(self, z_threshold=2.0):
-        mask = self.radii > z_threshold and self.num_tiles_hit > 0
         with torch.no_grad():
+            _, _, radii, _, num_tiles_hit = project_gaussians_video(
+                self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
+            )
+            
+            mask = (radii > z_threshold) & (num_tiles_hit > 0)
+            
             self._xyz.data = self._xyz.data[mask]
             self._cholesky.data = self._cholesky.data[mask]
             self._features_dc.data = self._features_dc.data[mask]
             self._opacity.data = self._opacity.data[mask]
+            
         print(f"Pruned to {self._xyz.shape[0]} Gaussians.")
     
     def forward(self):
         # print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(xyz=self.get_xyz, cholesky=self.get_cholesky_elements))
-        self.xys, depths, self.radii, conics, self.num_tiles_hit = project_gaussians_video(
+        self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
         out_img = rasterize_gaussians_sum_video(
-            self.xys, depths, self.radii, conics, self.num_tiles_hit,
+            self.xys, depths, radii, conics, num_tiles_hit,
             self.get_features, self._opacity, self.H, self.W, self.T,
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False

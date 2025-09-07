@@ -7,13 +7,13 @@
 #SBATCH --mail-user=e0407638@u.nus.edu   # Email for notifications
 
 source ~/.bashrc
-conda activate gv
+conda activate gv_h100
 cd gsplat
 pip install .[dev]
 cd ..
 
 # Default variable values.
-DATA_NAME="HoneyBee"
+DATA_NAME="Beauty"
 MODEL_NAME="GaussianVideo"
 TRAIN_ITERATIONS=20000
 QUANT_ITERATIONS=10000
@@ -66,38 +66,38 @@ python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_F
 python train_video.py \
     --dataset "${DATASET_PATH}" \
     --data_name "${DATA_NAME}" \
-    --iterations "${TRAIN_ITERATIONS}" \
-    --model_name "${MODEL_NAME}" \
-    --num_points "${NUM_POINTS}" \
+    --iterations_3d "${TRAIN_ITERATIONS}" \
+    --model_name_3d "${MODEL_NAME}" \
+    --num_points_3d "${NUM_POINTS}" \
     --start_frame "${START_FRAME}" \
     --num_frames "${NUM_FRAMES}" \
-    --lr "${LEARNING_RATE}" \
+    --lr_3d "${LEARNING_RATE}" \
     --save_imgs
 
 # Run the quantization training script.
-python train_quantize_video.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations "${QUANT_ITERATIONS}" \
-    --model_name "${MODEL_NAME}" \
-    --num_points "${NUM_POINTS}" \
-    --model_path "${CHECKPOINT_PATH}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --lr "${LEARNING_RATE}" \
-    --save_imgs
+# python train_quantize_video.py \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --iterations "${QUANT_ITERATIONS}" \
+#     --model_name "${MODEL_NAME}" \
+#     --num_points "${NUM_POINTS}" \
+#     --model_path "${CHECKPOINT_PATH}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --lr "${LEARNING_RATE}" \
+#     --save_imgs
 
-# Run the quantization testing script.
-python test_quantize_video.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations "${QUANT_ITERATIONS}" \
-    --model_name "${MODEL_NAME}" \
-    --num_points "${NUM_POINTS}" \
-    --model_path "${CHECKPOINT_QUANT_PATH}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --lr "${LEARNING_RATE}" \
-    --save_imgs
+# # Run the quantization testing script.
+# python test_quantize_video.py \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --iterations "${QUANT_ITERATIONS}" \
+#     --model_name "${MODEL_NAME}" \
+#     --num_points "${NUM_POINTS}" \
+#     --model_path "${CHECKPOINT_QUANT_PATH}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --lr "${LEARNING_RATE}" \
+#     --save_imgs
 
 echo "Done"

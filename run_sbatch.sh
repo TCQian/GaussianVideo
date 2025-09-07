@@ -1,17 +1,17 @@
 # gaussian_image
 dataset=("HoneyBee" "Beauty" "Jockey")
-testing_gaussians_1frames=(750 1500 2250 3000 3750 7500 15000 22500 30000 37500)
-for i in "${!dataset[@]}"; do
-    for j in "${!testing_gaussians_1frames[@]}"; do
-        sbatch run_gaussianimage.sh \
-            --data_name "${dataset[$i]}" \
-            --num_points "${testing_gaussians_1frames[$j]}" 
-    done
-done
+# testing_gaussians_1frames=(750 1500 2250 3000 3750 7500 15000 22500 30000 37500)
+# for i in "${!dataset[@]}"; do
+#     for j in "${!testing_gaussians_1frames[@]}"; do
+#         sbatch run_gaussianimage.sh \
+#             --data_name "${dataset[$i]}" \
+#             --num_points "${testing_gaussians_1frames[$j]}" 
+#     done
+# done
 
 # gaussian_video
-num_frames=(1 5 10 20)
-testing_gaussians_5frames=(750 1500 2250 3000 3750 7500 15000 22500 30000 37500)
+num_frames=(5 10 20)
+testing_gaussians_5frames=(2500 5000 7500 10000 12500 25000 50000 75000 100000 125000)
 testing_gaussians_10frames=(5000 10000 15000 20000 25000 50000 100000 150000 200000 250000)
 testing_gaussians_20frames=(10000 20000 30000 40000 50000 100000 200000 300000 400000 500000)
 for i in "${!dataset[@]}"; do    

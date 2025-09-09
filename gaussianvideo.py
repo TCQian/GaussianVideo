@@ -138,11 +138,11 @@ class GaussianVideo(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
-        # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        # for name, param in self.named_parameters():
-        #     if param.grad is not None:
-        #         grad_norm = param.grad.data.norm().item()
-        #         print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        if self.debug_mode:
+            for name, param in self.named_parameters():
+                if param.grad is not None:
+                    grad_norm = param.grad.data.norm().item()
+                    print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

@@ -20,7 +20,7 @@ QUANT_ITERATIONS=10000
 LEARNING_RATE=0.01
 
 # Default values for parameters to be overridden.
-NUM_POINTS=10000
+NUM_POINTS=2500
 START_FRAME=0
 NUM_FRAMES=5
 

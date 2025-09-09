@@ -77,6 +77,8 @@ class VideoTrainer:
         for iter in range(1, self.iterations+1):
             if iter == 1 or iter % 10000 == 0:
                 self.gaussian_model.debug_mode = True
+            else:
+                self.gaussian_model.debug_mode = False
             # if iter % 5000 == 1 and iter > 1:
             #     self.gaussian_model.prune(tile_threshold=2.0) # prune gaussians affecting <= 2 tiles
 

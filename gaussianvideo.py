@@ -34,7 +34,8 @@ class GaussianVideo(nn.Module):
 
         # Covariance
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 6))
-        self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
+        # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
+        self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
         with torch.no_grad():
@@ -75,7 +76,8 @@ class GaussianVideo(nn.Module):
     
     @property
     def get_opacity(self):
-        return self._opacity
+        # return self._opacity
+        return self.opacity_activation(self._opacity)
     
     @property
     def get_cholesky_elements(self):
@@ -105,7 +107,7 @@ class GaussianVideo(nn.Module):
         )
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, radii, conics, num_tiles_hit,
-            self.get_features, self._opacity, self.H, self.W, self.T,
+            self.get_features, self.get_opacity, self.H, self.W, self.T,
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )

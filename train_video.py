@@ -75,8 +75,10 @@ class VideoTrainer:
         self.gaussian_model.train()
         start_time = time.time()
         for iter in range(1, self.iterations+1):
-            if iter % 5000 == 1 and iter > 1:
-                self.gaussian_model.prune(tile_threshold=2.0) # prune gaussians affecting <= 2 tiles
+            if iter == 1 or iter % 10000 == 0:
+                self.gaussian_model.debug_mode = True
+            # if iter % 5000 == 1 and iter > 1:
+            #     self.gaussian_model.prune(tile_threshold=2.0) # prune gaussians affecting <= 2 tiles
 
             loss, psnr = self.gaussian_model.train_iter(self.gt_image)
             psnr_list.append(psnr)

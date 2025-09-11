@@ -14,7 +14,7 @@ cd ..
 
 # Default variable values.
 DATA_NAME="Beauty"
-MODEL_NAME="GaussianVideo"
+MODEL_NAME="GaussianVideo_Layer"
 TRAIN_ITERATIONS=20000
 QUANT_ITERATIONS=10000
 LEARNING_RATE=0.001
@@ -63,7 +63,7 @@ CHECKPOINT_QUANT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/$
 python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
 
 # Run the training script with the required arguments.
-python train_video.py \
+python gaussianvideo_layer.py \
     --dataset "${DATASET_PATH}" \
     --data_name "${DATA_NAME}" \
     --iterations_3d "${TRAIN_ITERATIONS}" \

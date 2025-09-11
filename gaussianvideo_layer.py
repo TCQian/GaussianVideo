@@ -11,7 +11,8 @@ from PIL import Image
 from filelock import FileLock, Timeout
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
-
+import sys
+import os
 class GaussianVideo_Layer(nn.Module):
     def __init__(self, loss_type="L2", **kwargs):
         super().__init__()
@@ -402,7 +403,7 @@ def main(argv):
     for i in range(start, start+image_length):
         image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
         images_paths.append(image_path)
-    trainer = VideoTrainer(images_paths=images_paths, num_points=args.num_points_3d,
+    trainer = VideoTrainer_Layer(images_paths=images_paths, num_points=args.num_points_3d,
         iterations=args.iterations_3d, model_name=args.model_name_3d, args=args, model_path=args.model_path_3d, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name)
     psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
     psnrs.append(psnr)

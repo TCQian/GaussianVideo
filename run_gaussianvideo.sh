@@ -17,12 +17,12 @@ DATA_NAME="Beauty"
 MODEL_NAME="GaussianVideo"
 TRAIN_ITERATIONS=20000
 QUANT_ITERATIONS=10000
-LEARNING_RATE=0.01
+LEARNING_RATE=0.001
 
 # Default values for parameters to be overridden.
-NUM_POINTS=2500
+NUM_POINTS=750
 START_FRAME=0
-NUM_FRAMES=5
+NUM_FRAMES=1
 
 # Parse command-line arguments.
 # Usage: ./script.sh --data_name MyData --num_points 30000 --start_frame 40 --num_frames 15

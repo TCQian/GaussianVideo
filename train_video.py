@@ -75,7 +75,7 @@ class VideoTrainer:
         self.gaussian_model.train()
         start_time = time.time()
         for iter in range(1, self.iterations+1):
-            if iter == 1 or iter % 10000 == 0:
+            if iter == 1 or iter % 1000 == 0:
                 self.gaussian_model.debug_mode = True
             else:
                 self.gaussian_model.debug_mode = False

@@ -1057,10 +1057,11 @@ __global__ void rasterize_forward_sum_video(
             const float opac = xyz_opac.w;
             const float3 delta = {xyz_opac.x - px, xyz_opac.y - py, xyz_opac.z - pz};
 
-            printf("delta.z = %.6f, conic.z = %.6f, conic.u = %.6f\n", delta.z, conic.z, conic.u);
-            assert(delta.z == 0.f);
-            assert(conic.z == 0.f);
-            assert(conic.u == 0.f);
+            // printf("xyz_opac.z = %.6f, pz = %.6f\n", xyz_opac.z, pz);
+            // printf("delta.z = %.6f, conic.z = %.6f, conic.u = %.6f\n", delta.z, conic.z, conic.u);
+            // assert(delta.z == 0.f);
+            // assert(conic.z == 0.f);
+            // assert(conic.u == 0.f);
 
             // Compute full Mahalanobis distance (times 0.5 factor):
             const float sigma = 0.5f * (

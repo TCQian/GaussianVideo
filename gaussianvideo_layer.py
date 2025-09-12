@@ -17,6 +17,7 @@ import torch.nn.functional as F
 from pytorch_msssim import ms_ssim
 from tqdm import tqdm
 import random
+from utils import *
 class GaussianVideo_Layer(nn.Module):
     def __init__(self, loss_type="L2", **kwargs):
         super().__init__()
@@ -45,6 +46,8 @@ class GaussianVideo_Layer(nn.Module):
         self.opacity_activation = torch.sigmoid
         self.rgb_activation = torch.sigmoid
         
+        self._init_layer1()
+
         if kwargs["opt_type"] == "adam":
             self.optimizer = torch.optim.Adam(self.parameters(), lr=kwargs["lr"])
         else:
@@ -64,23 +67,27 @@ class GaussianVideo_Layer(nn.Module):
         self.layer = 0
 
     def _init_layer1(self):
-        self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_3D, 1)))
+        # self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_3D, 1)))
 
         # 2D -> 3D, xy is random, z is specified frame number from 0 to T-1
         self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_2D * self.T, 3) - 0.5)))
-        for t in range(self.T):
-            self._xyz_2D[t * self.init_num_points_2D:(t + 1) * self.init_num_points_2D, 2] = torch.atanh((2 * t) - 0.5)
+        if self.T > 1:
+            for t in range(self.T):
+                val = torch.atanh(torch.tensor(2 * (t / (self.T - 1)) - 1.0)).item()
+                self._xyz_2D.data[t * self.init_num_points_2D : (t + 1) * self.init_num_points_2D, 2] = val
+        else:
+            self._xyz_2D.data[:, 2] = torch.atanh(torch.tensor(- 1.0)).item()
 
         # 2D -> 3D, L11, L12, L22 are random, L13, L23 are 0 and L33 is 1
-        self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points_2D, 6))
+        self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points_2D  * self.T, 6))
         with torch.no_grad():
             self._cholesky_2D.data[:, 2] = 0
             self._cholesky_2D.data[:, 4] = 0
             self._cholesky_2D.data[:, 5] = 1
 
         # self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D, 1)))
-        self.register_buffer('_opacity_2D', torch.ones((self.init_num_points_2D, 1)))
-        self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points_2D, 3))
+        self.register_buffer('_opacity_2D', torch.ones((self.init_num_points_2D * self.T, 1)))
+        self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points_2D * self.T, 3))
         self.layer = 1
 
     def merge_3D2D(self):
@@ -95,10 +102,8 @@ class GaussianVideo_Layer(nn.Module):
                 if param.grad is not None:
                     if name == "_xyz_2D":
                         param.grad[:, 2] = 0
-                        param[:, 2].requires_grad_(False)
                     elif name == "_cholesky_2D":
                         param.grad[:, [2, 4, 5]] = 0
-                        param[:, [2, 4, 5]].requires_grad_(False)
 
     @property
     def get_xyz(self):
@@ -314,32 +319,7 @@ class VideoTrainer_Layer:
                 # Save the image to the specified directory
                 pil_image.save(str(self.log_dir / name))
         return psnr, ms_ssim_value
-    
-def images_paths_to_tensor(images_paths: list[Path]):
-    # Initialize a list to hold the image tensors
-    image_tensors = []
-    
-    # Loop through each image path
-    for image_path in images_paths:
-        # Convert the image at the current path to a tensor
-        img_tensor = image_path_to_tensor(image_path)
-        # Append the tensor to the list
-        image_tensors.append(img_tensor)
-    
-    # Stack the list of tensors along a new dimension to create a 5D tensor
-    # This will result in a tensor of shape [T, 1, C, H, W]
-    stacked_tensor = torch.stack(image_tensors, dim=0)  # Shape: [T, 1, C, H, W]
-    
-    # Rearrange the dimensions to get the final shape [1, C, H, W, T]
-    final_tensor = stacked_tensor.permute(1, 2, 3, 4, 0)  # Shape: [1, C, H, W, T]
-    
-    return final_tensor
 
-def image_path_to_tensor(image_path: Path):
-    img = Image.open(image_path)
-    transform = transforms.ToTensor()
-    img_tensor = transform(img).unsqueeze(0) #[1, C, H, W]
-    return img_tensor
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Example training script.")

@@ -231,6 +231,33 @@ def calculate_vmaf(gt_yuv_path: str, generated_yuv_path: str, width: int, height
     
     return 0.0  # Fallback value
 
+    
+def images_paths_to_tensor(images_paths: list[Path]):
+    # Initialize a list to hold the image tensors
+    image_tensors = []
+    
+    # Loop through each image path
+    for image_path in images_paths:
+        # Convert the image at the current path to a tensor
+        img_tensor = image_path_to_tensor(image_path)
+        # Append the tensor to the list
+        image_tensors.append(img_tensor)
+    
+    # Stack the list of tensors along a new dimension to create a 5D tensor
+    # This will result in a tensor of shape [T, 1, C, H, W]
+    stacked_tensor = torch.stack(image_tensors, dim=0)  # Shape: [T, 1, C, H, W]
+    
+    # Rearrange the dimensions to get the final shape [1, C, H, W, T]
+    final_tensor = stacked_tensor.permute(1, 2, 3, 4, 0)  # Shape: [1, C, H, W, T]
+    
+    return final_tensor
+
+def image_path_to_tensor(image_path: Path):
+    img = Image.open(image_path)
+    transform = transforms.ToTensor()
+    img_tensor = transform(img).unsqueeze(0) #[1, C, H, W]
+    return img_tensor
+
 def save_frames(frames: list[np.ndarray], save_dir: str):
     os.makedirs(save_dir, exist_ok=True)
     for idx, frame in enumerate(frames, start=1):

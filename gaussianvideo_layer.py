@@ -295,11 +295,11 @@ class ProgressiveVideoTrainer:
         self.log_dir = Path(f"./checkpoints/{args.data_name}/{model_name}_i{args.iterations_layer0}+{args.iterations_layer1}_g{args.num_points_layer0}+{args.num_points_layer1}_f{num_frames}_s{start_frame}/{video_name}")
             
         if model_name == "GaussianVideo_Layer":
-
-            progressive_mode = layer == 1 and args.model_path_layer0 is not None
-            assert progressive_mode, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
-
-            checkpoint_path = args.model_path_layer0 if progressive_mode else None
+            checkpoint_path = None
+            if layer == 1:
+                assert args.model_path_layer0 is not None, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
+                checkpoint_path = args.model_path_layer0
+                
             self.iterations = self.iterations_layer0 if layer == 0 else self.iterations_layer1
 
             self.gaussian_model = GaussianVideo_Layer(
@@ -314,7 +314,6 @@ class ProgressiveVideoTrainer:
                 BLOCK_T=BLOCK_T, 
                 device=self.device, 
                 quantize=False,
-                progressive_mode=progressive_mode,
                 checkpoint_path=checkpoint_path,
                 num_points_layer0=self.num_points_layer0,
                 num_points_layer1=self.num_points_layer1,
@@ -476,6 +475,9 @@ def parse_args(argv):
         help="Learning rate for layer 1 (default: %(default)s)",
     )
     parser.add_argument("--model_path_layer1", type=str, default=None, help="Path to a layer 1 checkpoint")
+    
+    args = parser.parse_args(argv)
+    return args
 
 def main(argv):
     args = parse_args(argv)

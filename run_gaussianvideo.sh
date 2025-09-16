@@ -82,6 +82,8 @@ python gaussianvideo_layer.py \
     --iterations_layer0 "${TRAIN_ITERATIONS_LAYER0}" \
     --num_points_layer0 "${NUM_POINTS_LAYER0}" \
     --lr_layer0 "${LEARNING_RATE_LAYER0}" \
+    --num_points_layer1 "${NUM_POINTS_LAYER1}" \
+    --lr_layer1 "${LEARNING_RATE_LAYER1}" \
     --save_imgs
 
 python gaussianvideo_layer.py \

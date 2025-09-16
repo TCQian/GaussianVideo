@@ -60,7 +60,7 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-echo "Starting ${MODEL_NAME_3D}_${NUM_POINTS_3D}_${MODEL_NAME_2D}_${NUM_POINTS_2D}_${DATA_NAME}_${NUM_FRAMES}..."
+echo "Starting ${MODEL_NAME}_${NUM_POINTS_LAYER0}_${NUM_POINTS_LAYER1}_${DATA_NAME}_${NUM_FRAMES}..."
 
 # Define dataset and checkpoint paths using the variables.
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
@@ -79,10 +79,9 @@ python gaussianvideo_layer.py \
     --start_frame "${START_FRAME}" \
     --num_frames "${NUM_FRAMES}" \
     --model_name "${MODEL_NAME}" \
-    --iterations_layer0 "${TRAIN_ITERATIONS_3D}" \
-    --iterations_layer1 "${TRAIN_ITERATIONS_2D}" \
-    --num_points_layer0 "${NUM_POINTS_3D}" \
-    --lr_layer0 "${LEARNING_RATE_3D}" \
+    --iterations_layer0 "${TRAIN_ITERATIONS_LAYER0}" \
+    --num_points_layer0 "${NUM_POINTS_LAYER0}" \
+    --lr_layer0 "${LEARNING_RATE_LAYER0}" \
     --save_imgs
 
 python gaussianvideo_layer.py \
@@ -92,13 +91,13 @@ python gaussianvideo_layer.py \
     --start_frame "${START_FRAME}" \
     --num_frames "${NUM_FRAMES}" \
     --model_name "${MODEL_NAME}" \
-    --iterations_layer0 "${TRAIN_ITERATIONS_3D}" \
-    --iterations_layer1 "${TRAIN_ITERATIONS_2D}" \
-    --num_points_layer0 "${NUM_POINTS_3D}" \
-    --lr_layer0 "${LEARNING_RATE_3D}" \
+    --iterations_layer0 "${TRAIN_ITERATIONS_LAYER0}" \
+    --iterations_layer1 "${TRAIN_ITERATIONS_LAYER1}" \
+    --num_points_layer0 "${NUM_POINTS_LAYER0}" \
+    --lr_layer0 "${LEARNING_RATE_LAYER0}" \
     --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
-    --num_points_layer1 "${NUM_POINTS_2D}" \
-    --lr_layer1 "${LEARNING_RATE_2D}" \
+    --num_points_layer1 "${NUM_POINTS_LAYER1}" \
+    --lr_layer1 "${LEARNING_RATE_LAYER1}" \
     --save_imgs
 
 

@@ -14,15 +14,19 @@ cd ..
 
 # Default variable values.
 DATA_NAME="Beauty"
-MODEL_NAME="GaussianVideo_Layer"
-TRAIN_ITERATIONS=20000
-QUANT_ITERATIONS=10000
-LEARNING_RATE=0.001
-
-# Default values for parameters to be overridden.
-NUM_POINTS=750
 START_FRAME=0
-NUM_FRAMES=1
+NUM_FRAMES=5
+
+MODEL_NAME="GaussianVideo_Layer"
+NUM_POINTS_LAYER0=2500
+TRAIN_ITERATIONS_LAYER0=20000
+QUANT_ITERATIONS_3D=10000
+LEARNING_RATE_LAYER0=0.01
+
+NUM_POINTS_LAYER1=750
+TRAIN_ITERATIONS_LAYER1=20000
+QUANT_ITERATIONS_2D=10000
+LEARNING_RATE_LAYER1=0.001
 
 # Parse command-line arguments.
 # Usage: ./script.sh --data_name MyData --num_points 30000 --start_frame 40 --num_frames 15
@@ -32,8 +36,12 @@ while [ "$#" -gt 0 ]; do
             DATA_NAME="$2"
             shift 2
             ;;
-        -p|--num_points)
-            NUM_POINTS="$2"
+        -pl0|--num_points_layer0)
+            NUM_POINTS_LAYER0="$2"
+            shift 2
+            ;;
+        -pl1|--num_points_layer1)
+            NUM_POINTS_LAYER1="$2"
             shift 2
             ;;
         -s|--start_frame)
@@ -52,27 +60,47 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-echo "Starting GaussianVideo_${DATA_NAME}_${NUM_FRAMES}_${NUM_POINTS}..."
+echo "Starting ${MODEL_NAME_3D}_${NUM_POINTS_3D}_${MODEL_NAME_2D}_${NUM_POINTS_2D}_${DATA_NAME}_${NUM_FRAMES}..."
 
 # Define dataset and checkpoint paths using the variables.
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
 DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
-CHECKPOINT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
-CHECKPOINT_QUANT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME}_i${QUANT_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
+CHECKPOINT_DIR_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_i${TRAIN_ITERATIONS_LAYER0}+${TRAIN_ITERATIONS_LAYER1}_g${NUM_POINTS_LAYER0}+${NUM_POINTS_LAYER1}_f${NUM_FRAMES}_s${START_FRAME}/"
+CHECKPOINT_PATH_LAYER0="${CHECKPOINT_DIR_PATH}layer_0_model.pth.tar"
+CHECKPOINT_PATH_LAYER1="${CHECKPOINT_DIR_PATH}layer_1_model.pth.tar"
 
-python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
+# python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
 
 # Run the training script with the required arguments.
 python gaussianvideo_layer.py \
+    --layer 0 \
     --dataset "${DATASET_PATH}" \
     --data_name "${DATA_NAME}" \
-    --iterations_3d "${TRAIN_ITERATIONS}" \
-    --model_name_3d "${MODEL_NAME}" \
-    --num_points_3d "${NUM_POINTS}" \
     --start_frame "${START_FRAME}" \
     --num_frames "${NUM_FRAMES}" \
-    --lr_3d "${LEARNING_RATE}" \
+    --model_name "${MODEL_NAME}" \
+    --iterations_layer0 "${TRAIN_ITERATIONS_3D}" \
+    --iterations_layer1 "${TRAIN_ITERATIONS_2D}" \
+    --num_points_layer0 "${NUM_POINTS_3D}" \
+    --lr_layer0 "${LEARNING_RATE_3D}" \
     --save_imgs
+
+python gaussianvideo_layer.py \
+    --layer 1 \
+    --dataset "${DATASET_PATH}" \
+    --data_name "${DATA_NAME}" \
+    --start_frame "${START_FRAME}" \
+    --num_frames "${NUM_FRAMES}" \
+    --model_name "${MODEL_NAME}" \
+    --iterations_layer0 "${TRAIN_ITERATIONS_3D}" \
+    --iterations_layer1 "${TRAIN_ITERATIONS_2D}" \
+    --num_points_layer0 "${NUM_POINTS_3D}" \
+    --lr_layer0 "${LEARNING_RATE_3D}" \
+    --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
+    --num_points_layer1 "${NUM_POINTS_2D}" \
+    --lr_layer1 "${LEARNING_RATE_2D}" \
+    --save_imgs
+
 
 # Run the quantization training script.
 # python train_quantize_video.py \

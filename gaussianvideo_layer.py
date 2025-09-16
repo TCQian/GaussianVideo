@@ -19,15 +19,17 @@ from tqdm import tqdm
 import random
 from utils import *
 class GaussianVideo_Layer(nn.Module):
-    def __init__(self, loss_type="L2", **kwargs):
+    def __init__(self, layer= 0, loss_type="L2", **kwargs):
         super().__init__()
 
-        self.debug_mode = False  # enable kernel logging
+        self.debug_mode = False 
 
-        self.layer = 0
+        self.layer = int(layer)
         self.loss_type = loss_type
-        # self.init_num_points_3D = 2500
-        self.init_num_points_2D = kwargs["num_points"]
+        self.opt_type = kwargs["opt_type"]
+        self.lr = kwargs["lr"]
+        self.init_num_points_3D = kwargs["num_points_layer0"]
+        self.init_num_points_2D = kwargs["num_points_layer1"]
 
         self.H, self.W, self.T = kwargs["H"], kwargs["W"], kwargs["T"]
         self.BLOCK_W, self.BLOCK_H, self.BLOCK_T = kwargs["BLOCK_W"], kwargs["BLOCK_H"], kwargs["BLOCK_T"]
@@ -41,23 +43,27 @@ class GaussianVideo_Layer(nn.Module):
 
         self.register_buffer('background', torch.ones(3))
         self.register_buffer('cholesky_bound_3D', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
-        self.register_buffer('cholesky_bound_2D', torch.tensor([0.5, 0, 0, 0.5, 0, 0]).view(1, 3))
+        self.register_buffer('cholesky_bound_2D', torch.tensor([0.5, 0, 0, 0.5, 0, 0]).view(1, 6))
 
         self.opacity_activation = torch.sigmoid
-        self.rgb_activation = torch.sigmoid
-        
-        self._init_layer1()
 
-        if kwargs["opt_type"] == "adam":
-            self.optimizer = torch.optim.Adam(self.parameters(), lr=kwargs["lr"])
+        self.checkpoint_path = kwargs.get("checkpoint_path", None)
+
+        self._init_layer0() if self.layer == 0 else self._init_layer1()
+
+        if self.layer == 1:
+            self._setup_progressive_optimizer()
         else:
-            self.optimizer = Adan(self.parameters(), lr=kwargs["lr"])
+            if self.opt_type == "adam":
+                self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+            else:
+                self.optimizer = Adan(self.parameters(), lr=self.lr)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20000, gamma=0.5)
 
     def _init_layer0(self):
         self._xyz_3D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_3D, 3) - 0.5)))
         self._cholesky_3D = nn.Parameter(torch.rand(self.init_num_points_3D, 6))
-        self.register_buffer('_opacity_3D', torch.ones((self.init_num_points_3D, 1)))
+        self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_3D, 1)))
         self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points_3D, 3))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
@@ -65,11 +71,17 @@ class GaussianVideo_Layer(nn.Module):
             self._cholesky_3D.data[:, 5] += self.T  # adjust the constant as needed
 
         self.layer = 0
+        print("GaussianVideo_Layer: Layer 0 initialized, number of parameters: ", sum(p.numel() for p in self.parameters()))
 
     def _init_layer1(self):
-        # self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_3D, 1)))
+        assert self.checkpoint_path is not None, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
+        self._load_layer0_checkpoint()
 
-        # 2D -> 3D, xy is random, z is specified frame number from 0 to T-1
+        # check if _opacity_3D is a parameter
+        if not isinstance(self._opacity_3D, nn.Parameter):
+            print("GaussianVideo_Layer: _opacity_3D is not a parameter, creating parameter")
+            self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_3D, 1)))
+
         self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_2D * self.T, 3) - 0.5)))
         if self.T > 1:
             for t in range(self.T):
@@ -85,57 +97,143 @@ class GaussianVideo_Layer(nn.Module):
             self._cholesky_2D.data[:, 4] = 0
             self._cholesky_2D.data[:, 5] = 1
 
-        # self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D, 1)))
-        self.register_buffer('_opacity_2D', torch.ones((self.init_num_points_2D * self.T, 1)))
+        self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D * self.T, 1)))
+        # self.register_buffer('_opacity_2D', torch.ones((self.init_num_points_2D * self.T, 1)))
         self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points_2D * self.T, 3))
         self.layer = 1
+        print("GaussianVideo_Layer: Layer 1 initialized, number of parameters: ", sum(p.numel() for p in self.parameters()))
 
-    def merge_3D2D(self):
-        self._merged_xyz = torch.nn.Parameter(torch.cat((self._xyz_3D, self._xyz_2D), dim=0))
-        self._merged_cholesky = torch.nn.Parameter(torch.cat((self._cholesky_3D, self._cholesky_2D), dim=0))
-        self._merged_features_dc = torch.nn.Parameter(torch.cat((self._features_dc_3D, self._features_dc_2D), dim=0))
-        self._merged_opacity = torch.nn.Parameter(torch.cat((self._opacity_3D, self._opacity_2D), dim=0))
+    def _load_layer0_checkpoint(self):
+        """Load layer 0 checkpoint for progressive training"""
+        if self.checkpoint_path is None:
+            raise ValueError("checkpoint_path must be provided for progressive training")
+        
+        print(f"Loading layer 0 checkpoint from: {self.checkpoint_path}")
+        checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
+        
+        self._init_layer0()
+        layer0_params = {
+            '_xyz_3D': checkpoint.get('_xyz_3D'),
+            '_cholesky_3D': checkpoint.get('_cholesky_3D'),
+            '_opacity_3D': checkpoint.get('_opacity_3D'),
+            '_features_dc_3D': checkpoint.get('_features_dc_3D')
+        }
+        
+        for param_name, param_value in layer0_params.items():
+            if param_value is not None and hasattr(self, param_name):
+                if param_name == '_opacity_3D':
+                    self._opacity_3D = nn.Parameter(param_value.clone())
+                else:
+                    getattr(self, param_name).data.copy_(param_value)
+        
+        print("Layer 0 checkpoint loaded successfully")
 
-    def freeze_gaussian(self):
+    def _freeze_layer0_parameters(self):
+        """Freeze layer 0 parameters and apply 2D gaussian constraints"""
+        if self.layer == 1:
+            # Freeze layer 0 parameters by setting requires_grad=False
+            layer0_params = ['_xyz_3D', '_cholesky_3D', '_features_dc_3D']
+            
+            for param_name in layer0_params:
+                if hasattr(self, param_name):
+                    param = getattr(self, param_name)
+                    if isinstance(param, nn.Parameter):
+                        param.requires_grad = False
+                        print(f"Frozen layer 0 parameter: {param_name}")
+
+    def _apply_2d_gaussian_constraints(self):
+        """Apply gradient constraints to 2D gaussian parameters during training"""
         if self.layer == 1:
             for name, param in self.named_parameters():
                 if param.grad is not None:
                     if name == "_xyz_2D":
+                        # Freeze temporal dimension (z-coordinate)
                         param.grad[:, 2] = 0
                     elif name == "_cholesky_2D":
+                        # Freeze L13, L23, L33 elements (indices 2, 4, 5)
                         param.grad[:, [2, 4, 5]] = 0
+
+    def _setup_progressive_optimizer(self):
+        """Setup optimizer for progressive training - only train 2D gaussians and extra 3D features"""
+        self._freeze_layer0_parameters()
+        
+        trainable_params = []
+        trainable_params.extend([
+            self._xyz_2D,
+            self._cholesky_2D,
+            self._features_dc_2D,
+            self._opacity_2D
+        ])
+        
+        if hasattr(self, '_opacity_3D') and isinstance(self._opacity_3D, nn.Parameter) and self._opacity_3D.requires_grad:
+            trainable_params.append(self._opacity_3D)
+        
+        if self.opt_type == "adam":
+            self.optimizer = torch.optim.Adam(trainable_params, lr=self.lr)
+        else:
+            self.optimizer = Adan(trainable_params, lr=self.lr)
+        
+        print(f"Progressive optimizer setup: training {len(trainable_params)} parameter groups")
+
+    def save_checkpoint(self, path):
+        if self.layer == 0:
+            # Save only layer 0 parameters (3D gaussians)
+            layer0_state = {
+                '_xyz_3D': self._xyz_3D.data,
+                '_cholesky_3D': self._cholesky_3D.data,
+                '_opacity_3D': self._opacity_3D.data if isinstance(self._opacity_3D, nn.Parameter) else self._opacity_3D,
+                '_features_dc_3D': self._features_dc_3D.data,
+                'layer': self.layer
+            }
+            torch.save(layer0_state, path / "layer_0_model.pth.tar")
+            print(f"Layer 0 checkpoint saved to: {path / 'layer_0_model.pth.tar'}")
+        elif self.layer == 1:
+            layer1_state = {
+                '_xyz_2D': self._xyz_2D.data[:, :2],
+                '_cholesky_2D': self._cholesky_2D.data[:, [0, 1, 3]],
+                '_features_dc_2D': self._features_dc_2D.data,
+                '_opacity_2D': self._opacity_2D.data if isinstance(self._opacity_2D, nn.Parameter) else self._opacity_2D,
+                '_opacity_3D': self._opacity_3D.data if isinstance(self._opacity_3D, nn.Parameter) else self._opacity_3D,
+                'layer': self.layer
+            }
+            torch.save(layer1_state, path / "layer_1_model.pth.tar")
+            print(f"Layer 1 checkpoint saved to: {path / 'layer_1_model.pth.tar'}")
 
     @property
     def get_xyz(self):
         if self.layer == 0:
             return torch.tanh(self._xyz_3D)
         elif self.layer == 1:
-            return torch.tanh(self._xyz_2D)
+            if self.debug_mode:
+                print("Gaussian's xyz coordintes", self._xyz_2D[:, 2])
+            return torch.tanh(torch.cat((self._xyz_3D, self._xyz_2D), dim=0))
     
     @property
     def get_features(self):
         if self.layer == 0:
             return self._features_dc_3D
         elif self.layer == 1:
-            return self._features_dc_2D
+            return torch.cat((self._features_dc_3D, self._features_dc_2D), dim=0)
     
     @property
     def get_opacity(self):
         if self.layer == 0:
-            return self._opacity_3D
+            return self.opacity_activation(self._opacity_3D)
         elif self.layer == 1:
-            return self._opacity_2D
-            # return self.opacity_activation(self._opacity_2D)
+            return self.opacity_activation(torch.cat((self._opacity_3D, self._opacity_2D), dim=0))
     
     @property
     def get_cholesky_elements(self):
         if self.layer == 0:
             return self._cholesky_3D + self.cholesky_bound_3D
         elif self.layer == 1:
-            return self._cholesky_2D + self.cholesky_bound_2D
+            if self.debug_mode:
+                print("Gaussian's cholesky elements", self._cholesky_2D[:, [2, 4, 5]])
+            merged_cholesky = torch.cat((self._cholesky_3D, self._cholesky_2D), dim=0)
+            merged_bounds = torch.cat((self.cholesky_bound_3D, self.cholesky_bound_2D), dim=0)
+            return merged_cholesky + merged_bounds
     
     def forward(self):
-        # print("before projection, xyz: {xyz}, cholesky: {cholesky}".format(xyz=self.get_xyz, cholesky=self.get_cholesky_elements))
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
@@ -145,18 +243,6 @@ class GaussianVideo_Layer(nn.Module):
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )
-        # if self.debug_mode:
-            # radii_np = self.radii.detach().cpu().numpy()
-            # max_radius = np.ceil(radii_np.max() / 5) * 5
-            # bins = np.arange(0, max_radius + 5, 5)  # e.g., [0, 5, 10, ..., max]
-
-            # hist, bin_edges = np.histogram(radii_np, bins=bins)
-
-            # # Print histogram nicely
-            # print("Gaussian Radius Histogram (bin size = 5)")
-            # for i in range(len(hist)):
-            #     print(f"[{bin_edges[i]:>2.0f} - {bin_edges[i+1]:>2.0f}) : {hist[i]} Gaussians")
-            # self.debug_mode = False
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
         return {"render": out_img}
@@ -173,7 +259,7 @@ class GaussianVideo_Layer(nn.Module):
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
         if self.layer == 1:
-            self.freeze_gaussian()
+            self._apply_2d_gaussian_constraints()
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
@@ -182,36 +268,44 @@ class GaussianVideo_Layer(nn.Module):
         return loss, psnr
 
 
-class VideoTrainer_Layer:
+class ProgressiveVideoTrainer:
     """Trains 3D and 2D gaussians layer by layer to fit a video."""
     def __init__(
         self,
+        layer: int,
         images_paths: list[Path],
-        num_points: int = 2000,
         model_name:str = "GaussianVideo_Layer",
-        iterations:int = 30000,
-        model_path = None,
         args = None,
         video_name: str = "Jockey",
         num_frames: int = 50,
         start_frame: int = 0,
     ):
+
         self.video_name = video_name
         self.device = torch.device("cuda:0")
         self.gt_image = images_paths_to_tensor(images_paths).to(self.device)
 
-        self.num_points = num_points
+        self.num_points_layer0 = args.num_points_layer0
+        self.num_points_layer1 = args.num_points_layer1
         BLOCK_H, BLOCK_W, BLOCK_T = 16, 16, 1
         self.H, self.W, self.T = self.gt_image.shape[2], self.gt_image.shape[3], self.gt_image.shape[4]
-        self.iterations = iterations
+        self.iterations_layer0 = args.iterations_layer0
+        self.iterations_layer1 = args.iterations_layer1
         self.save_imgs = args.save_imgs
-        self.log_dir = Path(f"./checkpoints/{args.data_name}/{model_name}_i{args.iterations_3d}_g{num_points}_f{num_frames}_s{start_frame}/{video_name}")
+        self.log_dir = Path(f"./checkpoints/{args.data_name}/{model_name}_i{args.iterations_layer0}+{args.iterations_layer1}_g{args.num_points_layer0}+{args.num_points_layer1}_f{num_frames}_s{start_frame}/{video_name}")
             
         if model_name == "GaussianVideo_Layer":
+
+            progressive_mode = layer == 1 and args.model_path_layer0 is not None
+            assert progressive_mode, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
+
+            checkpoint_path = args.model_path_layer0 if progressive_mode else None
+            self.iterations = self.iterations_layer0 if layer == 0 else self.iterations_layer1
+
             self.gaussian_model = GaussianVideo_Layer(
+                layer=layer,
                 loss_type="L2", 
                 opt_type="adan", 
-                num_points=self.num_points, 
                 H=self.H, 
                 W=self.W, 
                 T=self.T, 
@@ -219,19 +313,15 @@ class VideoTrainer_Layer:
                 BLOCK_W=BLOCK_W, 
                 BLOCK_T=BLOCK_T, 
                 device=self.device, 
-                lr=args.lr_3d, 
-                quantize=False
+                quantize=False,
+                progressive_mode=progressive_mode,
+                checkpoint_path=checkpoint_path,
+                num_points_layer0=self.num_points_layer0,
+                num_points_layer1=self.num_points_layer1,
+                lr=args.lr_layer0 if layer == 0 else args.lr_layer1
             ).to(self.device)
 
         self.logwriter = LogWriter(self.log_dir)
-
-        if model_path is not None:
-            print(f"loading model path:{model_path}")
-            checkpoint = torch.load(model_path, map_location=self.device)
-            model_dict = self.gaussian_model.state_dict()
-            pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict}
-            model_dict.update(pretrained_dict)
-            self.gaussian_model.load_state_dict(model_dict)
 
     def train(self):     
         psnr_list, iter_list = [], []
@@ -265,8 +355,11 @@ class VideoTrainer_Layer:
             test_end_time = (time.time() - test_start_time)/100
 
         self.logwriter.write("Training Complete in {:.4f}s, Eval time:{:.8f}s, FPS:{:.4f}".format(end_time, test_end_time, 1/test_end_time))
-        torch.save(self.gaussian_model.state_dict(), self.log_dir / "gaussian_model.pth.tar")
-        np.save(self.log_dir / "training.npy", {"iterations": iter_list, "training_psnr": psnr_list, "training_time": end_time, 
+        
+        # Save checkpoint using the model's save_checkpointsave_checkpoint method
+        self.gaussian_model.save_checkpoint(self.log_dir)
+        
+        np.save(self.log_dir / "training_layer_{}.npy".format(self.gaussian_model.layer), {"iterations": iter_list, "training_psnr": psnr_list, "training_time": end_time, 
         "psnr": psnr_value, "ms-ssim": ms_ssim_value, "rendering_time": test_end_time, "rendering_fps": 1/test_end_time})
         return psnr_value, ms_ssim_value, end_time, test_end_time, 1/test_end_time
 
@@ -307,39 +400,29 @@ class VideoTrainer_Layer:
     
             # Loop through each time step
             for t in range(num_time_steps):
-                # Extract the image for the current time step
                 img = render_tensor[0, :, :, :, t]  # Shape: [C, H, W]
-                
-                # Convert the image tensor to a PIL Image
                 pil_image = transform(img)  # Convert to PIL Image
-                
-                # Define the filename based on the time step
                 name = f"{self.video_name}_fitting_t{t}.png"  # e.g., "_fitting_t0.png"
-                
-                # Save the image to the specified directory
                 pil_image.save(str(self.log_dir / name))
         return psnr, ms_ssim_value
 
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Example training script.")
+    
+    # Parameters for training
+    parser.add_argument("--seed", type=int, default=1, help="Set random seed for reproducibility")
+    parser.add_argument("--save_imgs", action="store_true", help="Save image")
+
+    # Progressively training parameters
+    parser.add_argument("--layer", type=int, default=0, help="Target layer to train (default: %(default)s)")
+    
+    # Parameters for dataset
     parser.add_argument(
         "-d", "--dataset", type=str, default='./dataset/Jockey/', help="Training dataset"
     )
     parser.add_argument(
         "--data_name", type=str, default='Jockey', help="Training dataset"
-    )
-    parser.add_argument(
-        "--model_name_3d", type=str, default="GaussianVideo", help="model selection for 3D: GaussianVideo"
-    )
-    parser.add_argument(
-        "--iterations_3d", type=int, default=50000, help="number of training epochs for 3D GaussianVideo (default: %(default)s)"
-    )
-    parser.add_argument(
-        "--num_points_3d",
-        type=int,
-        default=50000,
-        help="2D+T GS points (default: %(default)s)",
     )
     parser.add_argument(
         "--num_frames",
@@ -353,17 +436,46 @@ def parse_args(argv):
         default=0,
         help="Start frame (default: %(default)s)",
     )
-    parser.add_argument("--model_path_3d", type=str, default=None, help="Path to a 3D GaussianVideo's checkpoint")
-    parser.add_argument("--seed", type=int, default=1, help="Set random seed for reproducibility")
-    parser.add_argument("--save_imgs", action="store_true", help="Save image", default=True)
+
+    # Model parameters for layer 0
     parser.add_argument(
-        "--lr_3d",
+        "--model_name", type=str, default="GaussianVideo_Layer", help="model selection: GaussianVideo_Layer"
+    )
+
+    parser.add_argument(
+        "--iterations_layer0", type=int, default=50000, help="number of training epochs for layer 0 (default: %(default)s)"
+    )
+    parser.add_argument(
+        "--num_points_layer0",
+        type=int,
+        default=50000,
+        help="3D GS points in layer 0 (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--lr_layer0",
         type=float,
         default=1e-2,
-        help="Learning rate of 3D GaussianVideo (default: %(default)s)",
+        help="Learning rate of layer 0 (default: %(default)s)",
     )
-    args = parser.parse_args(argv)
-    return args
+    parser.add_argument("--model_path_layer0", type=str, default=None, help="Path to a layer 0 checkpoint")
+
+    # Model parameters for layer 1
+    parser.add_argument(
+        "--iterations_layer1", type=int, default=50000, help="number of training epochs for layer 1 (default: %(default)s)"
+    )
+    parser.add_argument(
+        "--num_points_layer1",
+        type=int,
+        default=50000,
+        help="2D GS points per frame in layer 1 (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--lr_layer1",
+        type=float,
+        default=1e-3,
+        help="Learning rate for layer 1 (default: %(default)s)",
+    )
+    parser.add_argument("--model_path_layer1", type=str, default=None, help="Path to a layer 1 checkpoint")
 
 def main(argv):
     args = parse_args(argv)
@@ -378,39 +490,19 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         np.random.seed(args.seed)
 
-    logwriter = LogWriter(Path(f"./checkpoints/{args.data_name}/{args.model_name_3d}_i{args.iterations_3d}_g{args.num_points_3d}_f{args.num_frames}_s{args.start_frame}"))
-    psnrs, ms_ssims, training_times, eval_times, eval_fpses = [], [], [], [], []
-    image_h, image_w = 0, 0
+    logwriter = LogWriter(Path(f"./checkpoints/{args.data_name}/{args.model_name}_i{args.iterations_layer0}+{args.iterations_layer1}_g{args.num_points_layer0}+{args.num_points_layer1}_f{args.num_frames}_s{args.start_frame}"))
     image_length, start = args.num_frames, args.start_frame
 
     images_paths = []
     for i in range(start, start+image_length):
         image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
         images_paths.append(image_path)
-    trainer = VideoTrainer_Layer(images_paths=images_paths, num_points=args.num_points_3d,
-        iterations=args.iterations_3d, model_name=args.model_name_3d, args=args, model_path=args.model_path_3d, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name)
+
+    trainer = ProgressiveVideoTrainer(layer=args.layer, images_paths=images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name)
     psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
-    psnrs.append(psnr)
-    ms_ssims.append(ms_ssim)
-    training_times.append(training_time) 
-    eval_times.append(eval_time)
-    eval_fpses.append(eval_fps)
-    image_h += trainer.H
-    image_w += trainer.W
-    image_name = image_path.stem
-    logwriter.write("{}: {}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
-        image_name, trainer.H, trainer.W, psnr, ms_ssim, training_time, eval_time, eval_fps))
 
-    avg_psnr = torch.tensor(psnrs).mean().item()
-    avg_ms_ssim = torch.tensor(ms_ssims).mean().item()
-    avg_training_time = torch.tensor(training_times).mean().item()
-    avg_eval_time = torch.tensor(eval_times).mean().item()
-    avg_eval_fps = torch.tensor(eval_fpses).mean().item()
-    # avg_h = image_h//image_length
-    # avg_w = image_w//image_length
-
-    logwriter.write("Average: {}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
-        image_h, image_w, avg_psnr, avg_ms_ssim, avg_training_time, avg_eval_time, avg_eval_fps))    
+    logwriter.write("Average: {}x{} for layer {}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
+        trainer.H, trainer.H, args.layer, psnr, ms_ssim, training_time, eval_time, eval_fps))    
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -8,9 +8,9 @@
 
 source ~/.bashrc
 conda activate gv_h100
-cd gsplat
-pip install .[dev]
-cd ..
+# cd gsplat
+# pip install .[dev]
+# cd ..
 
 # Default variable values.
 DATA_NAME="Beauty"
@@ -18,15 +18,15 @@ START_FRAME=0
 NUM_FRAMES=5
 
 MODEL_NAME="GaussianVideo_Layer"
-NUM_POINTS_LAYER0=2500
+NUM_POINTS_LAYER0=8000
 TRAIN_ITERATIONS_LAYER0=20000
 QUANT_ITERATIONS_3D=10000
-LEARNING_RATE_LAYER0=0.01
+LEARNING_RATE_LAYER0=0.1
 
-NUM_POINTS_LAYER1=750
+NUM_POINTS_LAYER1=800
 TRAIN_ITERATIONS_LAYER1=20000
 QUANT_ITERATIONS_2D=10000
-LEARNING_RATE_LAYER1=0.001
+LEARNING_RATE_LAYER1=0.01
 
 # Parse command-line arguments.
 # Usage: ./script.sh --data_name MyData --num_points 30000 --start_frame 40 --num_frames 15
@@ -70,6 +70,7 @@ CHECKPOINT_PATH_LAYER0="${CHECKPOINT_DIR_PATH}${DATA_NAME}/layer_0_model.pth.tar
 CHECKPOINT_PATH_LAYER1="${CHECKPOINT_DIR_PATH}${DATA_NAME}/layer_1_model.pth.tar"
 
 # python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
+# python gaussian3D2D.py 
 
 # Run the training script with the required arguments.
 python gaussianvideo_layer.py \

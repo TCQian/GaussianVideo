@@ -198,7 +198,7 @@ class Gaussian3Dplus2D(nn.Module):
             self.layer_0_model.train()
             for iter in range(1, self.iterations_3d+1):
                 if iter % 1000 == 1 and iter > 1:
-                    self.layer_0_model.prune(opac_threshold=0.2)
+                    self.layer_0_model.prune(opac_threshold=0.02)
                 loss, psnr = self.layer_0_model.train_iter(self.gt_image)
                 psnr_list.append(psnr)
                 iter_list.append(iter)
@@ -218,10 +218,10 @@ class Gaussian3Dplus2D(nn.Module):
         
         if not self.trained_2D:
             if len(self.layer_1_models) == 0:
-                extra_num_gaussians = (self.kwargs_0["num_points"] - self.final_num_3D_gaussians) / self.num_frames
+                extra_num_gaussians = int((self.kwargs_0["num_points"] - self.final_num_3D_gaussians) / self.num_frames)
                 self.logwriter.write(f"Extra number of gaussians: {extra_num_gaussians}")
                 self.kwargs_1["num_points"] += extra_num_gaussians
-                
+
                 for _ in range(self.num_frames):
                     self.layer_1_models.append(GaussianImage_Cholesky(**self.kwargs_1).to(self.device))
 

@@ -86,7 +86,7 @@ class GaussianVideo(nn.Module):
     def prune(self, opac_threshold=0.2):
         with torch.no_grad():
             print(f"min and max opacity: {self.get_opacity.min().item()}, {self.get_opacity.max().item()}")
-            mask = (self.get_opacity > opac_threshold)
+            mask = (self.get_opacity > opac_threshold).squeeze()
             
             self._xyz = torch.nn.Parameter(self._xyz[mask])
             self._cholesky = torch.nn.Parameter(self._cholesky[mask])

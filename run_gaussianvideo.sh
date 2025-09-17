@@ -66,8 +66,8 @@ echo "Starting ${MODEL_NAME}_${NUM_POINTS_LAYER0}_${NUM_POINTS_LAYER1}_${DATA_NA
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
 DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
 CHECKPOINT_DIR_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_i${TRAIN_ITERATIONS_LAYER0}+${TRAIN_ITERATIONS_LAYER1}_g${NUM_POINTS_LAYER0}+${NUM_POINTS_LAYER1}_f${NUM_FRAMES}_s${START_FRAME}/"
-CHECKPOINT_PATH_LAYER0="${CHECKPOINT_DIR_PATH}layer_0_model.pth.tar"
-CHECKPOINT_PATH_LAYER1="${CHECKPOINT_DIR_PATH}layer_1_model.pth.tar"
+CHECKPOINT_PATH_LAYER0="${CHECKPOINT_DIR_PATH}${DATA_NAME}/layer_0_model.pth.tar"
+CHECKPOINT_PATH_LAYER1="${CHECKPOINT_DIR_PATH}${DATA_NAME}/layer_1_model.pth.tar"
 
 # python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
 
@@ -80,6 +80,7 @@ python gaussianvideo_layer.py \
     --num_frames "${NUM_FRAMES}" \
     --model_name "${MODEL_NAME}" \
     --iterations_layer0 "${TRAIN_ITERATIONS_LAYER0}" \
+    --iterations_layer1 "${TRAIN_ITERATIONS_LAYER1}" \
     --num_points_layer0 "${NUM_POINTS_LAYER0}" \
     --lr_layer0 "${LEARNING_RATE_LAYER0}" \
     --num_points_layer1 "${NUM_POINTS_LAYER1}" \

@@ -204,8 +204,6 @@ class GaussianVideo_Layer(nn.Module):
         if self.layer == 0:
             return torch.tanh(self._xyz_3D)
         elif self.layer == 1:
-            if self.debug_mode:
-                print("Gaussian's xyz coordintes", self._xyz_2D[:, 2])
             return torch.tanh(torch.cat((self._xyz_3D, self._xyz_2D), dim=0))
     
     @property
@@ -227,11 +225,8 @@ class GaussianVideo_Layer(nn.Module):
         if self.layer == 0:
             return self._cholesky_3D + self.cholesky_bound_3D
         elif self.layer == 1:
-            if self.debug_mode:
-                print("Gaussian's cholesky elements", self._cholesky_2D[:, [2, 4, 5]])
-            merged_cholesky = torch.cat((self._cholesky_3D, self._cholesky_2D), dim=0)
-            merged_bounds = torch.cat((self.cholesky_bound_3D, self.cholesky_bound_2D), dim=0)
-            return merged_cholesky + merged_bounds
+            merged_cholesky = torch.cat((self._cholesky_3D + self.cholesky_bound_3D, self._cholesky_2D + self.cholesky_bound_2D), dim=0)
+            return merged_cholesky
     
     def forward(self):
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(

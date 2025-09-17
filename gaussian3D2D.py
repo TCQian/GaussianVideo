@@ -100,13 +100,11 @@ class Gaussian3Dplus2D(nn.Module):
         self.save_imgs = kwargs["save_imgs"]
         print(f"Creating log for {str(self.log_dir).split('/')[-2]}")
 
-        kwargs_0 = get_kwargs(kwargs, layer=0)
-        self.layer_0_model = GaussianVideo(**kwargs_0).to(self.device)
+        self.kwargs_0 = get_kwargs(kwargs, layer=0)
+        self.layer_0_model = GaussianVideo(**self.kwargs_0).to(self.device)
 
         self.layer_1_models = []
-        kwargs_1 = get_kwargs(kwargs, layer=1)
-        for _ in range(self.num_frames):
-            self.layer_1_models.append(GaussianImage_Cholesky(**kwargs_1).to(self.device))
+        self.kwargs_1 = get_kwargs(kwargs, layer=1)
         
         self.trained_3D = False
         self.trained_2D = False
@@ -199,6 +197,8 @@ class Gaussian3Dplus2D(nn.Module):
             start_time = time.time()
             self.layer_0_model.train()
             for iter in range(1, self.iterations_3d+1):
+                if iter % 1000 == 1 and iter > 1:
+                    self.layer_0_model.prune(opac_threshold=0.2)
                 loss, psnr = self.layer_0_model.train_iter(self.gt_image)
                 psnr_list.append(psnr)
                 iter_list.append(iter)
@@ -208,12 +208,23 @@ class Gaussian3Dplus2D(nn.Module):
                         progress_bar.update(10)
             torch.save(self.layer_0_model.state_dict(), self.log_dir / "layer_0_model.pth.tar")
             total_time += time.time() - start_time
+            # get number of gaussians at the end of training
+            self.final_num_3D_gaussians = self.layer_0_model.get_xyz.shape[0]
+            self.logwriter.write(f"Number of gaussians at the end of training: {self.final_num_3D_gaussians}")
             self.trained_3D = True
         else:
             with torch.no_grad():
                 progress_bar.update(self.iterations_3d)
         
         if not self.trained_2D:
+            if len(self.layer_1_models) == 0:
+                extra_num_gaussians = (self.kwargs_0["num_points"] - self.final_num_3D_gaussians) / self.num_frames
+                self.logwriter.write(f"Extra number of gaussians: {extra_num_gaussians}")
+                self.kwargs_1["num_points"] += extra_num_gaussians
+                
+                for _ in range(self.num_frames):
+                    self.layer_1_models.append(GaussianImage_Cholesky(**self.kwargs_1).to(self.device))
+
             self.layer_0_model.eval()
             with torch.no_grad():
                 layer_0_img = self.layer_0_model()["render"]

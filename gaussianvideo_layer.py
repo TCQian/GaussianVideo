@@ -170,7 +170,7 @@ class GaussianVideo_Layer(nn.Module):
 
     def save_checkpoint(self, path):
         if self.layer == 0:
-            features_weighted = self._features_dc_3D.data * self.get_opacity_3D
+            features_weighted = self._features_dc_3D.data * self.get_opacity
             layer0_state = {
                 '_xyz_3D': self._xyz_3D.data,
                 '_cholesky_3D': self._cholesky_3D.data,
@@ -219,6 +219,21 @@ class GaussianVideo_Layer(nn.Module):
         elif self.layer == 1:
             merged_cholesky = torch.cat((self._cholesky_3D + self.cholesky_bound_3D, self._cholesky_2D + self.cholesky_bound_2D), dim=0)
             return merged_cholesky
+
+    
+    def prune(self, opac_threshold=0.2):
+        with torch.no_grad():
+            print(f"min and max opacity: {self.get_opacity.min().item()}, {self.get_opacity.max().item()}")
+            mask = (self.get_opacity > opac_threshold).squeeze()
+            
+            self._xyz_3D = torch.nn.Parameter(self._xyz_3D[mask])
+            self._cholesky_3D = torch.nn.Parameter(self._cholesky_3D[mask])
+            self._features_dc_3D = torch.nn.Parameter(self._features_dc_3D[mask])
+            self._opacity_3D = torch.nn.Parameter(self._opacity_3D[mask])
+            for param_group in self.optimizer.param_groups:
+                param_group['params'] = [p for p in self.parameters() if p.requires_grad]
+            
+        print(f"Pruned to {self._xyz.shape[0]} Gaussians.")
     
     def forward(self):
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
@@ -267,7 +282,7 @@ class ProgressiveVideoTrainer:
         num_frames: int = 50,
         start_frame: int = 0,
     ):
-
+        self.layer = layer
         self.video_name = video_name
         self.device = torch.device("cuda:0")
         self.gt_image = images_paths_to_tensor(images_paths).to(self.device)
@@ -283,14 +298,14 @@ class ProgressiveVideoTrainer:
             
         if model_name == "GaussianVideo_Layer":
             checkpoint_path = None
-            if layer == 1:
+            if self.layer == 1:
                 assert args.model_path_layer0 is not None, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
                 checkpoint_path = args.model_path_layer0
                 
             self.iterations = self.iterations_layer0 if layer == 0 else self.iterations_layer1
 
             self.gaussian_model = GaussianVideo_Layer(
-                layer=layer,
+                layer=self.layer,
                 loss_type="L2", 
                 opt_type="adan", 
                 H=self.H, 
@@ -320,7 +335,8 @@ class ProgressiveVideoTrainer:
                 self.gaussian_model.debug_mode = True
             else:
                 self.gaussian_model.debug_mode = False
-            if iter % 5000 == 1 and iter > 1:
+
+            if self.layer == 0 and (iter % 1000 == 1 and iter > 1):
                 self.gaussian_model.prune(opac_threshold=0.02)
 
             loss, psnr = self.gaussian_model.train_iter(self.gt_image)

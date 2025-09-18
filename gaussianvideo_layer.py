@@ -110,16 +110,9 @@ class GaussianVideo_Layer(nn.Module):
         print(f"Loading layer 0 checkpoint from: {self.checkpoint_path}")
         checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
         
-        self._init_layer0()
-        layer0_params = {
-            '_xyz_3D': checkpoint.get('_xyz_3D'),
-            '_cholesky_3D': checkpoint.get('_cholesky_3D'),
-            '_features_dc_3D': checkpoint.get('_features_dc_3D')
-        }
-        
-        for param_name, param_value in layer0_params.items():
-            if param_value is not None and hasattr(self, param_name):
-                getattr(self, param_name).data.copy_(param_value)
+        self._xyz_3D = nn.Parameter(checkpoint['_xyz_3D'])
+        self._cholesky_3D = nn.Parameter(checkpoint['_cholesky_3D'])
+        self._features_dc_3D = nn.Parameter(checkpoint['_features_dc_3D'])
         
         print("Layer 0 checkpoint loaded successfully")
 
@@ -233,7 +226,7 @@ class GaussianVideo_Layer(nn.Module):
             for param_group in self.optimizer.param_groups:
                 param_group['params'] = [p for p in self.parameters() if p.requires_grad]
             
-        print(f"Pruned to {self._xyz.shape[0]} Gaussians.")
+        print(f"Pruned to {self._xyz_3D.shape[0]} Gaussians.")
     
     def forward(self):
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(

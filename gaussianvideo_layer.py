@@ -76,7 +76,7 @@ class GaussianVideo_Layer(nn.Module):
     def _init_layer1(self):
         assert self.checkpoint_path is not None, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
         self._load_layer0_checkpoint()
-        self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self._xyz_3D.shape[0], 1)))
+        self._opacity_3D = nn.Parameter(torch.logit(0.99 * torch.ones(self._xyz_3D.shape[0], 1)))
         extra_num_gaussians = int((self.init_num_points_3D - self._xyz_3D.shape[0]) / self.T)
         print(f"GaussianVideo_Layer: Extra number of gaussians: {extra_num_gaussians}")
 

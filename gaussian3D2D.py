@@ -87,7 +87,8 @@ def image_path_to_tensor(image_path: Path):
 class Gaussian3Dplus2D(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
-
+        self.early_stopping = EarlyStopping(patience=100, min_delta=1e-9)
+        
         self.start = kwargs["start_frame"]
         self.num_frames = kwargs["num_frames"]
 

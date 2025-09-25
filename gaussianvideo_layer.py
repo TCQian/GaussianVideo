@@ -18,6 +18,31 @@ from pytorch_msssim import ms_ssim
 from tqdm import tqdm
 import random
 from utils import *
+
+class EarlyStopping:
+    def __init__(self, patience=100, min_delta=0):
+        self.patience = patience  # Number of tolerated iterations with no improvement
+        self.min_delta = min_delta  # Minimum improvement threshold
+        self.best_loss = None  # Stores the best loss value
+        self.counter = 0  # Tracks the number of iterations without improvement
+
+    def __call__(self, current_loss):
+        if self.best_loss is None:
+            self.best_loss = current_loss
+            return False  # Do not stop training
+
+        # If the improvement over the previous best loss is less than min_delta, consider it no improvement
+        if self.best_loss - current_loss > self.min_delta:
+            self.best_loss = current_loss
+            self.counter = 0  # Reset counter
+        else:
+            self.counter += 1
+
+        # If the counter exceeds patience, stop training
+        if self.counter >= self.patience:
+            return True  # Stop training
+
+        return False  # Continue training
 class GaussianVideo_Layer(nn.Module):
     def __init__(self, layer= 0, loss_type="L2", **kwargs):
         super().__init__()
@@ -275,6 +300,9 @@ class ProgressiveVideoTrainer:
         num_frames: int = 50,
         start_frame: int = 0,
     ):
+
+        self.early_stopping = EarlyStopping(patience=100, min_delta=1e-9)
+
         self.layer = layer
         self.video_name = video_name
         self.device = torch.device("cuda:0")
@@ -295,7 +323,7 @@ class ProgressiveVideoTrainer:
                 assert args.model_path_layer0 is not None, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
                 checkpoint_path = args.model_path_layer0
                 
-            self.iterations = self.iterations_layer0 if layer == 0 else self.iterations_layer1
+            self.iterations = self.iterations_layer0 if layer == 0 else self.iterations_layer1 * num_frames
 
             self.gaussian_model = GaussianVideo_Layer(
                 layer=self.layer,
@@ -333,6 +361,11 @@ class ProgressiveVideoTrainer:
                 self.gaussian_model.prune(opac_threshold=0.02)
 
             loss, psnr = self.gaussian_model.train_iter(self.gt_image)
+            
+            if self.early_stopping(loss.item()):
+                print(f"Early stopping at iteration {iter}")
+                break
+
             psnr_list.append(psnr)
             iter_list.append(iter)
             with torch.no_grad():

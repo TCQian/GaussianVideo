@@ -15,6 +15,8 @@ import json
 import random
 import sys
 
+from gaussianvideo_layer import EarlyStopping
+
 def get_kwargs(kwargs, layer):
     """Extract and validate parameters for specific layers from the JSON config"""
     
@@ -191,15 +193,21 @@ class Gaussian3Dplus2D(nn.Module):
         
         total_time = 0
         psnr_list, iter_list = [], []
-        progress_bar = tqdm(range(1, self.iterations+1), desc="Training progress")
         
         if not self.trained_3D:
             start_time = time.time()
             self.layer_0_model.train()
+            progress_bar = tqdm(range(1, self.iterations_3d+1), desc="Training 3D progress")
+
             for iter in range(1, self.iterations_3d+1):
                 if iter % 1000 == 1 and iter > 1:
                     self.layer_0_model.prune(opac_threshold=0.02)
                 loss, psnr = self.layer_0_model.train_iter(self.gt_image)
+
+                if self.early_stopping(loss.item()):
+                    print(f"Early stopping at iteration {iter}")
+                    break
+
                 psnr_list.append(psnr)
                 iter_list.append(iter)
                 with torch.no_grad():
@@ -234,9 +242,14 @@ class Gaussian3Dplus2D(nn.Module):
                 self.layer_1_models[t].set_background(background)
                 self.layer_1_models[t].train()
                 
-                start_iter = self.iterations_3d + 1 + (t * self.iterations_2d)
-                for iter in range(start_iter, start_iter+self.iterations_2d+1):
+                progress_bar = tqdm(range(1, self.iterations_2d+1), desc="Training 2D progress for frame {}".format(t))
+                for iter in range(1, self.iterations_2d+1):
                     loss, psnr = self.layer_1_models[t].train_iter(self.gt_image[..., t])
+
+                    if self.early_stopping(loss.item()):
+                        print(f"Early stopping at iteration {iter}")
+                        break
+
                     psnr_list.append(psnr)
                     iter_list.append(iter)
                     with torch.no_grad():

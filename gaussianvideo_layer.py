@@ -398,7 +398,7 @@ class ProgressiveVideoTrainer:
             for t in range(num_time_steps):
                 img = render_tensor[0, :, :, :, t]  # Shape: [C, H, W]
                 pil_image = transform(img)  # Convert to PIL Image
-                name = f"{self.video_name}_fitting_t{t}.png"  # e.g., "_fitting_t0.png"
+                name = f"{self.video_name}_fitting_t{t}_layer{self.layer}.png"  # e.g., "_fitting_t0.png"
                 pil_image.save(str(self.log_dir / name))
         return psnr, ms_ssim_value
 

@@ -87,7 +87,6 @@ def image_path_to_tensor(image_path: Path):
 class Gaussian3Dplus2D(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
-        self.early_stopping = EarlyStopping(patience=100, min_delta=1e-9)
         
         self.start = kwargs["start_frame"]
         self.num_frames = kwargs["num_frames"]
@@ -196,6 +195,8 @@ class Gaussian3Dplus2D(nn.Module):
         psnr_list, iter_list = [], []
         
         if not self.trained_3D:
+            self.early_stopping = EarlyStopping(patience=1000, min_delta=1e-10)
+            
             start_time = time.time()
             self.layer_0_model.train()
             progress_bar = tqdm(range(1, self.iterations_3d+1), desc="Training 3D progress")
@@ -237,8 +238,11 @@ class Gaussian3Dplus2D(nn.Module):
             self.layer_0_model.eval()
             with torch.no_grad():
                 layer_0_img = self.layer_0_model()["render"]
+
             for t in range(self.num_frames):
+                self.early_stopping = EarlyStopping(patience=1000, min_delta=1e-10)
                 background = layer_0_img[..., t].squeeze(0).permute(1, 2, 0)
+
                 start_time = time.time()
                 self.layer_1_models[t].set_background(background)
                 self.layer_1_models[t].train()

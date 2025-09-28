@@ -70,7 +70,7 @@ CHECKPOINT_PATH_LAYER0="${CHECKPOINT_DIR_PATH}${DATA_NAME}/layer_0_model.pth.tar
 CHECKPOINT_PATH_LAYER1="${CHECKPOINT_DIR_PATH}${DATA_NAME}/layer_1_model.pth.tar"
 
 # python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
-# python gaussian3D2D.py 
+python gaussian3D2D.py 
 
 # Run the training script with the required arguments.
 python gaussianvideo_layer.py \

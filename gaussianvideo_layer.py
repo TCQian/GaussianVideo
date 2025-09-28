@@ -20,7 +20,7 @@ import random
 from utils import *
 
 class EarlyStopping:
-    def __init__(self, patience=100, min_delta=0):
+    def __init__(self, patience=100, min_delta=1e-10):
         self.patience = patience  # Number of tolerated iterations with no improvement
         self.min_delta = min_delta  # Minimum improvement threshold
         self.best_loss = None  # Stores the best loss value
@@ -301,7 +301,7 @@ class ProgressiveVideoTrainer:
         start_frame: int = 0,
     ):
 
-        self.early_stopping = EarlyStopping(patience=100, min_delta=1e-9)
+        self.early_stopping = EarlyStopping(patience=1000, min_delta=1e-10)
 
         self.layer = layer
         self.video_name = video_name

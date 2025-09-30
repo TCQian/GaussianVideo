@@ -35,7 +35,8 @@ class GaussianVideo(nn.Module):
         # Covariance
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 6))
         # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
-        self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
+        # self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
+        self._opacity = nn.Parameter(0.01 * torch.ones(self.init_num_points, 1))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
         with torch.no_grad():
@@ -46,7 +47,7 @@ class GaussianVideo(nn.Module):
         self.last_size = (self.H, self.W, self.T)
         self.quantize = kwargs["quantize"]
         self.register_buffer('background', torch.ones(3))
-        self.opacity_activation = torch.sigmoid
+        # self.opacity_activation = torch.sigmoid
         self.rgb_activation = torch.sigmoid
         self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))
         # self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5]).view(1, 3))
@@ -76,8 +77,8 @@ class GaussianVideo(nn.Module):
     
     @property
     def get_opacity(self):
-        # return self._opacity
-        return self.opacity_activation(self._opacity)
+        return self._opacity
+        # return self.opacity_activation(self._opacity)
     
     @property
     def get_cholesky_elements(self):
@@ -85,8 +86,11 @@ class GaussianVideo(nn.Module):
 
     def prune(self, opac_threshold=0.2):
         with torch.no_grad():
-            print(f"min and max opacity: {self.get_opacity.min().item()}, {self.get_opacity.max().item()}")
-            mask = (self.get_opacity > opac_threshold).squeeze()
+            opacity = self.get_opacity
+            opacity_min = opacity.min()
+            opacity_max = opacity.max()
+            opacity_normalized = (opacity - opacity_min) / (opacity_max - opacity_min + 1e-8)
+            mask = (opacity_normalized > opac_threshold).squeeze()
             
             self._xyz = torch.nn.Parameter(self._xyz[mask])
             self._cholesky = torch.nn.Parameter(self._cholesky[mask])

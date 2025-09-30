@@ -26,8 +26,7 @@ class GaussianImage_Cholesky(nn.Module):
         self._xyz = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 2) - 0.5)))
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 3))
         # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
-        # self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
-        self._opacity = nn.Parameter(0.01 * torch.ones(self.init_num_points, 1))
+        self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
         self.last_size = (self.H, self.W)
         self.quantize = kwargs["quantize"]
@@ -37,7 +36,7 @@ class GaussianImage_Cholesky(nn.Module):
         else:
             self.register_buffer('background', torch.ones(self.H, self.W, 3)) # / 2.0)
 
-        # self.opacity_activation = torch.sigmoid
+        self.opacity_activation = torch.sigmoid
         self.rgb_activation = torch.sigmoid
         self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))
         self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5]).view(1, 3))
@@ -66,8 +65,8 @@ class GaussianImage_Cholesky(nn.Module):
     
     @property
     def get_opacity(self):
-        return self._opacity
-        # return self.opacity_activation(self._opacity)
+        # return self._opacity
+        return self.opacity_activation(self._opacity)
 
     @property
     def get_cholesky_elements(self):

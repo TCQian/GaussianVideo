@@ -70,7 +70,7 @@ class GaussianVideo_Layer(nn.Module):
         self.register_buffer('cholesky_bound_3D', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
         self.register_buffer('cholesky_bound_2D', torch.tensor([0.5, 0, 0, 0.5, 0, 0]).view(1, 6))
 
-        # self.opacity_activation = torch.sigmoid
+        self.opacity_activation = torch.sigmoid
 
         self.checkpoint_path = kwargs.get("checkpoint_path", None)
 
@@ -88,8 +88,7 @@ class GaussianVideo_Layer(nn.Module):
     def _init_layer0(self):
         self._xyz_3D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_3D, 3) - 0.5)))
         self._cholesky_3D = nn.Parameter(torch.rand(self.init_num_points_3D, 6))
-        # self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_3D, 1)))
-        self._opacity_3D = nn.Parameter(0.01 * torch.ones(self.init_num_points_3D, 1))
+        self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_3D, 1)))
         self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points_3D, 3))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
@@ -102,8 +101,7 @@ class GaussianVideo_Layer(nn.Module):
     def _init_layer1(self):
         assert self.checkpoint_path is not None, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
         self._load_layer0_checkpoint()
-        self._opacity_3D = nn.Parameter(0.99 * torch.ones(self._xyz_3D.shape[0], 1))
-        # self._opacity_3D = nn.Parameter(torch.logit(0.99 * torch.ones(self._xyz_3D.shape[0], 1)))
+        self._opacity_3D = nn.Parameter(torch.logit(0.99 * torch.ones(self._xyz_3D.shape[0], 1)))
         extra_num_gaussians = int((self.init_num_points_3D - self._xyz_3D.shape[0]) / self.T)
         print(f"GaussianVideo_Layer: Extra number of gaussians: {extra_num_gaussians}")
 
@@ -124,8 +122,7 @@ class GaussianVideo_Layer(nn.Module):
             self._cholesky_2D.data[:, 4] = 0
             self._cholesky_2D.data[:, 5] = 1
 
-        self._opacity_2D = nn.Parameter(0.01 * torch.ones(self.init_num_points_2D * self.T, 1))
-        # self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D * self.T, 1)))
+        self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D * self.T, 1)))
         self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points_2D * self.T, 3))
         self.layer = 1
         print("GaussianVideo_Layer: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])
@@ -229,11 +226,9 @@ class GaussianVideo_Layer(nn.Module):
     @property
     def get_opacity(self):
         if self.layer == 0:
-            return self._opacity_3D
-            # return self.opacity_activation(self._opacity_3D)
+            return self.opacity_activation(self._opacity_3D)
         elif self.layer == 1:
-            return torch.cat((self._opacity_3D, self._opacity_2D), dim=0)
-            # return self.opacity_activation(torch.cat((self._opacity_3D, self._opacity_2D), dim=0))
+            return self.opacity_activation(torch.cat((self._opacity_3D, self._opacity_2D), dim=0))
     
     @property
     def get_cholesky_elements(self):
@@ -246,11 +241,8 @@ class GaussianVideo_Layer(nn.Module):
     
     def prune(self, opac_threshold=0.2):
         with torch.no_grad():
-            opacity = self.get_opacity
-            opacity_min = opacity.min()
-            opacity_max = opacity.max()
-            opacity_normalized = (opacity - opacity_min) / (opacity_max - opacity_min + 1e-8)
-            mask = (opacity_normalized > opac_threshold).squeeze()
+            print(f"min and max opacity: {self.get_opacity.min().item()}, {self.get_opacity.max().item()}")
+            mask = (self.get_opacity > opac_threshold).squeeze()
             
             self._xyz_3D = torch.nn.Parameter(self._xyz_3D[mask])
             self._cholesky_3D = torch.nn.Parameter(self._cholesky_3D[mask])

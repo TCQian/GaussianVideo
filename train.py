@@ -13,6 +13,7 @@ from utils import *
 from tqdm import tqdm
 import random
 import torchvision.transforms as transforms
+from gaussianvideo_layer import EarlyStopping
 
 class SimpleTrainer2d:
     """Trains random 2d gaussians to fit an image."""
@@ -38,6 +39,7 @@ class SimpleTrainer2d:
         self.iterations = iterations
         self.save_imgs = args.save_imgs
         self.log_dir = Path(f"./checkpoints/{args.data_name}/{model_name}_{args.iterations_2d}_{num_points}/{self.image_name}")
+        self.early_stopping = EarlyStopping(patience=1000, min_delta=1e-10)
 
         if model_name == "GaussianImage_Cholesky":
             from gaussianimage_cholesky import GaussianImage_Cholesky
@@ -71,7 +73,17 @@ class SimpleTrainer2d:
         self.gaussian_model.train()
         start_time = time.time()
         for iter in range(1, self.iterations+1):
+            if iter == 1 or iter % 1000 == 0:
+                self.gaussian_model.debug_mode = True
+            else:
+                self.gaussian_model.debug_mode = False
+                
             loss, psnr = self.gaussian_model.train_iter(self.gt_image)
+
+            if self.early_stopping(loss.item()):
+                print(f"Early stopping at iteration {iter}")
+                break
+
             psnr_list.append(psnr)
             iter_list.append(iter)
             with torch.no_grad():

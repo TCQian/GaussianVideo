@@ -12,6 +12,7 @@ from optimizer import Adan
 class GaussianImage_Cholesky(nn.Module):
     def __init__(self, background_image=None, loss_type="L2", **kwargs):
         super().__init__()
+        self.debug_mode = False
         self.loss_type = loss_type
         self.init_num_points = kwargs["num_points"]
         self.H, self.W = kwargs["H"], kwargs["W"]
@@ -82,7 +83,7 @@ class GaussianImage_Cholesky(nn.Module):
                 self.get_features, self.get_opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False)
         # out_img, alpha = rasterize_gaussians(self.xys, depths, self.radii, conics, num_tiles_hit,
             # self.get_features, self.get_opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=True)
-        alpha = alpha[..., None]
+        # alpha = alpha[..., None]
         out_img = torch.clamp(out_img, 0, 1) #[H, W, 3]
         out_img = out_img.view(-1, self.H, self.W, 3).permute(0, 3, 1, 2).contiguous()
         return {"render": out_img}
@@ -96,11 +97,11 @@ class GaussianImage_Cholesky(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / mse_loss.item())
 
-        # print(f"[Loss] {loss.item():.6f}, PSNR: {psnr:.2f} dB")
-        # for name, param in self.named_parameters():
-        #     if param.grad is not None:
-        #         grad_norm = param.grad.data.norm().item()
-        #         print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        if self.debug_mode:
+            for name, param in self.named_parameters():
+                if param.grad is not None:
+                    grad_norm = param.grad.data.norm().item()
+                    print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none = True)

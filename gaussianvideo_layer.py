@@ -134,26 +134,14 @@ class GaussianVideo_Layer(nn.Module):
         
         print(f"Loading layer 0 checkpoint from: {self.checkpoint_path}")
         checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
-        
-        self._xyz_3D = nn.Parameter(checkpoint['_xyz_3D'])
-        self._cholesky_3D = nn.Parameter(checkpoint['_cholesky_3D'])
-        self._features_dc_3D = nn.Parameter(checkpoint['_features_dc_3D'])
-        self._opacity_3D = nn.Parameter(checkpoint['_opacity_3D'])
+
+        with torch.no_grad():
+            self.register_buffer('_xyz_3D', checkpoint['_xyz_3D'])
+            self.register_buffer('_cholesky_3D', checkpoint['_cholesky_3D'])
+            self.register_buffer('_features_dc_3D', checkpoint['_features_dc_3D'])
+            self._opacity_3D = nn.Parameter(checkpoint['_opacity_3D'])
         
         print("Layer 0 checkpoint loaded successfully")
-
-    def _freeze_layer0_parameters(self):
-        """Freeze layer 0 parameters and apply 2D gaussian constraints"""
-        if self.layer == 1:
-            # Freeze layer 0 parameters by setting requires_grad=False
-            layer0_params = ['_xyz_3D', '_cholesky_3D', '_features_dc_3D']
-            
-            for param_name in layer0_params:
-                if hasattr(self, param_name):
-                    param = getattr(self, param_name)
-                    if isinstance(param, nn.Parameter):
-                        param.requires_grad = False
-                        print(f"Frozen layer 0 parameter: {param_name}")
 
     def _apply_2d_gaussian_constraints(self):
         """Apply gradient constraints to 2D gaussian parameters during training"""
@@ -163,22 +151,22 @@ class GaussianVideo_Layer(nn.Module):
                     if name == "_xyz_2D":
                         # Freeze temporal dimension (z-coordinate)
                         param.grad[:, 2] = 0
+                        param.grad[:, 2].requires_grad_(False)
                     elif name == "_cholesky_2D":
                         # Freeze L13, L23, L33 elements (indices 2, 4, 5)
                         param.grad[:, [2, 4, 5]] = 0
+                        param.grad[:, [2, 4, 5]].requires_grad_(False)
 
     def _setup_progressive_optimizer(self):
         """Setup optimizer for progressive training - only train 2D gaussians and extra 3D features"""
-        self._freeze_layer0_parameters()
         
-        trainable_params = []
-        trainable_params.extend([
+        trainable_params =[
             self._opacity_3D,
             self._xyz_2D,
             self._cholesky_2D,
             self._features_dc_2D,
             self._opacity_2D
-        ])
+        ]
         
         if self.opt_type == "adam":
             self.optimizer = torch.optim.Adam(trainable_params, lr=self.lr)
@@ -189,7 +177,6 @@ class GaussianVideo_Layer(nn.Module):
 
     def save_checkpoint(self, path):
         if self.layer == 0:
-            # features_weighted = self._features_dc_3D.data * self.get_opacity
             layer0_state = {
                 '_xyz_3D': self._xyz_3D.data,
                 '_cholesky_3D': self._cholesky_3D.data,
@@ -204,8 +191,8 @@ class GaussianVideo_Layer(nn.Module):
                 '_xyz_2D': self._xyz_2D.data[:, :2],
                 '_cholesky_2D': self._cholesky_2D.data[:, [0, 1, 3]],
                 '_features_dc_2D': self._features_dc_2D.data,
-                '_opacity_2D': self._opacity_2D.data if isinstance(self._opacity_2D, nn.Parameter) else self._opacity_2D,
-                '_opacity_3D': self._opacity_3D.data if isinstance(self._opacity_3D, nn.Parameter) else self._opacity_3D,
+                '_opacity_2D': self._opacity_2D.data,
+                '_opacity_3D': self._opacity_3D.data,
                 'layer': self.layer
             }
             torch.save(layer1_state, path / "layer_1_model.pth.tar")
@@ -287,7 +274,7 @@ class GaussianVideo_Layer(nn.Module):
             for name, param in self.named_parameters():
                 if param.grad is not None:
                     grad_norm = param.grad.data.norm().item()
-                    print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+                    print(f"[Gradient Norm Layer {self.layer}] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

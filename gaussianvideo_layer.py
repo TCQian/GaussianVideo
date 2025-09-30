@@ -101,7 +101,7 @@ class GaussianVideo_Layer(nn.Module):
     def _init_layer1(self):
         assert self.checkpoint_path is not None, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
         self._load_layer0_checkpoint()
-        self._opacity_3D = nn.Parameter(torch.logit(0.99 * torch.ones(self._xyz_3D.shape[0], 1)))
+        # self._opacity_3D = nn.Parameter(torch.logit(0.99 * torch.ones(self._xyz_3D.shape[0], 1)))
         extra_num_gaussians = int((self.init_num_points_3D - self._xyz_3D.shape[0]) / self.T)
         print(f"GaussianVideo_Layer: Extra number of gaussians: {extra_num_gaussians}")
 
@@ -138,6 +138,7 @@ class GaussianVideo_Layer(nn.Module):
         self._xyz_3D = nn.Parameter(checkpoint['_xyz_3D'])
         self._cholesky_3D = nn.Parameter(checkpoint['_cholesky_3D'])
         self._features_dc_3D = nn.Parameter(checkpoint['_features_dc_3D'])
+        self._opacity_3D = nn.Parameter(checkpoint['_opacity_3D'])
         
         print("Layer 0 checkpoint loaded successfully")
 
@@ -188,11 +189,12 @@ class GaussianVideo_Layer(nn.Module):
 
     def save_checkpoint(self, path):
         if self.layer == 0:
-            features_weighted = self._features_dc_3D.data * self.get_opacity
+            # features_weighted = self._features_dc_3D.data * self.get_opacity
             layer0_state = {
                 '_xyz_3D': self._xyz_3D.data,
                 '_cholesky_3D': self._cholesky_3D.data,
-                '_features_dc_3D': features_weighted,
+                '_features_dc_3D': self._features_dc_3D.data,
+                '_opacity_3D': self._opacity_3D.data,
                 'layer': self.layer
             }
             torch.save(layer0_state, path / "layer_0_model.pth.tar")

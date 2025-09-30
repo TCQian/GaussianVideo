@@ -224,7 +224,7 @@ class GaussianVideo_Layer(nn.Module):
         if self.layer == 0:
             return self._cholesky_3D + self.cholesky_bound_3D
         elif self.layer == 1:
-            merged_cholesky = torch.cat((self._cholesky_3D + self.cholesky_bound_3D, self._cholesky_2D + self.cholesky_bound_2D), dim=0)
+            merged_cholesky = torch.cat((self._cholesky_3D, self._cholesky_2D + self.cholesky_bound_2D), dim=0)
             return merged_cholesky
 
     

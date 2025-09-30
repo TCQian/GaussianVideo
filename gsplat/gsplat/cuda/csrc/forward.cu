@@ -1073,6 +1073,10 @@ __global__ void rasterize_forward_sum_video(
                 conic.v * delta.z * delta.z
             );
 
+            if (xyz_opac.z != pz) {
+                continue;
+            }
+
             const float alpha = min(1.f, opac * __expf(-sigma));
 
             // // If voxel (i, j, k) equals (0, 0, 0), print detailed debug info:

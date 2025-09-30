@@ -133,13 +133,13 @@ class GaussianVideo_Layer(nn.Module):
             raise ValueError("checkpoint_path must be provided for progressive training")
         
         print(f"Loading layer 0 checkpoint from: {self.checkpoint_path}")
-        checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
+        # checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
 
         with torch.no_grad():
-            self.register_buffer('_xyz_3D', checkpoint['_xyz_3D'])
-            self.register_buffer('_cholesky_3D', checkpoint['_cholesky_3D'])
-            self.register_buffer('_features_dc_3D', checkpoint['_features_dc_3D'])
-            self._opacity_3D = nn.Parameter(checkpoint['_opacity_3D'])
+            self.register_buffer('_xyz_3D', torch.tensor([]))
+            self.register_buffer('_cholesky_3D', torch.tensor([]))
+            self.register_buffer('_features_dc_3D', torch.tensor([]))
+            self._opacity_3D = nn.Parameter(torch.tensor([]))
         
         print("Layer 0 checkpoint loaded successfully")
 
@@ -161,7 +161,7 @@ class GaussianVideo_Layer(nn.Module):
         """Setup optimizer for progressive training - only train 2D gaussians and extra 3D features"""
         
         trainable_params =[
-            self._opacity_3D,
+            # self._opacity_3D,
             self._xyz_2D,
             self._cholesky_2D,
             self._features_dc_2D,
@@ -381,7 +381,7 @@ class ProgressiveVideoTrainer:
         self.logwriter.write("Training Complete in {:.4f}s, Eval time:{:.8f}s, FPS:{:.4f}".format(end_time, test_end_time, 1/test_end_time))
         
         # Save checkpoint using the model's save_checkpointsave_checkpoint method
-        self.gaussian_model.save_checkpoint(self.log_dir)
+        # self.gaussian_model.save_checkpoint(self.log_dir)
         
         np.save(self.log_dir / "training_layer_{}.npy".format(self.gaussian_model.layer), {"iterations": iter_list, "training_psnr": psnr_list, "training_time": end_time, 
         "psnr": psnr_value, "ms-ssim": ms_ssim_value, "rendering_time": test_end_time, "rendering_fps": 1/test_end_time})

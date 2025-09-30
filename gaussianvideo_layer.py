@@ -281,6 +281,12 @@ class GaussianVideo_Layer(nn.Module):
         if self.layer == 1:
             self._apply_2d_gaussian_constraints()
 
+        if self.debug_mode:
+            for name, param in self.named_parameters():
+                if param.grad is not None:
+                    grad_norm = param.grad.data.norm().item()
+                    print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
         self.scheduler.step()

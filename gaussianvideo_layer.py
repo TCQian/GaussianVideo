@@ -261,11 +261,12 @@ class GaussianVideo_Layer(nn.Module):
         if self.debug_mode:
             # write all gaussian's attributes to a txt file
             with open(os.path.join(self.log_dir, "gaussians_GaussianVideo_Layer.txt"), "w") as f:
-                f.write(f"Number of gaussians: {self._xyz_3D.shape[0]}\n")
-                f.write(f"xyz: {self._xyz_3D.tolist()}\n")
-                f.write(f"cholesky: {self._cholesky_3D.tolist()}\n")
-                f.write(f"features_dc: {self._features_dc_3D.tolist()}\n")
-                f.write(f"opacity: {self._opacity_3D.tolist()}\n")
+                f.write(f"Number of gaussians: {self._xyz_2D.shape[0]}\n")
+                f.write(f"xyz: {self._xyz_2D.tolist()}\n")
+                f.write(f"cholesky: {self._cholesky_2D.tolist()}\n")
+                f.write(f"features_dc: {self._features_dc_2D.tolist()}\n")
+                f.write(f"opacity: {self._opacity_2D.tolist()}\n")
+                f.write(f"opacity_3D: {self._opacity_3D.tolist()}\n")
                 f.write(f"conic: {conics.tolist()}\n")
                 f.write(f"num_tiles_hit: {num_tiles_hit.tolist()}\n")
                 f.write(f"radii: {radii.tolist()}\n")

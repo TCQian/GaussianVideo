@@ -93,19 +93,19 @@ class GaussianImage_Cholesky(nn.Module):
     def forward(self):
         #assert torch.allclose(self.background, torch.ones(3, device=self.background.device) / 2.0), "Currently only support gray background"
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_2d(self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.tile_bounds)
-        if self.debug_mode:
-            # write all gaussian's attributes to a txt file
-            with open(os.path.join(self.log_dir, "gaussians_GaussianImage_Cholesky.txt"), "w") as f:
-                f.write(f"Number of gaussians: {self._xyz.shape[0]}\n")
-                f.write(f"xyz: {self._xyz.tolist()}\n")
-                f.write(f"cholesky: {self._cholesky.tolist()}\n")
-                f.write(f"features_dc: {self._features_dc.tolist()}\n")
-                f.write(f"opacity: {self._opacity.tolist()}\n")
-                f.write(f"conic: {conics.tolist()}\n")
-                f.write(f"num_tiles_hit: {num_tiles_hit.tolist()}\n")
-                f.write(f"radii: {self.radii.tolist()}\n")
-                f.write(f"depths: {depths.tolist()}\n")
-                f.write(f"xys: {self.xys.tolist()}\n")
+        # if self.debug_mode:
+        #     # write all gaussian's attributes to a txt file
+        #     with open(os.path.join(self.log_dir, "gaussians_GaussianImage_Cholesky.txt"), "w") as f:
+        #         f.write(f"Number of gaussians: {self._xyz.shape[0]}\n")
+        #         f.write(f"xyz: {self._xyz.tolist()}\n")
+        #         f.write(f"cholesky: {self._cholesky.tolist()}\n")
+        #         f.write(f"features_dc: {self._features_dc.tolist()}\n")
+        #         f.write(f"opacity: {self._opacity.tolist()}\n")
+        #         f.write(f"conic: {conics.tolist()}\n")
+        #         f.write(f"num_tiles_hit: {num_tiles_hit.tolist()}\n")
+        #         f.write(f"radii: {self.radii.tolist()}\n")
+        #         f.write(f"depths: {depths.tolist()}\n")
+        #         f.write(f"xys: {self.xys.tolist()}\n")
 
         out_img = rasterize_gaussians_sum(self.xys, depths, self.radii, conics, num_tiles_hit,
                 self.get_features, self.get_opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False)
@@ -130,6 +130,34 @@ class GaussianImage_Cholesky(nn.Module):
                 if param.grad is not None:
                     grad_norm = param.grad.data.norm().item()
                     print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+                    
+                    # Print individual component gradients for specific parameters
+                    if name == "_xyz":
+                        # xyz parameters have shape (N, 2) where columns are x, y
+                        x_grad_norm = param.grad.data[:, 0].norm().item()
+                        y_grad_norm = param.grad.data[:, 1].norm().item()
+                        print(f"  -> x: {x_grad_norm:.6e}, y: {y_grad_norm:.6e}")
+                    
+                    elif name == "_cholesky":
+                        # Cholesky parameters have shape (N, 3) for 2D Gaussians: L11, L21, L22
+                        chol_labels = ["L11", "L21", "L22"]
+                        chol_grads = []
+                        for i in range(param.grad.data.shape[1]):
+                            chol_grad_norm = param.grad.data[:, i].norm().item()
+                            chol_grads.append(f"{chol_labels[i]}: {chol_grad_norm:.6e}")
+                        print(f"  -> {', '.join(chol_grads)}")
+                    
+                    elif name == "_features_dc":
+                        # Feature parameters have shape (N, 3) where columns are RGB
+                        r_grad_norm = param.grad.data[:, 0].norm().item()
+                        g_grad_norm = param.grad.data[:, 1].norm().item()
+                        b_grad_norm = param.grad.data[:, 2].norm().item()
+                        print(f"  -> R: {r_grad_norm:.6e}, G: {g_grad_norm:.6e}, B: {b_grad_norm:.6e}")
+                    
+                    elif name == "_opacity":
+                        # Opacity parameters have shape (N, 1) - single value per gaussian
+                        opacity_grad_norm = param.grad.data.norm().item()
+                        print(f"  -> opacity: {opacity_grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none = True)

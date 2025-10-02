@@ -258,19 +258,19 @@ class GaussianVideo_Layer(nn.Module):
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
-        if self.debug_mode:
-            # write all gaussian's attributes to a txt file
-            with open(os.path.join(self.log_dir, "gaussians_GaussianVideo_Layer.txt"), "w") as f:
-                f.write(f"Number of gaussians: {self._xyz_2D.shape[0]}\n")
-                f.write(f"xyz: {self._xyz_2D.tolist()}\n")
-                f.write(f"cholesky: {self._cholesky_2D.tolist()}\n")
-                f.write(f"features_dc: {self._features_dc_2D.tolist()}\n")
-                f.write(f"opacity: {self._opacity_2D.tolist()}\n")
-                f.write(f"conic: {conics.tolist()}\n")
-                f.write(f"num_tiles_hit: {num_tiles_hit.tolist()}\n")
-                f.write(f"radii: {radii.tolist()}\n")
-                f.write(f"depths: {depths.tolist()}\n")
-                f.write(f"xys: {self.xys.tolist()}\n")
+        # if self.debug_mode:
+        #     # write all gaussian's attributes to a txt file
+        #     with open(os.path.join(self.log_dir, "gaussians_GaussianVideo_Layer.txt"), "w") as f:
+        #         f.write(f"Number of gaussians: {self._xyz_2D.shape[0]}\n")
+        #         f.write(f"xyz: {self._xyz_2D.tolist()}\n")
+        #         f.write(f"cholesky: {self._cholesky_2D.tolist()}\n")
+        #         f.write(f"features_dc: {self._features_dc_2D.tolist()}\n")
+        #         f.write(f"opacity: {self._opacity_2D.tolist()}\n")
+        #         f.write(f"conic: {conics.tolist()}\n")
+        #         f.write(f"num_tiles_hit: {num_tiles_hit.tolist()}\n")
+        #         f.write(f"radii: {radii.tolist()}\n")
+        #         f.write(f"depths: {depths.tolist()}\n")
+        #         f.write(f"xys: {self.xys.tolist()}\n")
 
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, radii, conics, num_tiles_hit,
@@ -296,11 +296,42 @@ class GaussianVideo_Layer(nn.Module):
         if self.layer == 1:
             self._apply_2d_gaussian_constraints()
 
-        # if self.debug_mode:
-            # for name, param in self.named_parameters():
-            #     if param.grad is not None:
-            #         grad_norm = param.grad.data.norm().item()
-            #         print(f"[Gradient Norm Layer {self.layer}] {name}: {grad_norm:.6e}")
+        if self.debug_mode:
+            for name, param in self.named_parameters():
+                if param.grad is not None:
+                    grad_norm = param.grad.data.norm().item()
+                    print(f"[Gradient Norm Layer {self.layer}] {name}: {grad_norm:.6e}")
+                    
+                    # Print individual component gradients for specific parameters
+                    if name in ["_xyz_3D", "_xyz_2D"]:
+                        # xyz parameters have shape (N, 3) where columns are x, y, z
+                        x_grad_norm = param.grad.data[:, 0].norm().item()
+                        y_grad_norm = param.grad.data[:, 1].norm().item()
+                        z_grad_norm = param.grad.data[:, 2].norm().item()
+                        print(f"  -> x: {x_grad_norm:.6e}, y: {y_grad_norm:.6e}, z: {z_grad_norm:.6e}")
+                    
+                    elif name in ["_cholesky_3D", "_cholesky_2D"]:
+                        # Cholesky parameters have shape (N, 6) representing lower triangular matrix elements
+                        # L11, L21, L22, L31, L32, L33 (or similar structure)
+                        chol_labels = ["L11", "L21", "L22", "L31", "L32", "L33"]
+                        chol_grads = []
+                        for i in range(param.grad.data.shape[1]):
+                            chol_grad_norm = param.grad.data[:, i].norm().item()
+                            chol_grads.append(f"{chol_labels[i]}: {chol_grad_norm:.6e}")
+                        print(f"  -> {', '.join(chol_grads)}")
+                    
+                    elif name in ["_features_dc_3D", "_features_dc_2D"]:
+                        # Feature parameters have shape (N, 3) where columns are RGB
+                        r_grad_norm = param.grad.data[:, 0].norm().item()
+                        g_grad_norm = param.grad.data[:, 1].norm().item()
+                        b_grad_norm = param.grad.data[:, 2].norm().item()
+                        print(f"  -> R: {r_grad_norm:.6e}, G: {g_grad_norm:.6e}, B: {b_grad_norm:.6e}")
+                    
+                    elif name in ["_opacity_3D", "_opacity_2D"]:
+                        # Opacity parameters have shape (N, 1) - single value per gaussian
+                        opacity_grad_norm = param.grad.data.norm().item()
+                        print(f"  -> opacity: {opacity_grad_norm:.6e}")
+
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
@@ -373,7 +404,7 @@ class ProgressiveVideoTrainer:
         self.gaussian_model.train()
         start_time = time.time()
         for iter in range(1, self.iterations+1):
-            if iter == 1 or iter == 2: #iter % 1000 == 0:
+            if iter == 1 or iter % 100 == 0:
                 self.gaussian_model.debug_mode = True
             else:
                 self.gaussian_model.debug_mode = False

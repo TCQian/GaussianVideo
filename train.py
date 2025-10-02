@@ -44,7 +44,7 @@ class SimpleTrainer2d:
         if model_name == "GaussianImage_Cholesky":
             from gaussianimage_cholesky import GaussianImage_Cholesky
             self.gaussian_model = GaussianImage_Cholesky(background_image=self.background_image, loss_type="L2", opt_type="adan", num_points=self.num_points, H=self.H, W=self.W, BLOCK_H=BLOCK_H, BLOCK_W=BLOCK_W, 
-                device=self.device, lr=args.lr_2d, quantize=False).to(self.device)
+                device=self.device, lr=args.lr_2d, quantize=False, log_dir=self.log_dir).to(self.device)
 
         elif model_name == "GaussianImage_RS":
             from gaussianimage_rs import GaussianImage_RS

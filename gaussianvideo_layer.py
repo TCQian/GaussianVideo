@@ -258,6 +258,20 @@ class GaussianVideo_Layer(nn.Module):
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
+        if self.debug_mode:
+            # write all gaussian's attributes to a txt file
+            with open(os.path.join(self.log_dir, "gaussians_GaussianVideo_Layer.txt"), "w") as f:
+                f.write(f"Number of gaussians: {self._xyz_3D.shape[0]}\n")
+                f.write(f"xyz: {self._xyz_3D.tolist()}\n")
+                f.write(f"cholesky: {self._cholesky_3D.tolist()}\n")
+                f.write(f"features_dc: {self._features_dc_3D.tolist()}\n")
+                f.write(f"opacity: {self._opacity_3D.tolist()}\n")
+                f.write(f"conic: {conics.tolist()}\n")
+                f.write(f"num_tiles_hit: {num_tiles_hit.tolist()}\n")
+                f.write(f"radii: {radii.tolist()}\n")
+                f.write(f"depths: {depths.tolist()}\n")
+                f.write(f"xys: {self.xys.tolist()}\n")
+
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, radii, conics, num_tiles_hit,
             self.get_features, self.get_opacity, self.H, self.W, self.T,
@@ -282,11 +296,11 @@ class GaussianVideo_Layer(nn.Module):
         if self.layer == 1:
             self._apply_2d_gaussian_constraints()
 
-        if self.debug_mode:
-            for name, param in self.named_parameters():
-                if param.grad is not None:
-                    grad_norm = param.grad.data.norm().item()
-                    print(f"[Gradient Norm Layer {self.layer}] {name}: {grad_norm:.6e}")
+        # if self.debug_mode:
+            # for name, param in self.named_parameters():
+            #     if param.grad is not None:
+            #         grad_norm = param.grad.data.norm().item()
+            #         print(f"[Gradient Norm Layer {self.layer}] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
@@ -359,7 +373,7 @@ class ProgressiveVideoTrainer:
         self.gaussian_model.train()
         start_time = time.time()
         for iter in range(1, self.iterations+1):
-            if iter == 1 or iter % 1000 == 0:
+            if iter == 1 or iter == 2: #iter % 1000 == 0:
                 self.gaussian_model.debug_mode = True
             else:
                 self.gaussian_model.debug_mode = False

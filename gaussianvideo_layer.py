@@ -107,7 +107,19 @@ class GaussianVideo_Layer(nn.Module):
 
         self.init_num_points_2D += extra_num_gaussians
 
-        self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_2D * self.T, 3) - 0.5)))
+        with torch.no_grad():
+            data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
+
+        if data is not None:
+            self._xyz_2D = nn.Parameter(data["xyz"])
+            self._cholesky_2D = nn.Parameter(data["cholesky"])
+            self._features_dc_2D = nn.Parameter(data["features_dc"])
+            print(f"Loaded Gaussian 0, xyz: {self._xyz[0].tolist()}, cholesky: {self._cholesky[0].tolist()}, features_dc: {self._features_dc[0].tolist()}")
+        else:
+            raise ValueError("Failed to load Gaussian parameters.")
+
+
+        # self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_2D * self.T, 3) - 0.5)))
         if self.T > 1:
             for t in range(self.T):
                 val = torch.atanh(torch.tensor(2 * (t / (self.T - 1)) - 1.0)).item()
@@ -116,14 +128,14 @@ class GaussianVideo_Layer(nn.Module):
             self._xyz_2D.data[:, 2] = torch.atanh(torch.tensor(- 1.0)).item()
 
         # 2D -> 3D, L11, L12, L22 are random, L13, L23 are 0 and L33 is 1
-        self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points_2D  * self.T, 6))
+        # self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points_2D  * self.T, 6))
         with torch.no_grad():
             self._cholesky_2D.data[:, 2] = 0
             self._cholesky_2D.data[:, 4] = 0
             self._cholesky_2D.data[:, 5] = 1
 
         self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D * self.T, 1)))
-        self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points_2D * self.T, 3))
+        # self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points_2D * self.T, 3))
         self.layer = 1
         print("GaussianVideo_Layer: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])
 

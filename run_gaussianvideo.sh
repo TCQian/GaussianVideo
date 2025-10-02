@@ -15,7 +15,7 @@ cd ..
 # Default variable values.
 DATA_NAME="Beauty"
 START_FRAME=0
-NUM_FRAMES=5
+NUM_FRAMES=1
 
 MODEL_NAME="GaussianVideo_Layer"
 NUM_POINTS_LAYER0=0

@@ -26,9 +26,22 @@ class GaussianImage_Cholesky(nn.Module):
 
         self._xyz = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 2) - 0.5)))
         self._cholesky = nn.Parameter(torch.rand(self.init_num_points, 3))
-        # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
-        self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
+
+        # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
+
+
+        data = save_and_load_gaussian(self, dim=2, file_path="params_500k.pth")
+
+        if data is not None:
+            self._xyz = nn.Parameter(data["xyz"])
+            self._cholesky = nn.Parameter(data["cholesky"])
+            self._features_dc = nn.Parameter(data["features_dc"])
+            print(f"Loaded Gaussian 0, xyz: {self._xyz[0].tolist()}, cholesky: {self._cholesky[0].tolist()}, features_dc: {self._features_dc[0].tolist()}")
+        else:
+            raise ValueError("Failed to load Gaussian parameters.")
+
+        self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         self.last_size = (self.H, self.W)
         self.quantize = kwargs["quantize"]
 

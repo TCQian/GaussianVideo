@@ -22,7 +22,7 @@ QUANT_ITERATIONS=10000
 # Default values for parameters to be overridden.
 NUM_POINTS=2500
 START_FRAME=0
-NUM_FRAMES=5
+NUM_FRAMES=1
 
 # Parse command-line arguments.
 # Usage: ./script.sh --data_name MyData --num_points 30000 --start_frame 40 --num_frames 15

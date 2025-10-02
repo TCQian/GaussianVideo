@@ -266,7 +266,6 @@ class GaussianVideo_Layer(nn.Module):
                 f.write(f"cholesky: {self._cholesky_2D.tolist()}\n")
                 f.write(f"features_dc: {self._features_dc_2D.tolist()}\n")
                 f.write(f"opacity: {self._opacity_2D.tolist()}\n")
-                f.write(f"opacity_3D: {self._opacity_3D.tolist()}\n")
                 f.write(f"conic: {conics.tolist()}\n")
                 f.write(f"num_tiles_hit: {num_tiles_hit.tolist()}\n")
                 f.write(f"radii: {radii.tolist()}\n")

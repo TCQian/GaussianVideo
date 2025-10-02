@@ -287,7 +287,10 @@ def save_and_load_gaussian(model, dim=3, file_path: str=""):
         print(f"[ERROR] Failed to save/load {file_path}. Reason: {e}\nPlease run GaussianVideo model with 500k Gaussians to generate the parameters.")
 
     # select the subset of Gaussians based on the model's requirements, number of Gaussians and dimensions
-    required_gaussians = model._xyz.shape[0]
+    try:
+        required_gaussians = model._xyz.shape[0]
+    except:
+        required_gaussians = model._xyz_2D.shape[0]
     assert data["xyz"].shape[0] >= required_gaussians, "Loaded Gaussians are less than the required Gaussians."
     if dim == 2:
         data["xyz"] = data["xyz"][:required_gaussians, :2]

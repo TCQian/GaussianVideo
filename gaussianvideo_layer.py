@@ -48,7 +48,8 @@ class GaussianVideo_Layer(nn.Module):
         super().__init__()
 
         self.debug_mode = False 
-
+        self.log_dir = kwargs["log_dir"]
+        
         self.layer = int(layer)
         self.loss_type = loss_type
         self.opt_type = kwargs["opt_type"]
@@ -106,6 +107,7 @@ class GaussianVideo_Layer(nn.Module):
         print(f"GaussianVideo_Layer: Extra number of gaussians: {extra_num_gaussians}")
 
         self.init_num_points_2D += extra_num_gaussians
+        self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_2D * self.T, 3) - 0.5)))
 
         with torch.no_grad():
             data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
@@ -114,12 +116,11 @@ class GaussianVideo_Layer(nn.Module):
             self._xyz_2D = nn.Parameter(data["xyz"])
             self._cholesky_2D = nn.Parameter(data["cholesky"])
             self._features_dc_2D = nn.Parameter(data["features_dc"])
-            print(f"Loaded Gaussian 0, xyz: {self._xyz[0].tolist()}, cholesky: {self._cholesky[0].tolist()}, features_dc: {self._features_dc[0].tolist()}")
+            print(f"Loaded Gaussian 0, xyz: {self._xyz_2D[0].tolist()}, cholesky: {self._cholesky_2D[0].tolist()}, features_dc: {self._features_dc_2D[0].tolist()}")
         else:
             raise ValueError("Failed to load Gaussian parameters.")
 
 
-        # self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_2D * self.T, 3) - 0.5)))
         if self.T > 1:
             for t in range(self.T):
                 val = torch.atanh(torch.tensor(2 * (t / (self.T - 1)) - 1.0)).item()
@@ -392,7 +393,8 @@ class ProgressiveVideoTrainer:
                 checkpoint_path=checkpoint_path,
                 num_points_layer0=self.num_points_layer0,
                 num_points_layer1=self.num_points_layer1,
-                lr=args.lr_layer0 if layer == 0 else args.lr_layer1
+                lr=args.lr_layer0 if layer == 0 else args.lr_layer1,
+                log_dir=self.log_dir
             ).to(self.device)
 
         self.logwriter = LogWriter(self.log_dir)

@@ -308,7 +308,10 @@ def save_and_load_gaussian(model, dim=3, file_path: str=""):
     assert torch.all(data["features_dc"] >= 0.0) and torch.all(data["features_dc"] <= 1.0), "Features DC values are out of range [0, 1]."
     assert data["xyz"].shape[0] == required_gaussians, "Loaded Gaussians do not match the required number."
 
-    print(f"[INFO] Gaussian parameters loaded successfully with parameter xyz with size of {data['xyz'].shape}, cholesky with size of {data['cholesky'].shape} and color with size of {data['features_dc'].shape}.")
+    try:
+        print(f"[INFO] Gaussian parameters loaded successfully with parameter xyz with size of {data['xyz'].shape}, cholesky with size of {data['cholesky'].shape} and color with size of {data['features_dc'].shape}.")
+    except:
+        print(f"[INFO] Gaussian parameters loaded successfully with parameter xyz with size of {data['xyz_2D'].shape}, cholesky with size of {data['cholesky_2D'].shape} and color with size of {data['features_dc_2D'].shape}.")
     return data
 
 if __name__ == "__main__":

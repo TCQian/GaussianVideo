@@ -382,40 +382,45 @@ compute_cov3d_bounds(const float6 cov3d, float6 &conic, float &radius)
      * 4) Approximate the largest eigenvalue
      *    via power iteration
      ************************************************/
+    float b = 0.5f * (Cxx + Cyy);
+    float v1 = b + sqrt(max(0.1f, b * b - det));
+    float v2 = b - sqrt(max(0.1f, b * b - det));
+    // take 3 sigma of covariance
+    radius = ceil(3.f * sqrt(max(v1, v2)));
     // We want: max eigenvalue of original Cov (not the inverse).
     // We'll apply Cov * vector repeatedly to find the principal eigenvector.
 
     // Build "Cov" as full 3x3 for multiplication:
     // We'll do a small vector multiply in a loop.
-    auto matvec = [&](const float3 &v) {
-        return make_float3(
-            Cxx*v.x + Cxy*v.y + Cxz*v.z,
-            Cxy*v.x + Cyy*v.y + Cyz*v.z,
-            Cxz*v.x + Cyz*v.y + Czz*v.z
-        );
-    };
+    // auto matvec = [&](const float3 &v) {
+    //     return make_float3(
+    //         Cxx*v.x + Cxy*v.y + Cxz*v.z,
+    //         Cxy*v.x + Cyy*v.y + Cyz*v.z,
+    //         Cxz*v.x + Cyz*v.y + Czz*v.z
+    //     );
+    // };
 
-    float3 v = make_float3(1.f, 1.f, 1.f);  // initial guess
-    for (int i = 0; i < 5; i++) {
-        float3 w = matvec(v);
-        float len = sqrtf(w.x*w.x + w.y*w.y + w.z*w.z);
-        if (len < 1e-12f) break;
-        w.x /= len; w.y /= len; w.z /= len;
-        v = w;
-    }
-    // Approx eigenvalue = v^T * Cov * v
-    float3 Mv = matvec(v);
-    float largestEigenVal = (v.x*Mv.x + v.y*Mv.y + v.z*Mv.z);
+    // float3 v = make_float3(1.f, 1.f, 1.f);  // initial guess
+    // for (int i = 0; i < 5; i++) {
+    //     float3 w = matvec(v);
+    //     float len = sqrtf(w.x*w.x + w.y*w.y + w.z*w.z);
+    //     if (len < 1e-12f) break;
+    //     w.x /= len; w.y /= len; w.z /= len;
+    //     v = w;
+    // }
+    // // Approx eigenvalue = v^T * Cov * v
+    // float3 Mv = matvec(v);
+    // float largestEigenVal = (v.x*Mv.x + v.y*Mv.y + v.z*Mv.z);
 
-    if (largestEigenVal < 0.f) {
-        // numerical issues -> clamp
-        largestEigenVal = 0.f;
-    }
+    // if (largestEigenVal < 0.f) {
+    //     // numerical issues -> clamp
+    //     largestEigenVal = 0.f;
+    // }
 
     /************************************************
      * 5) The bounding radius = 3*sqrt(largestEigenVal)
      ************************************************/
-    radius = ceilf(3.f * sqrtf(largestEigenVal));
+    // radius = ceilf(3.f * sqrtf(largestEigenVal));
 
     return true;
 }

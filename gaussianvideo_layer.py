@@ -263,15 +263,14 @@ class GaussianVideo_Layer(nn.Module):
             # write all gaussian's attributes to a txt file
             with open(os.path.join(self.log_dir, "gaussians_GaussianVideo_Layer.txt"), "a") as f:
                 f.write(f"Number of gaussians: {self._xyz_2D.shape[0]}\n")
-                f.write(f"xyz: {self._xyz_2D.tolist()}\n")
-                f.write(f"cholesky: {self._cholesky_2D.tolist()}\n")
-                f.write(f"features_dc: {self._features_dc_2D.tolist()}\n")
-                f.write(f"opacity: {self._opacity_2D.tolist()}\n")
-                f.write(f"conic: {conics.tolist()}\n")
-                f.write(f"num_tiles_hit: {num_tiles_hit.tolist()}\n")
-                f.write(f"radii: {radii.tolist()}\n")
-                f.write(f"depths: {depths.tolist()}\n")
-                f.write(f"xys: {self.xys.tolist()}\n")
+                f.write(f"xyz: {self._xyz_2D[:10].tolist()}\n")
+                f.write(f"cholesky: {self._cholesky_2D[:10].tolist()}\n")
+                f.write(f"features_dc: {self._features_dc_2D[:10].tolist()}\n")
+                f.write(f"opacity: {self._opacity_2D[:10].tolist()}\n")
+                f.write(f"conic: {conics[:10].tolist()}\n")
+                f.write(f"num_tiles_hit: {num_tiles_hit[:10].tolist()}\n")
+                f.write(f"radii: {radii[:10].tolist()}\n")
+                f.write(f"xys: {self.xys[:10].tolist()}\n")
 
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, radii, conics, num_tiles_hit,
@@ -406,7 +405,7 @@ class ProgressiveVideoTrainer:
         self.gaussian_model.train()
         start_time = time.time()
         for iter in range(1, self.iterations+1):
-            if iter <= 3: #or iter % 100 == 0:
+            if iter <= 2000: #or iter % 100 == 0:
                 self.gaussian_model.debug_mode = True
             else:
                 self.gaussian_model.debug_mode = False

@@ -97,15 +97,14 @@ class GaussianImage_Cholesky(nn.Module):
             # write all gaussian's attributes to a txt file
             with open(os.path.join(self.log_dir, "gaussians_GaussianImage_Cholesky.txt"), "a") as f:
                 f.write(f"Number of gaussians: {self._xyz.shape[0]}\n")
-                f.write(f"xyz: {self._xyz.tolist()}\n")
-                f.write(f"cholesky: {self._cholesky.tolist()}\n")
-                f.write(f"features_dc: {self._features_dc.tolist()}\n")
-                f.write(f"opacity: {self._opacity.tolist()}\n")
-                f.write(f"conic: {conics.tolist()}\n")
-                f.write(f"num_tiles_hit: {num_tiles_hit.tolist()}\n")
-                f.write(f"radii: {self.radii.tolist()}\n")
-                f.write(f"depths: {depths.tolist()}\n")
-                f.write(f"xys: {self.xys.tolist()}\n")
+                f.write(f"xyz: {self._xyz[:10].tolist()}\n")
+                f.write(f"cholesky: {self._cholesky[:10].tolist()}\n")
+                f.write(f"features_dc: {self._features_dc[:10].tolist()}\n")
+                f.write(f"opacity: {self._opacity[:10].tolist()}\n")
+                f.write(f"conic: {conics[:10].tolist()}\n")
+                f.write(f"num_tiles_hit: {num_tiles_hit[:10].tolist()}\n")
+                f.write(f"radii: {self.radii[:10].tolist()}\n")
+                f.write(f"xys: {self.xys[:10].tolist()}\n")
 
         out_img = rasterize_gaussians_sum(self.xys, depths, self.radii, conics, num_tiles_hit,
                 self.get_features, self.get_opacity, self.H, self.W, self.BLOCK_H, self.BLOCK_W, background=self.background, return_alpha=False)

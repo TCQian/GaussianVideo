@@ -344,15 +344,16 @@ class GaussianVideo_Layer(nn.Module):
         )
         if self.debug_mode:
             # write all gaussian's attributes to a txt file
-            with open(os.path.join(self.log_dir, "pretrained_gaussians_GaussianVideo_Layer.txt"), "a") as f:
+            with open(os.path.join(self.log_dir, "gaussians_GaussianVideo_Layer.txt"), "a") as f:
                 f.write(f"Number of gaussians: {self._xyz_2D.shape[0]}\n")
-                f.write(f"xyz: {self.get_xyz.tolist()}\n")
-                f.write(f"cholesky: {self.get_cholesky_elements.tolist()}\n")
-                f.write(f"features_dc: {self.get_features.tolist()}\n")
-                f.write(f"opacity: {self.get_opacity.tolist()}\n")
+                f.write(f"xyz: {self._xyz_2D.tolist()}\n")
+                f.write(f"cholesky: {self._cholesky_2D.tolist()}\n")
+                f.write(f"features_dc: {self._features_dc_2D.tolist()}\n")
+                f.write(f"opacity: {self._opacity_2D.tolist()}\n")
                 f.write(f"conic: {conics.tolist()}\n")
                 f.write(f"num_tiles_hit: {num_tiles_hit.tolist()}\n")
                 f.write(f"radii: {radii.tolist()}\n")
+                f.write(f"depths: {depths.tolist()}\n")
                 f.write(f"xys: {self.xys.tolist()}\n")
 
         out_img = rasterize_gaussians_sum_video(
@@ -530,7 +531,6 @@ class ProgressiveVideoTrainer:
 
     def test(self):
         self.gaussian_model.eval()
-        self.gaussian_model.debug_mode = True
         with torch.no_grad():
             out = self.gaussian_model()
         mse_loss = F.mse_loss(out["render"].float(), self.gt_image.float())

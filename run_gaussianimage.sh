@@ -57,7 +57,7 @@ echo "Starting GaussianImage_${DATA_NAME}_${NUM_FRAMES}_${NUM_POINTS}..."
 # Define dataset and checkpoint paths using the variables.
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
 DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
-CHECKPOINT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/Beauty/GaussianImage_Cholesky_20000_2500/frame_0001/gaussian_model.pth.tar"
+CHECKPOINT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_${TRAIN_ITERATIONS}_${NUM_POINTS}/"
 CHECKPOINT_QUANT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME}_${QUANT_ITERATIONS}_${NUM_POINTS}/"
 
 python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
@@ -71,7 +71,6 @@ python train.py \
     --num_points "${NUM_POINTS}" \
     --start_frame "${START_FRAME}" \
     --num_frames "${NUM_FRAMES}" \
-    --model_path "${CHECKPOINT_PATH}" \
     --save_imgs
 
 # Run the quantization training script.

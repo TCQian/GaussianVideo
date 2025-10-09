@@ -219,7 +219,7 @@ class GaussianVideo_Layer(nn.Module):
                 self._cholesky_2D.data[:, 4] = 0
                 self._cholesky_2D.data[:, 5] = 1
 
-        self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D * self.T, 1)))
+        # self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D * self.T, 1)))
         self.layer = 1
         print("GaussianVideo_Layer: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])
 

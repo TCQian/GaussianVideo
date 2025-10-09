@@ -108,6 +108,7 @@ class SimpleTrainer2d:
 
     def test(self):
         self.gaussian_model.eval()
+        self.gaussian_model.debug_mode = True
         with torch.no_grad():
             out = self.gaussian_model()
         mse_loss = F.mse_loss(out["render"].float(), self.gt_image.float())
@@ -213,7 +214,8 @@ def main(argv):
 
         trainer = SimpleTrainer2d(image_path=image_path, background_path=background_path, num_points=args.num_points_2d, 
             iterations=args.iterations_2d, model_name=args.model_name_2d, args=args, model_path=args.model_path_2d)
-        psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
+        # psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
+        psnr, ms_ssim = trainer.test()
         psnrs.append(psnr)
         ms_ssims.append(ms_ssim)
         training_times.append(training_time) 

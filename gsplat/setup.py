@@ -87,6 +87,11 @@ def get_extensions():
     if sys.platform == "win32":
         extra_compile_args["nvcc"] += ["-DWIN32_LEAN_AND_MEAN"]
 
+    # Get all header files for dependency tracking
+    header_files = glob.glob(osp.join(extensions_dir, "*.cuh")) + glob.glob(
+        osp.join(extensions_dir, "*.h")
+    )
+
     extension = CUDAExtension(
         f"gsplat.csrc",
         sources,
@@ -95,6 +100,7 @@ def get_extensions():
         undef_macros=undef_macros,
         extra_compile_args=extra_compile_args,
         extra_link_args=extra_link_args,
+        depends=header_files,
     )
 
     return [extension]

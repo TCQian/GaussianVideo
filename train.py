@@ -72,13 +72,22 @@ class SimpleTrainer2d:
         best_psnr = 0
         self.gaussian_model.train()
         start_time = time.time()
+
+        os.makedirs(self.log_dir / 'train', exist_ok=True)
         for iter in range(1, self.iterations+1):
-            if iter == 1 or iter % 10 == 0:
-                self.gaussian_model.debug_mode = True
-            else:
-                self.gaussian_model.debug_mode = False
+            # if iter == 1 or iter % 10 == 0:
+            #     self.gaussian_model.debug_mode = True
+            # else:
+            #     self.gaussian_model.debug_mode = False
                 
             loss, psnr = self.gaussian_model.train_iter(self.gt_image)
+
+            if iter == 1 or iter % 10 == 0:
+                image = self.gaussian_model.forward()["render"]
+                transform = transforms.ToPILImage()
+                img = transform(image.float().squeeze(0))
+                name = self.image_name + str(iter) + ".png" 
+                img.save(str(self.log_dir / 'train' / name))
 
             if self.early_stopping(loss.item()):
                 print(f"Early stopping at iteration {iter}")

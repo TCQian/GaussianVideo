@@ -75,10 +75,10 @@ class SimpleTrainer2d:
 
         os.makedirs(self.log_dir / 'train', exist_ok=True)
         for iter in range(1, self.iterations+1):
-            # if iter == 1 or iter % 10 == 0:
-            #     self.gaussian_model.debug_mode = True
-            # else:
-            #     self.gaussian_model.debug_mode = False
+            if iter == 1 or iter == 2 or iter % 10 == 0:
+                self.gaussian_model.debug_mode = True
+            else:
+                self.gaussian_model.debug_mode = False
                 
             loss, psnr = self.gaussian_model.train_iter(self.gt_image)
 

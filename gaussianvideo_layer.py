@@ -125,8 +125,8 @@ class GaussianVideo_Layer(nn.Module):
             cholesky[:, 4] = 0
             cholesky[:, 5] = 1
 
-            data["xyz"].append(xyz)
-            data["cholesky"].append(cholesky)
+            data["xyz"].extend(xyz)
+            data["cholesky"].extend(cholesky)
             data["features_dc"].append(checkpoint["_features_dc"])
             data["opacity"].append(checkpoint["_opacity"])
         return data
@@ -144,11 +144,12 @@ class GaussianVideo_Layer(nn.Module):
         # Try to load from GaussianImage_Cholesky model first
         gaussian_image_paths = glob.glob("./checkpoints/Beauty/GaussianImage_Cholesky_20000_2500/frame_000*/gaussian_model.pth.tar")
         print(f'Found {len(gaussian_image_paths)} GaussianImage_Cholesky models')
-        assert len(gaussian_image_paths) > 0 and len(gaussian_image_paths) <= self.T, "GaussianImage_Cholesky model not found or number of models does not match the number of frames"
+        assert len(gaussian_image_paths) > 0 and len(gaussian_image_paths) >= self.T, "GaussianImage_Cholesky model not found or number of models does not match the number of frames"
         data = self._load_gaussian_image_model(gaussian_image_paths[:self.T])
         self._xyz_2D = nn.Parameter(data["xyz"])
         self._cholesky_2D = nn.Parameter(data["cholesky"])
         self._features_dc_2D = nn.Parameter(data["features_dc"])
+        self._opacity_2D = nn.Parameter(data["opacity"])
         print(f"Loaded Gaussian 0, xyz: {self._xyz_2D[0].tolist()}, cholesky: {self._cholesky_2D[0].tolist()}, features_dc: {self._features_dc_2D[0].tolist()}")
 
         self.layer = 1
@@ -419,10 +420,10 @@ class ProgressiveVideoTrainer:
         self.gaussian_model.train()
         start_time = time.time()
         for iter in range(1, self.iterations+1):
-            if iter <= 2000: #or iter % 100 == 0:
-                self.gaussian_model.debug_mode = True
-            else:
-                self.gaussian_model.debug_mode = False
+            # if iter <= 2000: #or iter % 100 == 0:
+            #     self.gaussian_model.debug_mode = True
+            # else:
+            #     self.gaussian_model.debug_mode = False
 
             if self.layer == 0 and (iter % 1000 == 1 and iter > 1):
                 self.gaussian_model.prune(opac_threshold=0.02)

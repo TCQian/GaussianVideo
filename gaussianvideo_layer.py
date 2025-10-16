@@ -127,22 +127,15 @@ class GaussianVideo_Layer(nn.Module):
 
             data["xyz"].extend(xyz)
             data["cholesky"].extend(cholesky)
-            data["features_dc"].append(checkpoint["_features_dc"])
-            data["opacity"].append(checkpoint["_opacity"])
+            data["features_dc"].extend(checkpoint["_features_dc"])
+            data["opacity"].extend(checkpoint["_opacity"])
         return data
         
     def _init_layer1(self):
-        assert self.checkpoint_path is not None, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
-        self._load_layer0_checkpoint()
-        # self._opacity_3D = nn.Parameter(torch.logit(0.99 * torch.ones(self._xyz_3D.shape[0], 1)))
-        extra_num_gaussians = int((self.init_num_points_3D - self._xyz_3D.shape[0]) / self.T)
-        print(f"GaussianVideo_Layer: Extra number of gaussians: {extra_num_gaussians}")
-
-        self.init_num_points_2D += extra_num_gaussians
-        self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_2D * self.T, 3) - 0.5)))
-
         # Try to load from GaussianImage_Cholesky model first
         gaussian_image_paths = glob.glob("./checkpoints/Beauty/GaussianImage_Cholesky_20000_2500/frame_000*/gaussian_model.pth.tar")
+        # sort gaussian_image_paths by the number in the folder name
+        gaussian_image_paths.sort(key=lambda x: int(x.split("/")[-2].split("_")[-1]))
         print(f'Found {len(gaussian_image_paths)} GaussianImage_Cholesky models')
         assert len(gaussian_image_paths) > 0 and len(gaussian_image_paths) >= self.T, "GaussianImage_Cholesky model not found or number of models does not match the number of frames"
         data = self._load_gaussian_image_model(gaussian_image_paths[:self.T])

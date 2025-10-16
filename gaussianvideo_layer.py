@@ -18,6 +18,7 @@ from pytorch_msssim import ms_ssim
 from tqdm import tqdm
 import random
 from utils import *
+import glob
 
 class EarlyStopping:
     def __init__(self, patience=100, min_delta=1e-10):
@@ -99,6 +100,37 @@ class GaussianVideo_Layer(nn.Module):
         self.layer = 0
         print("GaussianVideo_Layer: Layer 0 initialized, number of gaussians: ", self._xyz_3D.shape[0])
 
+
+    def _load_gaussian_image_model(self, model_paths):
+        """Load GaussianImage_Cholesky model and convert to 3D parameters"""
+        data = {"xyz": [], "cholesky": [], "features_dc": [], "opacity": []}
+        for t, model_path in enumerate(model_paths):
+            print(f"Loading GaussianImage_Cholesky model from: {model_path}")
+            checkpoint = torch.load(model_path, map_location="cpu")
+            xyz = checkpoint["_xyz"]
+            # convert xyz to 3D
+            xyz = torch.cat((xyz, torch.zeros(xyz.shape[0], 1)), dim=1)
+            if self.T > 1:
+                val = torch.atanh(torch.tensor(2 * (t / (self.T - 1)) - 1.0)).item()
+                xyz[:, 2] = val
+            else:
+                xyz[:, 2] = torch.atanh(torch.tensor(- 1.0)).item()
+
+            cholesky = checkpoint["_cholesky"]
+            # create 3D cholesky with 6 elements
+            cholesky = torch.cat((cholesky, torch.zeros(cholesky.shape[0], 3)), dim=1) # (N, 6) (L11, L21, L31, L22, L32, L33)
+            # 2D -> 3D, L11, L12, L22 are random, L13, L23 are 0 and L33 is 1
+            cholesky[:, 3] = cholesky[:, 2] # swap L31 to L22
+            cholesky[:, 2] = 0
+            cholesky[:, 4] = 0
+            cholesky[:, 5] = 1
+
+            data["xyz"].append(xyz)
+            data["cholesky"].append(cholesky)
+            data["features_dc"].append(checkpoint["_features_dc"])
+            data["opacity"].append(checkpoint["_opacity"])
+        return data
+        
     def _init_layer1(self):
         assert self.checkpoint_path is not None, "GaussianVideo_Layer: Layer 1 requires a layer 0 checkpoint"
         self._load_layer0_checkpoint()
@@ -109,34 +141,16 @@ class GaussianVideo_Layer(nn.Module):
         self.init_num_points_2D += extra_num_gaussians
         self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_2D * self.T, 3) - 0.5)))
 
-        with torch.no_grad():
-            data = save_and_load_gaussian(self, dim=3, file_path="params_500k.pth")
+        # Try to load from GaussianImage_Cholesky model first
+        gaussian_image_paths = glob.glob("./checkpoints/Beauty/GaussianImage_Cholesky_20000_2500/frame_000*/gaussian_model.pth.tar")
+        print(f'Found {len(gaussian_image_paths)} GaussianImage_Cholesky models')
+        assert len(gaussian_image_paths) > 0 and len(gaussian_image_paths) <= self.T, "GaussianImage_Cholesky model not found or number of models does not match the number of frames"
+        data = self._load_gaussian_image_model(gaussian_image_paths[:self.T])
+        self._xyz_2D = nn.Parameter(data["xyz"])
+        self._cholesky_2D = nn.Parameter(data["cholesky"])
+        self._features_dc_2D = nn.Parameter(data["features_dc"])
+        print(f"Loaded Gaussian 0, xyz: {self._xyz_2D[0].tolist()}, cholesky: {self._cholesky_2D[0].tolist()}, features_dc: {self._features_dc_2D[0].tolist()}")
 
-        if data is not None:
-            self._xyz_2D = nn.Parameter(data["xyz"])
-            self._cholesky_2D = nn.Parameter(data["cholesky"])
-            self._features_dc_2D = nn.Parameter(data["features_dc"])
-            print(f"Loaded Gaussian 0, xyz: {self._xyz_2D[0].tolist()}, cholesky: {self._cholesky_2D[0].tolist()}, features_dc: {self._features_dc_2D[0].tolist()}")
-        else:
-            raise ValueError("Failed to load Gaussian parameters.")
-
-
-        if self.T > 1:
-            for t in range(self.T):
-                val = torch.atanh(torch.tensor(2 * (t / (self.T - 1)) - 1.0)).item()
-                self._xyz_2D.data[t * self.init_num_points_2D : (t + 1) * self.init_num_points_2D, 2] = val
-        else:
-            self._xyz_2D.data[:, 2] = torch.atanh(torch.tensor(- 1.0)).item()
-
-        # 2D -> 3D, L11, L12, L22 are random, L13, L23 are 0 and L33 is 1
-        # self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points_2D  * self.T, 6))
-        with torch.no_grad():
-            self._cholesky_2D.data[:, 2] = 0
-            self._cholesky_2D.data[:, 4] = 0
-            self._cholesky_2D.data[:, 5] = 1
-
-        self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D * self.T, 1)))
-        # self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points_2D * self.T, 3))
         self.layer = 1
         print("GaussianVideo_Layer: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])
 
@@ -584,10 +598,11 @@ def main(argv):
         images_paths.append(image_path)
 
     trainer = ProgressiveVideoTrainer(layer=args.layer, images_paths=images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name)
-    psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
+    # psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
+    psnr, ms_ssim = trainer.test() 
 
     logwriter.write("Average: {}x{} for layer {}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
-        trainer.H, trainer.H, args.layer, psnr, ms_ssim, training_time, eval_time, eval_fps))    
+        trainer.H, trainer.H, args.layer, psnr, ms_ssim))#, training_time, eval_time, eval_fps))  
 
 if __name__ == "__main__":
     main(sys.argv[1:])

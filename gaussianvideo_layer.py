@@ -125,10 +125,15 @@ class GaussianVideo_Layer(nn.Module):
             cholesky[:, 4] = 0
             cholesky[:, 5] = 1
 
-            data["xyz"].extend(xyz)
-            data["cholesky"].extend(cholesky)
-            data["features_dc"].extend(checkpoint["_features_dc"])
-            data["opacity"].extend(checkpoint["_opacity"])
+            data["xyz"].append(xyz)
+            data["cholesky"].append(cholesky)
+            data["features_dc"].append(checkpoint["_features_dc"])
+            data["opacity"].append(checkpoint["_opacity"])
+
+        data["xyz"] = torch.cat(data["xyz"], dim=0)
+        data["cholesky"] = torch.cat(data["cholesky"], dim=0)
+        data["features_dc"] = torch.cat(data["features_dc"], dim=0)
+        data["opacity"] = torch.cat(data["opacity"], dim=0)
         return data
         
     def _init_layer1(self):

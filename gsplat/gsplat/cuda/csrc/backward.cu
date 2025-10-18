@@ -1436,10 +1436,10 @@ __global__ void rasterize_backward_sum_kernel_video(
                 // Full Mahalanobis distance using all six parameters:
                 float sigma = 0.5f * (
                     conic.x * delta.x * delta.x +
-                    2.f * conic.y * delta.x * delta.y +
-                    2.f * conic.z * delta.x * delta.z +
+                    conic.y * delta.x * delta.y +
+                    conic.z * delta.x * delta.z +
                     conic.w * delta.y * delta.y +
-                    2.f * conic.u * delta.y * delta.z +
+                    conic.u * delta.y * delta.z +
                     conic.v * delta.z * delta.z
                 );
                 vis = __expf(-sigma);

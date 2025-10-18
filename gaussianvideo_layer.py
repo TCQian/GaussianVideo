@@ -110,7 +110,7 @@ class GaussianVideo_Layer(nn.Module):
         self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_2D * self.T, 3) - 0.5)))
         if self.T > 1:
             for t in range(self.T):
-                val = torch.atanh(torch.tensor(2 * (t / (self.T - 1)) - 1.0)).item()
+                val = torch.atanh(torch.tensor(2 * (t / self.T) - 1.0)).item()
                 self._xyz_2D.data[t * self.init_num_points_2D : (t + 1) * self.init_num_points_2D, 2] = val
         else:
             self._xyz_2D.data[:, 2] = torch.atanh(torch.tensor(- 1.0)).item()

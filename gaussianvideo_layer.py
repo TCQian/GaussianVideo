@@ -111,7 +111,7 @@ class GaussianVideo_Layer(nn.Module):
             # convert xyz to 3D
             xyz = torch.cat((xyz, torch.zeros(xyz.shape[0], 1)), dim=1)
             if self.T > 1:
-                val = torch.atanh(torch.tensor(2 * (t / (self.T - 1)) - 1.0)).item()
+                val = torch.atanh(torch.tensor(2 * (t / self.T) - 1.0)).item()
                 xyz[:, 2] = val
             else:
                 xyz[:, 2] = torch.atanh(torch.tensor(- 1.0)).item()
@@ -137,6 +137,7 @@ class GaussianVideo_Layer(nn.Module):
         return data
         
     def _init_layer1(self):
+        self._load_layer0_checkpoint()
         # Try to load from GaussianImage_Cholesky model first
         gaussian_image_paths = glob.glob("./checkpoints/Beauty/GaussianImage_Cholesky_20000_2500/frame_000*/gaussian_model.pth.tar")
         # sort gaussian_image_paths by the number in the folder name
@@ -272,6 +273,12 @@ class GaussianVideo_Layer(nn.Module):
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
+        # loop through the self.xys and verify the self.xys[:, 2] is integer 1
+        for i in range(self.xys.shape[0]):
+            if self.xys[i, 2] not in range(self.T):
+                print(f"self.xys[:, 2] is not integer 0 to T-1: {self.xys[i, 2]}")
+                assert False, "self.xys[:, 2] is not integer 0 to T-1"
+        
         if self.debug_mode:
             # write all gaussian's attributes to a txt file
             with open(os.path.join(self.log_dir, "gaussians_GaussianVideo_Layer.txt"), "a") as f:

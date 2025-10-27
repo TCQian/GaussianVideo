@@ -270,12 +270,16 @@ class GaussianVideo_Layer(nn.Module):
         if self.layer == 1:
             self._apply_2d_gaussian_constraints()
 
-        if self.debug_mode:
-            for name, param in self.named_parameters():
-                if param.grad is not None:
-                    grad_norm = param.grad.data.norm().item()
-                    print(f"[Gradient Norm Layer {self.layer}] {name}: {grad_norm:.6e}")
-
+        if self.debug_mode and self.layer == 1:
+            # print first 3 gaussians' attributes from each interval of self.init_num_points_2D gauassian
+            print("Iteration starts here. ")
+            for i in range(0, self.init_num_points_2D, self.T):
+                targeted_num_gaussians = 1
+                print(f"    Frame {i}, Gaussian {i*self.init_num_points_2D} to {i*self.init_num_points_2D+targeted_num_gaussians}:")
+                print(f"        xyz: {self._xyz_2D[i*self.init_num_points_2D:i*self.init_num_points_2D+targeted_num_gaussians, :].tolist()}")
+                print(f"        cholesky: {self._cholesky_2D[i*self.init_num_points_2D:i*self.init_num_points_2D+targeted_num_gaussians, :].tolist()}")
+                print(f"        features: {self._features_dc_2D[i*self.init_num_points_2D:i*self.init_num_points_2D+targeted_num_gaussians, :].tolist()}")
+                print(f"        opacity: {self._opacity_2D[i*self.init_num_points_2D:i*self.init_num_points_2D+targeted_num_gaussians].tolist()}")
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
         self.scheduler.step()

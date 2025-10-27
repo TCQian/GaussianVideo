@@ -122,7 +122,8 @@ class GaussianVideo_Layer(nn.Module):
             self._cholesky_2D.data[:, 4] = 0
             self._cholesky_2D.data[:, 5] = 1
 
-        self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D * self.T, 1)))
+        # self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_2D * self.T, 1)))
+        self.register_buffer('_opacity_2D', torch.ones((self.init_num_points_2D * self.T, 1)))
         self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points_2D * self.T, 3))
         self.layer = 1
         print("GaussianVideo_Layer: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])
@@ -273,13 +274,13 @@ class GaussianVideo_Layer(nn.Module):
         if self.debug_mode and self.layer == 1:
             # print first 3 gaussians' attributes from each interval of self.init_num_points_2D gauassian
             print("Iteration starts here. ")
-            for i in range(0, self.init_num_points_2D, self.T):
+            for i in range(0, self.T):
                 targeted_num_gaussians = 1
                 print(f"    Frame {i}, Gaussian {i*self.init_num_points_2D} to {i*self.init_num_points_2D+targeted_num_gaussians}:")
-                print(f"        xyz: {self._xyz_2D[i*self.init_num_points_2D:i*self.init_num_points_2D+targeted_num_gaussians, :].tolist()}")
+                print(f"        xyz: {self.xys[self.init_num_points_3D+i*self.init_num_points_2D:self.init_num_points_3D+i*self.init_num_points_2D+targeted_num_gaussians, :].tolist()}")
                 print(f"        cholesky: {self._cholesky_2D[i*self.init_num_points_2D:i*self.init_num_points_2D+targeted_num_gaussians, :].tolist()}")
                 print(f"        features: {self._features_dc_2D[i*self.init_num_points_2D:i*self.init_num_points_2D+targeted_num_gaussians, :].tolist()}")
-                print(f"        opacity: {self._opacity_2D[i*self.init_num_points_2D:i*self.init_num_points_2D+targeted_num_gaussians].tolist()}")
+                print(f"        opacity: {self.get_opacity[self.init_num_points_3D+self.init_num_points_2D+i*self.init_num_points_2D:self.init_num_points_3D+self.init_num_points_2D+i*self.init_num_points_2D+targeted_num_gaussians].tolist()}")
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
         self.scheduler.step()

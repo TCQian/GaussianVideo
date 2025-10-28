@@ -1436,10 +1436,10 @@ __global__ void rasterize_backward_sum_kernel_video(
                 // Full Mahalanobis distance using all six parameters:
                 float sigma = 0.5f * (
                     conic.x * delta.x * delta.x +
-                    conic.y * delta.x * delta.y +
-                    conic.z * delta.x * delta.z +
+                    2.f * conic.y * delta.x * delta.y +
+                    2.f * conic.z * delta.x * delta.z +
                     conic.w * delta.y * delta.y +
-                    conic.u * delta.y * delta.z +
+                    2.f * conic.u * delta.y * delta.z +
                     conic.v * delta.z * delta.z
                 );
                 vis = __expf(-sigma);
@@ -1470,13 +1470,14 @@ __global__ void rasterize_backward_sum_kernel_video(
                 // d sigma/d(conic.y) = delta.x * delta.y
                 // d sigma/d(conic.z) = delta.x * delta.z
                 // d sigma/d(conic.w) = 0.5 * delta.y^2
-                // d sigma/d(conic.u) = delta.y * delta.z
+                // d sigma/d(conic.u) = delta.y * delta.z 
                 // d sigma/d(conic.v) = 0.5 * delta.z^2
+                // half the gradient of off-diagonal element, to stabilize the training
                 v_conic_local.x = v_sigma * 0.5f * delta.x * delta.x;
-                v_conic_local.y = v_sigma * (delta.x * delta.y);
-                v_conic_local.z = v_sigma * (delta.x * delta.z);
+                v_conic_local.y = v_sigma * 0.5f * (delta.x * delta.y); 
+                v_conic_local.z = v_sigma * 0.5f * (delta.x * delta.z);
                 v_conic_local.w = v_sigma * 0.5f * delta.y * delta.y;
-                v_conic_local.u = v_sigma * (delta.y * delta.z);
+                v_conic_local.u = v_sigma * 0.5f * (delta.y * delta.z);
                 v_conic_local.v = v_sigma * 0.5f * delta.z * delta.z;
                 
                 // Compute derivative of sigma with respect to pixel coordinates.

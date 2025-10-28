@@ -75,6 +75,16 @@ class GaussianImage_Cholesky(nn.Module):
     def set_background(self, background):
         self.background = background
 
+    def prune(self, opac_threshold=0.2):
+        print(f"min and max opacity: {self.get_opacity.min().item()}, {self.get_opacity.max().item()}")
+        mask = (self.get_opacity > opac_threshold).squeeze()
+        self._xyz = torch.nn.Parameter(self._xyz[mask])
+        self._cholesky = torch.nn.Parameter(self._cholesky[mask])
+        self._features_dc = torch.nn.Parameter(self._features_dc[mask])
+        self._opacity = torch.nn.Parameter(self._opacity[mask])
+        for param_group in self.optimizer.param_groups:
+            param_group['params'] = [p for p in self.parameters() if p.requires_grad]
+
     def forward(self):
         #assert torch.allclose(self.background, torch.ones(3, device=self.background.device) / 2.0), "Currently only support gray background"
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_2d(self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.tile_bounds)

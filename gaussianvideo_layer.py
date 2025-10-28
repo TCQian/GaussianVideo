@@ -67,7 +67,7 @@ class GaussianVideo_Layer(nn.Module):
         self.device = kwargs["device"]
 
         self.register_buffer('background', torch.ones(3))
-        self.register_buffer('cholesky_bound_3D', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
+        self.register_buffer('cholesky_bound_3D', torch.tensor([0.5, 0, 0, 0.5, 0, 0.5]).view(1, 6))
         self.register_buffer('cholesky_bound_2D', torch.tensor([0.5, 0, 0, 0.5, 0, 0]).view(1, 6))
 
         self.opacity_activation = torch.sigmoid
@@ -92,8 +92,8 @@ class GaussianVideo_Layer(nn.Module):
         self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points_3D, 3))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
-        with torch.no_grad():
-            self._cholesky_3D.data[:, 5] += self.T  # adjust the constant as needed
+        # with torch.no_grad():
+        #     self._cholesky_3D.data[:, 5] += self.T  # adjust the constant as needed
 
         self.layer = 0
         print("GaussianVideo_Layer: Layer 0 initialized, number of gaussians: ", self._xyz_3D.shape[0])

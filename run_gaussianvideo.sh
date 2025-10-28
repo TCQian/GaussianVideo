@@ -70,7 +70,7 @@ CHECKPOINT_PATH_LAYER0="${CHECKPOINT_DIR_PATH}${DATA_NAME}/layer_0_model.pth.tar
 CHECKPOINT_PATH_LAYER1="${CHECKPOINT_DIR_PATH}${DATA_NAME}/layer_1_model.pth.tar"
 
 # python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
-python gaussian3D2D.py 
+# python gaussian3D2D.py 
 
 # Run the training script with the required arguments.
 python gaussianvideo_layer.py \
@@ -88,21 +88,21 @@ python gaussianvideo_layer.py \
     --lr_layer1 "${LEARNING_RATE_LAYER1}" \
     --save_imgs
 
-python gaussianvideo_layer.py \
-    --layer 1 \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --model_name "${MODEL_NAME}" \
-    --iterations_layer0 "${TRAIN_ITERATIONS_LAYER0}" \
-    --iterations_layer1 "${TRAIN_ITERATIONS_LAYER1}" \
-    --num_points_layer0 "${NUM_POINTS_LAYER0}" \
-    --lr_layer0 "${LEARNING_RATE_LAYER0}" \
-    --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
-    --num_points_layer1 "${NUM_POINTS_LAYER1}" \
-    --lr_layer1 "${LEARNING_RATE_LAYER1}" \
-    --save_imgs
+# python gaussianvideo_layer.py \
+#     --layer 1 \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --model_name "${MODEL_NAME}" \
+#     --iterations_layer0 "${TRAIN_ITERATIONS_LAYER0}" \
+#     --iterations_layer1 "${TRAIN_ITERATIONS_LAYER1}" \
+#     --num_points_layer0 "${NUM_POINTS_LAYER0}" \
+#     --lr_layer0 "${LEARNING_RATE_LAYER0}" \
+#     --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
+#     --num_points_layer1 "${NUM_POINTS_LAYER1}" \
+#     --lr_layer1 "${LEARNING_RATE_LAYER1}" \
+#     --save_imgs
 
 
 # Run the quantization training script.

@@ -14,7 +14,6 @@ import random
 from utils import *
 from gaussianimage_cholesky import GaussianImage_Cholesky
 from gaussianvideo3D2D import GaussianVideo3D2D
-from logwriter import LogWriter
 
 class EarlyStopping:
     def __init__(self, patience=100, min_delta=1e-10):
@@ -59,6 +58,7 @@ class GaussianVideo3D2DTrainer:
 
         self.layer = layer
         self.video_name = video_name
+        self.model_name = model_name
         self.device = torch.device("cuda:0")
         self.gt_image = images_paths_to_tensor(images_paths).to(self.device)
 
@@ -109,9 +109,10 @@ class GaussianVideo3D2DTrainer:
 
             self.gaussian_model_list = []
             for t, num_points in enumerate(num_points_list):
-                background_path = os.path.dirname(checkpoint_path) / f"{self.video_name}_fitting_t{t}_layer{self.layer}.png"  # e.g., "_fitting_t0.png"
+                background_path = Path(f"{str(checkpoint_path).replace('layer_0_model.pth.tar', '')}/{self.video_name}_fitting_t{t}_layer0.png")
+                background_img = image_path_to_tensor(background_path).squeeze(0).permute(1, 2, 0).to(self.device)
                 self.gaussian_model_list.append(GaussianImage_Cholesky(
-                    background_image=background_path,
+                    background_image=background_img,
                     loss_type="L2", 
                     opt_type="adan", 
                     num_points=num_points,
@@ -123,7 +124,7 @@ class GaussianVideo3D2DTrainer:
                     quantize=False,
                     iterations=self.iterations,
                     lr=args.lr
-                ))
+                ).to(self.device))
 
         self.logwriter = LogWriter(self.log_dir)
 
@@ -140,7 +141,7 @@ class GaussianVideo3D2DTrainer:
                 gaussian_model.debug_mode = False
 
             if (iter % 1000 == 1 and iter > 1):
-                gaussian_model.prune(opac_threshold=0.02)
+                gaussian_model.prune(opac_threshold=0.05)
 
             loss, psnr = gaussian_model.train_iter(gt_image)
             
@@ -185,7 +186,7 @@ class GaussianVideo3D2DTrainer:
                 gaussian_model.debug_mode = False
 
             if (iter % 1000 == 1 and iter > 1):
-                gaussian_model.prune(opac_threshold=0.02)
+                gaussian_model.prune(opac_threshold=0.05)
 
             loss, psnr = gaussian_model.train_iter(gt_image)
 
@@ -281,12 +282,12 @@ class GaussianVideo3D2DTrainer:
             for t in range(num_time_steps):
                 img = render_tensor[0, :, :, :, t]  # Shape: [C, H, W]
                 pil_image = transform(img)  # Convert to PIL Image
-                name = f"{self.video_name}_fitting_t{t}_layer{self.layer}.png"  # e.g., "_fitting_t0.png"
+                name = f"{self.video_name}_fitting_t{t}_layer{self.layer}.png"
                 pil_image.save(str(self.log_dir / name))
         return psnr, ms_ssim_value
 
     def test_GVGI(self, gaussian_model, gt_image, t=0):
-        self.gaussian_model.eval()
+        gaussian_model.eval()
         with torch.no_grad():
             out = gaussian_model()
         mse_loss = F.mse_loss(out["render"].float(), gt_image.float())
@@ -296,8 +297,9 @@ class GaussianVideo3D2DTrainer:
         if self.save_imgs:
             transform = transforms.ToPILImage()
             img = transform(out["render"].float().squeeze(0))
-            name = self.image_name + "_fitting.png" 
-            img.save(str(self.log_dir / name))
+            name = f"{self.video_name}_fitting_t{t}_layer{self.layer}.png"
+            Path(self.log_dir / f'frame_{t+1:04}').mkdir(parents=True, exist_ok=True)
+            img.save(str(self.log_dir / f'frame_{t+1:04}' / name))
         return psnr, ms_ssim_value
 
     def test(self):
@@ -384,7 +386,7 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         np.random.seed(args.seed)
 
-    log_dir = Path(f"./checkpoints/{args.data_name}/ProgressiveGaussianVideo_i{args.iterations_layer0}_g{args.num_points_layer0}_f{args.num_frames}_s{args.start_frame}/layer{args.layer}/")
+    log_dir = Path(f"./checkpoints/{args.data_name}/ProgressiveGaussianVideo_i{args.iterations}_g{args.num_points}_f{args.num_frames}_s{args.start_frame}/layer{args.layer}/")
     if args.layer == 1:
         log_dir = log_dir / (f"{args.model_name}_i{args.iterations}_g{args.num_points}/")
 

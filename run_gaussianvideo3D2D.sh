@@ -58,7 +58,7 @@ CHECKPOINT_DIR_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NA
 CHECKPOINT_PATH="${CHECKPOINT_DIR_PATH}/layer0/layer_0_model.pth.tar"
 
 # Run the training script with the required arguments.
-python gaussianvideo3D2D.py \
+python train_3D2D.py \
     --layer 0 \
     --dataset "${DATASET_PATH}" \
     --data_name "${DATA_NAME}" \
@@ -70,7 +70,7 @@ python gaussianvideo3D2D.py \
     --lr "${LEARNING_RATE}" \
     --save_imgs
 
-python gaussianvideo3D2D.py \
+python train_3D2D.py \
     --layer 1 \
     --dataset "${DATASET_PATH}" \
     --data_name "${DATA_NAME}" \
@@ -80,10 +80,10 @@ python gaussianvideo3D2D.py \
     --iterations "${TRAIN_ITERATIONS}" \
     --num_points "${NUM_POINTS}" \
     --lr "${LEARNING_RATE}" \
-    --model_path "${CHECKPOINT_PATH}" \
+    --model_path_layer0 "${CHECKPOINT_PATH}" \
     --save_imgs
 
-python gaussianvideo3D2D.py \
+python train_3D2D.py \
     --layer 1 \
     --dataset "${DATASET_PATH}" \
     --data_name "${DATA_NAME}" \
@@ -93,7 +93,7 @@ python gaussianvideo3D2D.py \
     --iterations "${TRAIN_ITERATIONS}" \
     --num_points "${NUM_POINTS}" \
     --lr "${LEARNING_RATE}" \
-    --model_path "${CHECKPOINT_PATH}" \
+    --model_path_layer0 "${CHECKPOINT_PATH}" \
     --save_imgs
 
 

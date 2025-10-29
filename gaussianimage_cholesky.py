@@ -77,6 +77,7 @@ class GaussianImage_Cholesky(nn.Module):
 
     def prune(self, opac_threshold=0.2):
         print(f"min and max opacity: {self.get_opacity.min().item()}, {self.get_opacity.max().item()}")
+
         mask = (self.get_opacity > opac_threshold).squeeze()
         self._xyz = torch.nn.Parameter(self._xyz[mask])
         self._cholesky = torch.nn.Parameter(self._cholesky[mask])
@@ -84,6 +85,9 @@ class GaussianImage_Cholesky(nn.Module):
         self._opacity = torch.nn.Parameter(self._opacity[mask])
         for param_group in self.optimizer.param_groups:
             param_group['params'] = [p for p in self.parameters() if p.requires_grad]
+        
+        print(f"Pruned to {self._xyz.shape[0]} Gaussians.")
+
 
     def forward(self):
         #assert torch.allclose(self.background, torch.ones(3, device=self.background.device) / 2.0), "Currently only support gray background"

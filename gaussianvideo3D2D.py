@@ -30,7 +30,7 @@ class GaussianVideo3D2D(nn.Module):
         ) # tile_bounds (120, 68, 50)
         self.device = kwargs["device"]
 
-        self.init_num_points = int(kwargs["num_points"] * self.T / 2)
+        self.init_num_points = kwargs["num_points"]
         
         self.register_buffer('background', torch.ones(3))
         self.register_buffer('cholesky_bound_3D', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
@@ -45,10 +45,11 @@ class GaussianVideo3D2D(nn.Module):
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20000, gamma=0.5)
 
     def _init_layer0(self):
-        self._xyz_3D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points_3D, 3) - 0.5)))
-        self._cholesky_3D = nn.Parameter(torch.rand(self.init_num_points_3D, 6))
-        self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points_3D, 1)))
-        self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points_3D, 3))
+        self.init_num_points = int(self.init_num_points * self.T / 2)
+        self._xyz_3D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 3) - 0.5)))
+        self._cholesky_3D = nn.Parameter(torch.rand(self.init_num_points, 6))
+        self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
+        self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points, 3))
         
         # Increase L33 (the last element in each row) to boost temporal variance.
         with torch.no_grad():
@@ -209,10 +210,10 @@ class GaussianVideo3D2D(nn.Module):
             print(f"min and max opacity: {self.get_opacity[self.num_points_layer0:].min().item()}, {self.get_opacity[self.num_points_layer0:].max().item()}")
             mask = (self.get_opacity[self.num_points_layer0:] > opac_threshold).squeeze()
 
-            self._xyz_2D = torch.nn.Parameter(self._xyz_2D[self.num_points_layer0:][mask])
-            self._cholesky_2D = torch.nn.Parameter(self._cholesky_2D[self.num_points_layer0:][mask])
-            self._features_dc_2D = torch.nn.Parameter(self._features_dc_2D[self.num_points_layer0:][mask])
-            self._opacity_2D = torch.nn.Parameter(self._opacity_2D[self.num_points_layer0:][mask])
+            self._xyz_2D = torch.nn.Parameter(self._xyz_2D[mask])
+            self._cholesky_2D = torch.nn.Parameter(self._cholesky_2D[mask])
+            self._features_dc_2D = torch.nn.Parameter(self._features_dc_2D[mask])
+            self._opacity_2D = torch.nn.Parameter(self._opacity_2D[mask])
             for param_group in self.optimizer.param_groups:
                 param_group['params'] = [p for p in self.parameters() if p.requires_grad]
 

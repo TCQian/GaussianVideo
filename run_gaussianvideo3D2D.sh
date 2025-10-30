@@ -8,9 +8,9 @@
 
 source ~/.bashrc
 conda activate gv_h100
-cd gsplat
-pip install .[dev]
-cd ..
+# cd gsplat
+# pip install .[dev]
+# cd ..
 
 # Default variable values.
 DATA_NAME="Beauty"
@@ -55,8 +55,9 @@ echo "Starting ProgressiveGaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${N
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
 DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
 CHECKPOINT_DIR_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/ProgressiveGaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}"
-CHECKPOINT_PATH="${CHECKPOINT_DIR_PATH}/layer0/layer_0_model.pth.tar"
-
+CHECKPOINT_PATH_LAYER0="${CHECKPOINT_DIR_PATH}/layer0/layer_0_model.pth.tar"
+CHECKPOINT_PATH_LAYER1_GV3D2D="${CHECKPOINT_DIR_PATH}/layer1/GV3D2D_i${TRAIN_ITERATIONS}_g${NUM_POINTS}/layer_1_model.pth.tar"
+CHECKPOINT_PATH_LAYER1_GVGI="${CHECKPOINT_DIR_PATH}/layer1/GVGI_i${TRAIN_ITERATIONS}_g${NUM_POINTS}/"
 # Run the training script with the required arguments.
 python train_3D2D.py \
     --layer 0 \
@@ -68,6 +69,7 @@ python train_3D2D.py \
     --iterations "${TRAIN_ITERATIONS}" \
     --num_points "${NUM_POINTS}" \
     --lr "${LEARNING_RATE}" \
+    # --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
     --save_imgs
 
 python train_3D2D.py \
@@ -80,7 +82,8 @@ python train_3D2D.py \
     --iterations "${TRAIN_ITERATIONS}" \
     --num_points "${NUM_POINTS}" \
     --lr "${LEARNING_RATE}" \
-    --model_path_layer0 "${CHECKPOINT_PATH}" \
+    --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
+    # --model_path_layer1 "${CHECKPOINT_PATH_LAYER1_GV3D2D}" \
     --save_imgs
 
 python train_3D2D.py \
@@ -93,7 +96,8 @@ python train_3D2D.py \
     --iterations "${TRAIN_ITERATIONS}" \
     --num_points "${NUM_POINTS}" \
     --lr "${LEARNING_RATE}" \
-    --model_path_layer0 "${CHECKPOINT_PATH}" \
+    --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
+    # --model_path_layer1 "${CHECKPOINT_PATH_LAYER1_GVGI}" \
     --save_imgs
 
 

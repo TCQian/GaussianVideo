@@ -38,22 +38,71 @@ class GaussianVideo3D2D(nn.Module):
 
         self.opacity_activation = torch.sigmoid
 
-        if self.layer == 1:
-            if kwargs["checkpoint_path"] is not None:
-                self._load_layer0_checkpoint(kwargs["checkpoint_path"])
-            else:
-                print('GaussianVideo3D2D: Without layer 0 checkpoint, layer 1 will train with 0 3D gaussians')
+        self._xyz_3D = None
+        self._cholesky_3D = None
+        self._features_dc_3D = None
+        self._opacity_3D = None
+        self._xyz_2D = None
+        self._cholesky_2D = None
+        self._features_dc_2D = None
+        self._opacity_2D = None
+        self.num_points_list = None
+        self.optimizer = None
+        self.scheduler = None
+
+    def _create_data_from_checkpoint(self, checkpoint_path_layer0, checkpoint_path_layer1):
+        if checkpoint_path_layer0 is not None:
+            checkpoint_layer0 = torch.load(checkpoint_path_layer0, map_location=self.device)
+        if checkpoint_path_layer1 is not None:
+            checkpoint_layer1 = torch.load(checkpoint_path_layer1, map_location=self.device)
+
+        if checkpoint_layer0 is not None:
+            self.register_buffer('_xyz_3D', checkpoint_layer0['_xyz_3D'])
+            self.register_buffer('_cholesky_3D', checkpoint_layer0['_cholesky_3D'])
+            self.register_buffer('_features_dc_3D', checkpoint_layer0['_features_dc_3D'])
+            self._opacity_3D = nn.Parameter(checkpoint_layer0['_opacity_3D'])
+            print(f"Layer 0 checkpoint loaded successfully with {self._xyz_3D.shape[0]} gaussians")
+        else:
+            if self.layer == 0:
+                self._init_layer0()
+            elif self.layer == 1: # required in get func
                 self.register_buffer('_xyz_3D', torch.zeros(0, 3))
                 self.register_buffer('_cholesky_3D', torch.zeros(0, 6))
                 self.register_buffer('_features_dc_3D', torch.zeros(0, 3))
                 self._opacity_3D = nn.Parameter(torch.zeros(0, 1))
-                self._init_layer1()
+                print('GaussianVideo3D2D: Without layer 0 checkpoint, layer 1 will train with 0 3D gaussians')
+            
+        if checkpoint_layer1 is not None:
+            self.num_points_list = checkpoint_layer1['gaussian_num_list']
+
+            self._xyz_2D = checkpoint_layer1['_xyz_2D']
+            z = []
+            for t, (start, end) in enumerate(self.num_points_list):
+                z.append(torch.atanh(torch.tensor((2 * (t / self.T)) - 1.0)).item())
+            self._xyz_2D = torch.cat((self._xyz_2D.data[:, :2], torch.tensor(z).view(-1, 1)), dim=1)
+
+            self._ckpt_cholesky_2D = checkpoint_layer1['_cholesky_2D']
+            self._cholesky_2D = nn.Parameter(torch.rand(len(self._xyz_2D), 6))
+            for t, (start, end) in enumerate(self.num_points_list):
+                self._cholesky_2D[start:end, 0] = self._ckpt_cholesky_2D[start:end, 0] # l11
+                self._cholesky_2D[start:end, 1] = self._ckpt_cholesky_2D[start:end, 1] # l12
+                self._cholesky_2D[start:end, 3] = self._ckpt_cholesky_2D[start:end, 2] # l22
+                self._cholesky_2D[start:end, 2] = 0 
+                self._cholesky_2D[start:end, 4] = 0
+                self._cholesky_2D[start:end, 5] = 1
+
+            self.register_buffer('_features_dc_2D', checkpoint_layer1['_features_dc_2D'])
+            self.register_buffer('_opacity_3D', checkpoint_layer1['_opacity_3D'])
+            self._opacity_2D = nn.Parameter(checkpoint_layer1['_opacity_2D'])
+            print(f"Layer 1 checkpoint loaded successfully with {self._xyz_2D.shape[0]} gaussians")
         else:
-            self._init_layer0()
+            if self.layer == 1:
+                self._init_layer1()
 
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20000, gamma=0.5)
 
     def _init_layer0(self):
+        self.init_num_points = int(self.num_points * self.T / 2)
         self._xyz_3D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 3) - 0.5)))
         self._cholesky_3D = nn.Parameter(torch.rand(self.init_num_points, 6))
         self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
@@ -68,6 +117,7 @@ class GaussianVideo3D2D(nn.Module):
         print("Layer 0 initialized, number of gaussians: ", self._xyz_3D.shape[0])
 
     def _init_layer1(self):
+        self.init_num_points = int((self.num_points * self.T) - self._xyz_3D.shape[0])
         num_points_per_frame = int(self.init_num_points / self.T)
         self.num_points_list = []
         for t in range(self.T):
@@ -106,55 +156,6 @@ class GaussianVideo3D2D(nn.Module):
 
         self.layer = 1
         print("GaussianVideo3D2D: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])
-
-    def _load_layer0_checkpoint(self, checkpoint_path):
-        """Load layer 0 checkpoint for progressive training"""
-        if checkpoint_path is None:
-            raise ValueError("checkpoint_path must be provided for progressive training")
-        
-        print(f"Loading layer 0 checkpoint from: {checkpoint_path}")
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
-
-        with torch.no_grad():
-            self.register_buffer('_xyz_3D', checkpoint['_xyz_3D'])
-            self.register_buffer('_cholesky_3D', checkpoint['_cholesky_3D'])
-            self.register_buffer('_features_dc_3D', checkpoint['_features_dc_3D'])
-            self._opacity_3D = nn.Parameter(checkpoint['_opacity_3D'])
-        
-        print("Layer 0 checkpoint loaded successfully")
-
-    def _load_layer1_checkpoint(self, checkpoint_path):
-        """Load layer 1 checkpoint for progressive training"""
-        if checkpoint_path is None:
-            raise ValueError("checkpoint_path must be provided for progressive training")
-        
-        print(f"Loading layer 1 checkpoint from: {checkpoint_path}")
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
-        
-        with torch.no_grad():
-            self.num_points_list = checkpoint['gaussian_num_list']
-
-            self._xyz_2D = checkpoint['_xyz_2D']
-            z = []
-            for t, (start, end) in enumerate(self.num_points_list):
-                z.append(torch.atanh(torch.tensor((2 * (t / self.T)) - 1.0)).item())
-            self._xyz_2D = torch.cat((self._xyz_2D.data[:, :2], torch.tensor(z).view(-1, 1)), dim=1)
-
-            self._ckpt_cholesky_2D = checkpoint['_cholesky_2D']
-            self._cholesky_2D = nn.Parameter(torch.rand(len(self._xyz_2D), 6))
-            for t, (start, end) in enumerate(self.num_points_list):
-                self._cholesky_2D[start:end, 0] = self._ckpt_cholesky_2D[start:end, 0] # l11
-                self._cholesky_2D[start:end, 1] = self._ckpt_cholesky_2D[start:end, 1] # l12
-                self._cholesky_2D[start:end, 3] = self._ckpt_cholesky_2D[start:end, 2] # l22
-                self._cholesky_2D[start:end, 2] = 0 
-                self._cholesky_2D[start:end, 4] = 0
-                self._cholesky_2D[start:end, 5] = 1
-
-            self.register_buffer('_features_dc_2D', checkpoint['_features_dc_2D'])
-            self.register_buffer('_opacity_3D', checkpoint['_opacity_3D'])
-            self._opacity_2D = nn.Parameter(checkpoint['_opacity_2D'])
-        
-        print("Layer 1 checkpoint loaded successfully")
 
     def _apply_2d_gaussian_constraints(self):
         """Apply gradient constraints to 2D gaussian parameters during training"""

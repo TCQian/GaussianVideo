@@ -69,12 +69,17 @@ class GaussianVideo3D2DTrainer:
         self.save_imgs = args.save_imgs
         self.log_dir = log_dir
         
-        checkpoint_path = None
+        if self.layer == 0:
+            self.init_num_points = int(args.num_points * self.T / 2)
         if self.layer == 1:
             assert args.model_path_layer0 is not None, " Layer 1 requires a layer 0 checkpoint"
-            checkpoint_path = args.model_path_layer0
+            print(f"loading model path:{args.model_path_layer0}")
+            checkpoint = torch.load(args.model_path_layer0, map_location=self.device)
+            self.num_points_layer0 = checkpoint['_xyz_3D'].shape[0]
+            self.init_num_points_layer = int((self.num_points * self.T) - self.num_points_layer0)
 
         if self.layer == 0 or self.model_name == "GV3D2D":
+            print(f"GaussianVideo3D2D: Available number of gaussians: {self.init_num_points} for layer {self.layer}")
             self.gaussian_model = GaussianVideo3D2D(
                 layer=self.layer,
                 loss_type="L2", 
@@ -85,33 +90,33 @@ class GaussianVideo3D2DTrainer:
                 BLOCK_H=BLOCK_H, 
                 BLOCK_W=BLOCK_W, 
                 BLOCK_T=BLOCK_T, 
+                checkpoint_path=args.model_path_layer0,
                 device=self.device, 
                 quantize=False,
-                checkpoint_path=checkpoint_path,
                 num_points=self.num_points,
                 iterations=self.iterations,
                 lr=args.lr
             ).to(self.device)
 
-        elif self.model_name == "GVGI" and self.layer == 1:
-            layer0_checkpoint = torch.load(checkpoint_path, map_location=self.device)
-            num_points_layer0 = layer0_checkpoint['_xyz_3D'].shape[0]
-            init_num_points = int((self.num_points * self.T) - num_points_layer0)
-            print(f"GVGI: Available number of gaussians: {init_num_points} for layer 1")
+            if args.model_path_layer1:
+                self.gaussian_model._load_layer1_checkpoint(args.model_path_layer1)
 
-            num_points_per_frame = int(init_num_points / self.T)
+        elif self.model_name == "GVGI" and self.layer == 1:
+            print(f"GVGI: Available number of gaussians: {self.init_num_points_layer} for layer 1")
+
+            num_points_per_frame = int(self.init_num_points_layer / self.T)
             num_points_list = []
             for t in range(self.T):
                 if t == self.T - 1:
-                    num_points_list.append(init_num_points - (t * num_points_per_frame))
+                    num_points_list.append(self.init_num_points_layer - (t * num_points_per_frame))
                 else:
                     num_points_list.append(num_points_per_frame)
 
             self.gaussian_model_list = []
             for t, num_points in enumerate(num_points_list):
-                background_path = Path(f"{str(checkpoint_path).replace('layer_0_model.pth.tar', '')}/{self.video_name}_fitting_t{t}_layer0.png")
+                background_path = Path(f"{args.model_path_layer0.replace('layer_0_model.pth.tar', '')}/{self.video_name}_fitting_t{t}_layer0.png")
                 background_img = image_path_to_tensor(background_path).squeeze(0).permute(1, 2, 0).to(self.device)
-                self.gaussian_model_list.append(GaussianImage_Cholesky(
+                gaussian_model = GaussianImage_Cholesky(
                     background_image=background_img,
                     loss_type="L2", 
                     opt_type="adan", 
@@ -124,7 +129,18 @@ class GaussianVideo3D2DTrainer:
                     quantize=False,
                     iterations=self.iterations,
                     lr=args.lr
-                ).to(self.device))
+                ).to(self.device)
+
+                if args.model_path_layer1:
+                    checkpoint_file_path = Path(args.model_path_layer1) / f'frame_{t+1:04}' / f"gaussian_model.pth.tar"
+                    if checkpoint_file_path.exists():
+                        checkpoint = torch.load(checkpoint_file_path, map_location=self.device)
+                        gaussian_model.load_state_dict(checkpoint)
+                        print(f"Loaded checkpoint from: {checkpoint_file_path}")
+                    else:
+                        print(f"No checkpoint found at: {checkpoint_file_path}")
+
+                self.gaussian_model_list.append(gaussian_model)
 
         self.logwriter = LogWriter(self.log_dir)
 
@@ -403,6 +419,9 @@ def main(argv):
 
     logwriter.write("Average: {}x{} for layer {}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
         trainer.H, trainer.H, args.layer, psnr, ms_ssim, training_time, eval_time, eval_fps))    
+
+    # psnr, ms_ssim = trainer.test()
+    # print(f"Test PSNR:{psnr:.4f}, MS-SSIM:{ms_ssim:.6f}")
 
 if __name__ == "__main__":
     main(sys.argv[1:])

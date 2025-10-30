@@ -33,7 +33,7 @@ class GaussianVideo3D2D(nn.Module):
         self.init_num_points = kwargs["num_points"]
         
         self.register_buffer('background', torch.ones(3))
-        self.register_buffer('cholesky_bound_3D', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
+        self.register_buffer('cholesky_bound_3D', torch.tensor([0.5, 0, 0, 0.5, 0, 0.5]).view(1, 6))
         self.register_buffer('cholesky_bound_2D', torch.tensor([0.5, 0, 0, 0.5, 0, 0]).view(1, 6))
 
         self.opacity_activation = torch.sigmoid
@@ -59,10 +59,6 @@ class GaussianVideo3D2D(nn.Module):
         self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points, 3))
         
-        # Increase L33 (the last element in each row) to boost temporal variance.
-        with torch.no_grad():
-            self._cholesky_3D.data[:, 5] += self.T  # adjust the constant as needed
-
         if self.opt_type == "adam":
             self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         else:

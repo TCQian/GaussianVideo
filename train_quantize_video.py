@@ -243,8 +243,8 @@ def main(argv):
         model_path=args.model_path_3d
     )
     psnr, ms_ssim, training_time, eval_time, eval_fps, bpp, best_psnr, best_ms_ssim, best_bpp = trainer.train()
-    logwriter.write("Final Results - PSNR:{:.4f}, MS-SSIM:{:.4f}, bpp:{:.4f}, Training time:{:.4f}s, Eval time:{:.8f}s, FPS:{:.4f}"
-                     .format(psnr, ms_ssim, bpp, training_time, eval_time, eval_fps))
-    
+    logwriter.write("Final Results - PSNR:{:.4f}, MS-SSIM:{:.4f}, bpp:{:.4f}, Best PSNR:{:.4f}, Best MS-SSIM:{:.4f}, Best bpp:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
+            psnr, ms_ssim, bpp, best_psnr, best_ms_ssim, best_bpp, training_time, eval_time, eval_fps))
+
 if __name__ == "__main__":
     main(sys.argv[1:])

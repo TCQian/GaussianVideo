@@ -55,9 +55,16 @@ echo "Starting ProgressiveGaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${N
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
 DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
 CHECKPOINT_DIR_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/ProgressiveGaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}"
+CHECKPOINT_DIR_PATH_QUANT="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/ProgressiveGaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}"
+
 CHECKPOINT_PATH_LAYER0="${CHECKPOINT_DIR_PATH}/layer0/layer_0_model.pth.tar"
 CHECKPOINT_PATH_LAYER1_GV3D2D="${CHECKPOINT_DIR_PATH}/layer1/GV3D2D_i${TRAIN_ITERATIONS}_g${NUM_POINTS}/layer_1_model.pth.tar"
 CHECKPOINT_PATH_LAYER1_GVGI="${CHECKPOINT_DIR_PATH}/layer1/GVGI_i${TRAIN_ITERATIONS}_g${NUM_POINTS}/"
+
+CHECKPOINT_QUANT_PATH_LAYER0="${CHECKPOINT_DIR_PATH_QUANT}/layer0/layer_0_model.pth.tar"
+CHECKPOINT_QUANT_PATH_LAYER1_GV3D2D="${CHECKPOINT_DIR_PATH_QUANT}/layer1/GV3D2D_i${TRAIN_ITERATIONS}_g${NUM_POINTS}/layer_1_model.pth.tar"
+CHECKPOINT_QUANT_PATH_LAYER1_GVGI="${CHECKPOINT_DIR_PATH_QUANT}/layer1/GVGI_i${TRAIN_ITERATIONS}_g${NUM_POINTS}/"
+
 # Run the training script with the required arguments.
 python train_3D2D.py \
     --layer 0 \
@@ -98,6 +105,36 @@ python train_3D2D.py \
     --lr "${LEARNING_RATE}" \
     --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
     # --model_path_layer1 "${CHECKPOINT_PATH_LAYER1_GVGI}" \
+    --save_imgs
+
+# Run the quantization training script.
+python train_quantize_3D2D.py \
+    --layer 0 \
+    --dataset "${DATASET_PATH}" \
+    --data_name "${DATA_NAME}" \
+    --start_frame "${START_FRAME}" \
+    --num_frames "${NUM_FRAMES}" \
+    --model_name "GV3D2D" \
+    --iterations "${TRAIN_ITERATIONS}" \
+    --num_points "${NUM_POINTS}" \
+    --lr "${LEARNING_RATE}" \
+    --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
+    # --model_path_layer1 "${CHECKPOINT_QUANT_PATH_LAYER1_GV3D2D}" \
+    --save_imgs
+
+# Run the quantization testing script.
+python test_quantize_3D2D.py \
+    --layer 0 \
+    --dataset "${DATASET_PATH}" \
+    --data_name "${DATA_NAME}" \
+    --start_frame "${START_FRAME}" \
+    --num_frames "${NUM_FRAMES}" \
+    --model_name "GV3D2D" \
+    --iterations "${TRAIN_ITERATIONS}" \
+    --num_points "${NUM_POINTS}" \
+    --lr "${LEARNING_RATE}" \
+    --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
+    # --model_path_layer1 "${CHECKPOINT_QUANT_PATH_LAYER1_GV3D2D}" \
     --save_imgs
 
 

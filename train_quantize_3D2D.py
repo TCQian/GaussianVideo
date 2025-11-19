@@ -24,13 +24,11 @@ class GaussianVideo3D2DTrainerQuantize:
     """Trains 3D and 2D gaussians layer by layer with quantization to fit a video."""
     def __init__(
         self,
+        layer: int,
         images_paths: list[Path],
-        num_points: int = 2000,
-        model_name: str = "GaussianVideo",
-        iterations: int = 30000,
-        model_path = None,
+        model_name:str = "GV3D2D",
         args = None,
-        video_name: str = "Video",
+        video_name: str = "Jockey",
         num_frames: int = 50,
         start_frame: int = 0,
         log_dir: Path = None,
@@ -39,14 +37,14 @@ class GaussianVideo3D2DTrainerQuantize:
         self.early_stopping = EarlyStopping(patience=1000, min_delta=1e-10)
 
         self.device = torch.device("cuda:0")
-        self.gt_video = images_paths_to_tensor(images_paths).to(self.device)  # [1, C, H, W, T]
-        self.num_points = num_points
+        self.gt_image = images_paths_to_tensor(images_paths).to(self.device)  # [1, C, H, W, T]
         self.video_name = video_name
+        self.model_name = model_name
+        self.layer = layer
 
         # Determine spatial and temporal dimensions
-        self.H, self.W, self.T = self.gt_video.shape[2], self.gt_video.shape[3], self.gt_video.shape[4]
+        self.H, self.W, self.T = self.gt_image.shape[2], self.gt_image.shape[3], self.gt_image.shape[4]
         BLOCK_H, BLOCK_W, BLOCK_T = 16, 16, 1  # adjust BLOCK_T if needed
-        self.iterations = iterations
         self.iterations = args.iterations
         self.num_points = args.num_points
         self.save_imgs = args.save_imgs
@@ -116,16 +114,6 @@ class GaussianVideo3D2DTrainerQuantize:
                 self.gaussian_model_list.append(gaussian_model)
 
         self.logwriter = LogWriter(self.log_dir)
-
-        if model_path is not None:
-            full_model_path = os.path.join(model_path, args.data_name, "gaussian_model.pth.tar")
-            print(f"loading model path:{full_model_path}")
-            checkpoint = torch.load(full_model_path, map_location=self.device)
-            model_dict = self.gaussian_model.state_dict()
-            pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict}
-            model_dict.update(pretrained_dict)
-            self.gaussian_model.load_state_dict(model_dict)
-            self.gaussian_model._init_data()
 
     def train_GV3D2D(self, gaussian_model, gt_image):
         psnr_list, iter_list = [], []

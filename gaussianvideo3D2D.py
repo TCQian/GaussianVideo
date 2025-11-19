@@ -33,7 +33,7 @@ class GaussianVideo3D2D(nn.Module):
         ) # tile_bounds (120, 68, 50)
         self.device = kwargs["device"]
 
-        self.init_num_points = kwargs["num_points"]
+        self.num_points = kwargs["num_points"]
         
         self.register_buffer('background', torch.ones(3))
         self.register_buffer('cholesky_bound_3D', torch.tensor([0.5, 0, 0, 0.5, 0, 0.5]).view(1, 6))
@@ -140,7 +140,8 @@ class GaussianVideo3D2D(nn.Module):
         print("Layer 0 initialized, number of gaussians: ", self._xyz_3D.shape[0])
 
     def _init_layer1(self):
-        self.init_num_points = int((self.num_points * self.T) - self._xyz_3D.shape[0])
+        self.num_points_layer0 = self._xyz_3D.shape[0]
+        self.init_num_points = int((self.num_points * self.T) - self.num_points_layer0)
         num_points_per_frame = int(self.init_num_points / self.T)
         self.num_points_list = []
         for t in range(self.T):

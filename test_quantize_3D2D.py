@@ -27,26 +27,26 @@ class GaussianVideo3D2DTrainerQuantize:
     """Tests quantized GaussianVideo models on a video (i.e. a set of frames)."""
     def __init__(
         self,
+        layer: int,
         images_paths: list[Path],
-        num_points: int = 2000,
-        model_name: str = "GaussianVideo",
-        iterations: int = 30000,
-        model_path = None,
+        model_name:str = "GV3D2D",
         args = None,
-        video_name: str = "Video",
+        video_name: str = "Jockey",
         num_frames: int = 50,
         start_frame: int = 0,
         log_dir: Path = None,
     ):
 
+        self.device = torch.device("cuda:0")
         self.gt_video = images_paths_to_tensor(images_paths).to(self.device)  # [1, C, H, W, T]
-        self.num_points = num_points
         self.video_name = video_name
+        self.model_name = model_name
+        self.layer = layer
 
         # Determine spatial and temporal dimensions
         self.H, self.W, self.T = self.gt_video.shape[2], self.gt_video.shape[3], self.gt_video.shape[4]
         BLOCK_H, BLOCK_W, BLOCK_T = 16, 16, 1  # adjust BLOCK_T if needed
-        self.iterations = iterations
+        self.iterations = args.iterations
         self.iterations = args.iterations
         self.num_points = args.num_points
         self.save_imgs = args.save_imgs
@@ -116,15 +116,6 @@ class GaussianVideo3D2DTrainerQuantize:
                 self.gaussian_model_list.append(gaussian_model)
 
         self.logwriter = LogWriter(self.log_dir, train=False)
-
-        if model_path is not None:
-            full_model_path = os.path.join(model_path, args.data_name, "gaussian_model.best.pth.tar")
-            print(f"loading model path: {full_model_path}")
-            checkpoint = torch.load(full_model_path, map_location=self.device)
-            model_dict = self.gaussian_model.state_dict()
-            pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict}
-            model_dict.update(pretrained_dict)
-            self.gaussian_model.load_state_dict(model_dict)
 
     def test_GV3D2D(self, gaussian_model, gt_image):
         gaussian_model.eval()
@@ -301,7 +292,7 @@ def main(argv):
         image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
         images_paths.append(image_path)
 
-    trainer = GaussianVideo3D2DTrainerQuantize(layer=args.layer, images_paths=images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name, model_path=args.model_path)
+    trainer = GaussianVideo3D2DTrainerQuantize(layer=args.layer, images_paths=images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name, log_dir=log_dir)
     
     data_dict = trainer.test()
     logwriter.write("Video: {}x{}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, bpp:{:.4f}, Eval time:{:.8f}s, FPS:{:.4f}, position_bpp:{:.4f}, cholesky_bpp:{:.4f}, feature_dc_bpp:{:.4f}".format(

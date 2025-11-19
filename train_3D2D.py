@@ -404,7 +404,7 @@ def main(argv):
         image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
         images_paths.append(image_path)
 
-    trainer = GaussianVideo3D2DTrainer(layer=args.layer, images_paths=images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name, log_dir=log_dir, quantize=args.quantize)
+    trainer = GaussianVideo3D2DTrainer(layer=args.layer, images_paths=images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name, log_dir=log_dir)
     psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
 
     logwriter.write("Average: {}x{} for layer {}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(

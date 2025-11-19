@@ -82,16 +82,16 @@ class GaussianVideo3D2D(nn.Module):
 
             self._ckpt_xyz_2D = checkpoint_layer1['_xyz_2D']
             H = len(self._ckpt_xyz_2D)
-            xyz = torch.zeros(H, 3, device=self.device, dtype=self._ckpt_xyz_2D.dtype)
+            xyz = torch.zeros(H, 3).to(self.device)
             xyz[:, :2] = self._ckpt_xyz_2D[:, :2]
             for t, (start, end) in enumerate(self.num_points_list):
                 val = 2.0 * ((t + 0.5) / max(self.T, 1)) - 1.0
                 val = max(min(val, 1.0 - 1e-6), -1.0 + 1e-6)
-                xyz[start:end, 2] = torch.atanh(torch.tensor(val, device=self.device, dtype=xyz.dtype))
+                xyz[start:end, 2] = torch.atanh(torch.tensor(val).to(self.device))
             self._xyz_2D = nn.Parameter(xyz)
 
             self._ckpt_cholesky_2D = checkpoint_layer1['_cholesky_2D']
-            chol = torch.rand(H, 6, device=self.device, dtype=self._ckpt_cholesky_2D.dtype)
+            chol = torch.rand(H, 6).to(self.device)
             for t, (start, end) in enumerate(self.num_points_list):
                 chol[start:end, 0] = self._ckpt_cholesky_2D[start:end, 0] # l11
                 chol[start:end, 1] = self._ckpt_cholesky_2D[start:end, 1] # l12
@@ -131,10 +131,10 @@ class GaussianVideo3D2D(nn.Module):
 
     def _init_layer0(self):
         self.init_num_points = int(self.num_points * self.T / 2)
-        self._xyz_3D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 3) - 0.5)))
-        self._cholesky_3D = nn.Parameter(torch.rand(self.init_num_points, 6))
-        self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
-        self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points, 3))
+        self._xyz_3D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 3) - 0.5))).to(self.device)
+        self._cholesky_3D = nn.Parameter(torch.rand(self.init_num_points, 6)).to(self.device)
+        self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1))).to(self.device)
+        self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points, 3)).to(self.device)
 
         self.layer = 0
         print("Layer 0 initialized, number of gaussians: ", self._xyz_3D.shape[0])
@@ -152,18 +152,18 @@ class GaussianVideo3D2D(nn.Module):
                 end = start + num_points_per_frame
             self.num_points_list.append((start, end))
 
-        self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 3) - 0.5)))
+        self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 3) - 0.5))).to(self.device)
         for t, (start, end) in enumerate(self.num_points_list):
             self._xyz_2D.data[start:end, 2] = torch.atanh(torch.tensor((2 * (t / self.T)) - 1.0)).item()
 
-        self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points, 6))
+        self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points, 6)).to(self.device)
         with torch.no_grad():
             self._cholesky_2D.data[:, 2] = 0 # l31
             self._cholesky_2D.data[:, 4] = 0 # l32
             self._cholesky_2D.data[:, 5] = 1 # l33
 
-        self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
-        self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points, 3))
+        self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1))).to(self.device)
+        self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points, 3)).to(self.device)
 
         self.layer = 1
         print("GaussianVideo3D2D: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])

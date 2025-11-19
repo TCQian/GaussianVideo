@@ -18,7 +18,6 @@ import torchvision.transforms as transforms
 from utils import images_paths_to_tensor
 from gaussianvideo3D2D import GaussianVideo3D2D
 from gaussianimage_cholesky import GaussianImage_Cholesky
-from train_3D2D import EarlyStopping
 
 class GaussianVideo3D2DTrainerQuantize:
     """Trains 3D and 2D gaussians layer by layer with quantization to fit a video."""
@@ -33,7 +32,6 @@ class GaussianVideo3D2DTrainerQuantize:
         start_frame: int = 0,
         log_dir: Path = None,
     ):
-
         self.early_stopping = EarlyStopping(patience=1000, min_delta=1e-10)
 
         self.device = torch.device("cuda:0")
@@ -66,9 +64,9 @@ class GaussianVideo3D2DTrainerQuantize:
                 num_points=self.num_points,
                 iterations=self.iterations,
                 lr=args.lr
-            ).to(self.device)
-
+            )
             self.gaussian_model._create_data_from_checkpoint(args.model_path_layer0, args.model_path_layer1)
+            self.gaussian_model.to(self.device)
 
         elif self.model_name == "GVGI":
             assert self.layer == 1, "GVGI is only able to process Layer 1 "
@@ -127,9 +125,6 @@ class GaussianVideo3D2DTrainerQuantize:
             else:
                 gaussian_model.debug_mode = False
 
-            if (iter % 1000 == 1 and iter > 1):
-                gaussian_model.prune(opac_threshold=0.05)
-
             loss, psnr = gaussian_model.train_iter_quantize(gt_image)
             
             if self.early_stopping(loss.item()):
@@ -140,7 +135,7 @@ class GaussianVideo3D2DTrainerQuantize:
             iter_list.append(iter)
             if psnr > best_psnr:
                 best_psnr = psnr
-                best_model_dict = copy.deepcopy(gaussian_model.get_state_dict())
+                best_model_dict = copy.deepcopy(gaussian_model.state_dict())
             if iter % 10 == 0:
                 progress_bar.set_postfix({
                     "Loss": f"{loss.item():.7f}",
@@ -152,7 +147,6 @@ class GaussianVideo3D2DTrainerQuantize:
         progress_bar.close()
         psnr_value, ms_ssim_value, bpp = self.test(best=False)
         gaussian_model.save_checkpoint(self.log_dir)
-        print(f"Number of gaussians at the end of training: {gaussian_model.get_xyz.shape[0]}")
         
         gaussian_model.load_state_dict(best_model_dict)
         best_psnr_value, best_ms_ssim_value, best_bpp = self.test(best=True)
@@ -193,9 +187,6 @@ class GaussianVideo3D2DTrainerQuantize:
                 gaussian_model.debug_mode = True
             else:
                 gaussian_model.debug_mode = False
-
-            if (iter % 1000 == 1 and iter > 1):
-                gaussian_model.prune(opac_threshold=0.05)
 
             loss, psnr = gaussian_model.train_iter_quantize(gt_image)
 

@@ -61,6 +61,11 @@ class GaussianVideo3D2D(nn.Module):
     def _create_data_from_checkpoint(self, checkpoint_path_layer0, checkpoint_path_layer1):
         if checkpoint_path_layer0 is not None:
             checkpoint_layer0 = torch.load(checkpoint_path_layer0, map_location=self.device)
+            if self.quantize:
+                self.cholesky_quantizer.load_state_dict(checkpoint_layer0['cholesky_quantizer'])
+                self.features_dc_quantizer.load_state_dict(checkpoint_layer0['features_dc_quantizer'])
+                self.xyz_quantizer.load_state_dict(checkpoint_layer0['xyz_quantizer'])
+                
             self._xyz_3D = checkpoint_layer0['_xyz_3D'].requires_grad_(False)
             self._cholesky_3D = checkpoint_layer0['_cholesky_3D'].requires_grad_(False)
             self._features_dc_3D = checkpoint_layer0['_features_dc_3D'].requires_grad_(False)
@@ -70,28 +75,33 @@ class GaussianVideo3D2D(nn.Module):
             if self.layer == 0:
                 self._init_layer0()
             elif self.layer == 1: # required in get func
-                self._xyz_3D = torch.zeros(0, 3).to(self.device).requires_grad_(False)
-                self._cholesky_3D = torch.zeros(0, 6).to(self.device).requires_grad_(False)
-                self._features_dc_3D = torch.zeros(0, 3).to(self.device).requires_grad_(False)
-                self._opacity_3D = torch.zeros(0, 1).to(self.device).requires_grad_(False)
+                self._xyz_3D = torch.zeros(0, 3).requires_grad_(False)
+                self._cholesky_3D = torch.zeros(0, 6).requires_grad_(False)
+                self._features_dc_3D = torch.zeros(0, 3).requires_grad_(False)
+                self._opacity_3D = torch.zeros(0, 1).requires_grad_(False)
                 print('GaussianVideo3D2D: Without layer 0 checkpoint, layer 1 will train with 0 3D gaussians')
             
         if checkpoint_path_layer1 is not None:
             checkpoint_layer1 = torch.load(checkpoint_path_layer1, map_location=self.device)
             self.num_points_list = checkpoint_layer1['gaussian_num_list']
 
+            if self.quantize:
+                self.cholesky_quantizer.load_state_dict(checkpoint_layer1['cholesky_quantizer'])
+                self.features_dc_quantizer.load_state_dict(checkpoint_layer1['features_dc_quantizer'])
+                self.xyz_quantizer.load_state_dict(checkpoint_layer1['xyz_quantizer'])
+
             self._ckpt_xyz_2D = checkpoint_layer1['_xyz_2D']
             H = len(self._ckpt_xyz_2D)
-            xyz = torch.zeros(H, 3).to(self.device)
+            xyz = torch.zeros(H, 3)
             xyz[:, :2] = self._ckpt_xyz_2D[:, :2]
             for t, (start, end) in enumerate(self.num_points_list):
                 val = 2.0 * ((t + 0.5) / max(self.T, 1)) - 1.0
                 val = max(min(val, 1.0 - 1e-6), -1.0 + 1e-6)
-                xyz[start:end, 2] = torch.atanh(torch.tensor(val).to(self.device))
+                xyz[start:end, 2] = torch.atanh(torch.tensor(val))
             self._xyz_2D = nn.Parameter(xyz)
 
             self._ckpt_cholesky_2D = checkpoint_layer1['_cholesky_2D']
-            chol = torch.rand(H, 6).to(self.device)
+            chol = torch.rand(H, 6)
             for t, (start, end) in enumerate(self.num_points_list):
                 chol[start:end, 0] = self._ckpt_cholesky_2D[start:end, 0] # l11
                 chol[start:end, 1] = self._ckpt_cholesky_2D[start:end, 1] # l12
@@ -187,15 +197,14 @@ class GaussianVideo3D2D(nn.Module):
                         # Freeze L13, L23, L33 elements (indices 2, 4, 5)
                         param.grad[:, [2, 4, 5]] = 0
                         param.grad[:, [2, 4, 5]].requires_grad_(False)
-
-    def get_state_dict(self):
+        
+    def save_checkpoint(self, path, best=False):
         if self.layer == 0:
             state = {
                 '_xyz_3D': self._xyz_3D.data,
                 '_cholesky_3D': self._cholesky_3D.data,
                 '_features_dc_3D': self._features_dc_3D.data,
                 '_opacity_3D': self._opacity_3D.data,
-                'layer': self.layer
             }
         elif self.layer == 1:
             state = {
@@ -206,10 +215,12 @@ class GaussianVideo3D2D(nn.Module):
                 '_opacity_3D': self._opacity_3D.data,
                 'gaussian_num_list': self.num_points_list,
             }
-        return state
-        
-    def save_checkpoint(self, path, best=False):
-        state = self.get_state_dict()
+
+        if self.quantize:
+            state['cholesky_quantizer'] = self.cholesky_quantizer.state_dict()
+            state['features_dc_quantizer'] = self.features_dc_quantizer.state_dict()
+            state['xyz_quantizer'] = self.xyz_quantizer.state_dict()
+
         if best:
             torch.save(state, path / f"layer_{self.layer}_model.best.pth.tar")
         else:

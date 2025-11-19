@@ -85,9 +85,9 @@ class GaussianVideo3D2DTrainer:
                 num_points=self.num_points,
                 iterations=self.iterations,
                 lr=args.lr
-            ).to(self.device)
-
+            )
             self.gaussian_model._create_data_from_checkpoint(args.model_path_layer0, args.model_path_layer1)
+            self.gaussian_model.to(self.device)
 
         elif self.model_name == "GVGI":
             assert self.layer == 1, "GVGI is only able to process Layer 1 "

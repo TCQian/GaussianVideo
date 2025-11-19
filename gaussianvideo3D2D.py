@@ -136,6 +136,9 @@ class GaussianVideo3D2D(nn.Module):
         self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points, 3))
 
+        if self.quantize:
+            self.cholesky_quantizer._init_data(self._cholesky_3D)
+
         self.layer = 0
         print("Layer 0 initialized, number of gaussians: ", self._xyz_3D.shape[0])
 
@@ -165,6 +168,9 @@ class GaussianVideo3D2D(nn.Module):
         self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points, 3))
 
+        if self.quantize:
+            self.cholesky_quantizer._init_data(self._cholesky_2D)
+            
         self.layer = 1
         print("GaussianVideo3D2D: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])
 

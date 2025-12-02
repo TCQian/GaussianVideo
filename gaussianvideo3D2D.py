@@ -61,10 +61,9 @@ class GaussianVideo3D2D(nn.Module):
     def _create_data_from_checkpoint(self, checkpoint_path_layer0, checkpoint_path_layer1):
         if checkpoint_path_layer0 is not None:
             checkpoint_layer0 = torch.load(checkpoint_path_layer0, map_location=self.device)
-            if self.quantize:
+            if self.quantize and 'cholesky_quantizer' in checkpoint_layer0.keys():
                 self.cholesky_quantizer.load_state_dict(checkpoint_layer0['cholesky_quantizer'])
                 self.features_dc_quantizer.load_state_dict(checkpoint_layer0['features_dc_quantizer'])
-                self.xyz_quantizer.load_state_dict(checkpoint_layer0['xyz_quantizer'])
                 
             self._xyz_3D = checkpoint_layer0['_xyz_3D'].requires_grad_(False)
             self._cholesky_3D = checkpoint_layer0['_cholesky_3D'].requires_grad_(False)
@@ -85,10 +84,9 @@ class GaussianVideo3D2D(nn.Module):
             checkpoint_layer1 = torch.load(checkpoint_path_layer1, map_location=self.device)
             self.num_points_list = checkpoint_layer1['gaussian_num_list']
 
-            if self.quantize:
+            if self.quantize and 'cholesky_quantizer' in checkpoint_layer1.keys():
                 self.cholesky_quantizer.load_state_dict(checkpoint_layer1['cholesky_quantizer'])
                 self.features_dc_quantizer.load_state_dict(checkpoint_layer1['features_dc_quantizer'])
-                self.xyz_quantizer.load_state_dict(checkpoint_layer1['xyz_quantizer'])
 
             self._ckpt_xyz_2D = checkpoint_layer1['_xyz_2D']
             H = len(self._ckpt_xyz_2D)
@@ -219,7 +217,6 @@ class GaussianVideo3D2D(nn.Module):
         if self.quantize:
             state['cholesky_quantizer'] = self.cholesky_quantizer.state_dict()
             state['features_dc_quantizer'] = self.features_dc_quantizer.state_dict()
-            state['xyz_quantizer'] = self.xyz_quantizer.state_dict()
 
         if best:
             torch.save(state, path / f"layer_{self.layer}_model.best.pth.tar")
@@ -354,7 +351,8 @@ class GaussianVideo3D2D(nn.Module):
         return loss, psnr
 
     def forward_quantize(self):
-        self.l_vqm, self.m_bit = 0, 16 * self.get_xyz.shape[0] * 3
+        num_points = self.get_layer_xyz().shape[0]
+        self.l_vqm, self.m_bit = 0, 16 * num_points * 3
         self.l_vqr, self.r_bit = 0, 0 
         
         output = self.forward()

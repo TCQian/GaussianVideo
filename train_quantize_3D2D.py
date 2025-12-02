@@ -18,7 +18,7 @@ import torchvision.transforms as transforms
 from utils import images_paths_to_tensor
 from gaussianvideo3D2D import GaussianVideo3D2D
 from gaussianimage_cholesky import GaussianImage_Cholesky
-
+from train_3D2D import EarlyStopping
 class GaussianVideo3D2DTrainerQuantize:
     """Trains 3D and 2D gaussians layer by layer with quantization to fit a video."""
     def __init__(

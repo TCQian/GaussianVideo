@@ -131,6 +131,11 @@ class GaussianVideo3D2D(nn.Module):
             self.trainable_params.append(self._features_dc_2D)
             self.trainable_params.append(self._opacity_2D)
 
+        if self.quantize:
+            if hasattr(self.cholesky_quantizer, 'scale') and hasattr(self.cholesky_quantizer, 'beta'):
+                self.trainable_params.append(self.cholesky_quantizer.scale)
+                self.trainable_params.append(self.cholesky_quantizer.beta)
+
         if self.opt_type == "adam":
             self.optimizer = torch.optim.Adam(self.trainable_params, lr=self.lr)
         else:
@@ -234,8 +239,8 @@ class GaussianVideo3D2D(nn.Module):
     @property
     def get_xyz(self):
         xyz = self.get_layer_xyz()
-        # if self.quantize:
-        #     xyz = self.xyz_quantizer(xyz)
+        if self.quantize:
+            xyz = self.xyz_quantizer(xyz)
         return torch.tanh(xyz)
 
     def get_layer_features(self):
@@ -248,8 +253,8 @@ class GaussianVideo3D2D(nn.Module):
     @property
     def get_features(self):
         feature_dc = self.get_layer_features()
-        # if self.quantize: 
-        #     feature_dc, self.l_vqc, self.c_bit = self.features_dc_quantizer(feature_dc)
+        if self.quantize: 
+            feature_dc, self.l_vqc, self.c_bit = self.features_dc_quantizer(feature_dc)
         return feature_dc
 
     @property
@@ -276,9 +281,6 @@ class GaussianVideo3D2D(nn.Module):
         cholesky, cholesky_bound = self.get_layer_cholesky()
         if self.quantize:
             cholesky, self.l_vqs, self.s_bit = self.cholesky_quantizer(cholesky)
-
-        if self.debug_mode:
-            print(f"cholesky: {cholesky[:10]}, self.l_vqs: {self.l_vqs}, self.s_bit: {self.s_bit}")
         return cholesky + cholesky_bound
     
     def prune(self, opac_threshold=0.2):
@@ -359,9 +361,9 @@ class GaussianVideo3D2D(nn.Module):
         self.l_vqr, self.r_bit = 0, 0 
         
         output = self.forward()
-        vq_loss = self.l_vqs #self.l_vqm + self.l_vqs + self.l_vqr + self.l_vqc
+        vq_loss = self.l_vqm + self.l_vqs + self.l_vqr + self.l_vqc
 
-        return {"render": output['render'], "vq_loss": vq_loss, "unit_bit": [self.s_bit]} #[self.m_bit, self.s_bit, self.r_bit, self.c_bit]}
+        return {"render": output['render'], "vq_loss": vq_loss, "unit_bit": [self.m_bit, self.s_bit, self.r_bit, self.c_bit]}
 
 
     def train_iter_quantize(self, gt_video):

@@ -53,7 +53,6 @@ class UniformQuantizer(nn.Module):
             grad = 1.0 / ((self.qmax * x.numel()) ** 0.5)
             s_scale = grad_scale(self.scale, grad)
             beta_scale = grad_scale(self.beta, grad)
-            s_scale, beta_scale = self.scale, self.beta
             code = ((x - beta_scale) / s_scale).clamp(self.qmin, self.qmax)
             quant = ste(code)
             dequant = quant * s_scale + beta_scale

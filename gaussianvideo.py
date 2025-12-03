@@ -172,7 +172,7 @@ class GaussianVideo(nn.Module):
         # Rasterize the projected Gaussians into a video volume.
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,
-            colors, self._opacity, self.H, self.W, self.T,
+            colors, self.get_opacity, self.H, self.W, self.T,
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )
@@ -268,7 +268,7 @@ class GaussianVideo(nn.Module):
         # Rasterize the projected Gaussians to obtain the rendered video
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,
-            colors, self._opacity, self.H, self.W, self.T,
+            colors, self.get_opacity, self.H, self.W, self.T,
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )

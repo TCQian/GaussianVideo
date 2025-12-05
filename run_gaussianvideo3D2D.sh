@@ -66,43 +66,43 @@ CHECKPOINT_QUANT_PATH_LAYER1_GV3D2D="${CHECKPOINT_DIR_PATH_QUANT}/layer1/GV3D2D_
 CHECKPOINT_QUANT_PATH_LAYER1_GVGI="${CHECKPOINT_DIR_PATH_QUANT}/layer1/GVGI_i${TRAIN_ITERATIONS}_g${NUM_POINTS}/"
 
 # Run the training script with the required arguments.
-# python train_3D2D.py \
-#     --layer 0 \
-#     --dataset "${DATASET_PATH}" \
-#     --data_name "${DATA_NAME}" \
-#     --start_frame "${START_FRAME}" \
-#     --num_frames "${NUM_FRAMES}" \
-#     --model_name "GV3D2D" \
-#     --iterations "${TRAIN_ITERATIONS}" \
-#     --num_points "${NUM_POINTS}" \
-#     --lr "${LEARNING_RATE}" \
-#     --save_imgs
+python train_3D2D.py \
+    --layer 0 \
+    --dataset "${DATASET_PATH}" \
+    --data_name "${DATA_NAME}" \
+    --start_frame "${START_FRAME}" \
+    --num_frames "${NUM_FRAMES}" \
+    --model_name "GV3D2D" \
+    --iterations "${TRAIN_ITERATIONS}" \
+    --num_points "${NUM_POINTS}" \
+    --lr "${LEARNING_RATE}" \
+    --save_imgs
 
-# python train_3D2D.py \
-#     --layer 1 \
-#     --dataset "${DATASET_PATH}" \
-#     --data_name "${DATA_NAME}" \
-#     --start_frame "${START_FRAME}" \
-#     --num_frames "${NUM_FRAMES}" \
-#     --model_name "GV3D2D" \
-#     --iterations "${TRAIN_ITERATIONS}" \
-#     --num_points "${NUM_POINTS}" \
-#     --lr "${LEARNING_RATE}" \
-#     --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
-#     --save_imgs
+python train_3D2D.py \
+    --layer 1 \
+    --dataset "${DATASET_PATH}" \
+    --data_name "${DATA_NAME}" \
+    --start_frame "${START_FRAME}" \
+    --num_frames "${NUM_FRAMES}" \
+    --model_name "GV3D2D" \
+    --iterations "${TRAIN_ITERATIONS}" \
+    --num_points "${NUM_POINTS}" \
+    --lr "${LEARNING_RATE}" \
+    --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
+    --save_imgs
 
-# python train_3D2D.py \
-#     --layer 1 \
-#     --dataset "${DATASET_PATH}" \
-#     --data_name "${DATA_NAME}" \
-#     --start_frame "${START_FRAME}" \
-#     --num_frames "${NUM_FRAMES}" \
-#     --model_name "GVGI" \
-#     --iterations "${TRAIN_ITERATIONS}" \
-#     --num_points "${NUM_POINTS}" \
-#     --lr "${LEARNING_RATE}" \
-#     --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
-#     --save_imgs
+python train_3D2D.py \
+    --layer 1 \
+    --dataset "${DATASET_PATH}" \
+    --data_name "${DATA_NAME}" \
+    --start_frame "${START_FRAME}" \
+    --num_frames "${NUM_FRAMES}" \
+    --model_name "GVGI" \
+    --iterations "${TRAIN_ITERATIONS}" \
+    --num_points "${NUM_POINTS}" \
+    --lr "${LEARNING_RATE}" \
+    --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
+    --save_imgs
 
 # Run the quantization training script.
 python train_quantize_3D2D.py \

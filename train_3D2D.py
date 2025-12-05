@@ -54,7 +54,8 @@ class GaussianVideo3D2DTrainer:
         log_dir: Path = None,
     ):
 
-        self.early_stopping = EarlyStopping(patience=1000, min_delta=1e-10)
+        self.early_stopping_patience = 1000
+        self.early_stopping_min_delta = 1e-10
 
         self.layer = layer
         self.video_name = video_name
@@ -127,7 +128,11 @@ class GaussianVideo3D2DTrainer:
                 ).to(self.device)
 
                 if args.model_path_layer1:
-                    gaussian_model.load_state_dict(checkpoint)
+                    model_dict = gaussian_model.state_dict()
+                    pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict}
+                    model_dict.update(pretrained_dict)
+                    gaussian_model.load_state_dict(model_dict)
+                    gaussian_model._init_data()
                     print(f"Loaded checkpoint from: {checkpoint_file_path}")
 
                 self.gaussian_model_list.append(gaussian_model)
@@ -139,6 +144,8 @@ class GaussianVideo3D2DTrainer:
         progress_bar = tqdm(range(1, self.iterations+1), desc="Training progress")
         best_psnr = 0
         gaussian_model.train()
+        self.early_stopping = EarlyStopping(patience=self.early_stopping_patience, min_delta=self.early_stopping_min_delta)
+        
         start_time = time.time()
         for iter in range(1, self.iterations+1):
             if iter == 1 or iter % 1000 == 0:
@@ -184,6 +191,8 @@ class GaussianVideo3D2DTrainer:
         progress_bar = tqdm(range(1, self.iterations+1), desc="Training progress")
         best_psnr = 0
         gaussian_model.train()
+        self.early_stopping = EarlyStopping(patience=self.early_stopping_patience, min_delta=self.early_stopping_min_delta)
+
         start_time = time.time()
         for iter in range(1, self.iterations+1):
             if iter == 1 or iter % 1000 == 0:
@@ -209,7 +218,7 @@ class GaussianVideo3D2DTrainer:
         print(f"Number of gaussians at the end of training: {gaussian_model.get_xyz.shape[0]}")
         end_time = time.time() - start_time
         progress_bar.close()
-        psnr_value, ms_ssim_value = self.test()
+        psnr_value, ms_ssim_value = self.test_GVGI(gaussian_model, gt_image, t)
         with torch.no_grad():
             gaussian_model.eval()
             test_start_time = time.time()

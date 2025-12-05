@@ -53,6 +53,25 @@ class GaussianVideo3D2DTrainerQuantize:
         self.save_imgs = args.save_imgs
         self.log_dir = log_dir
 
+        self.gaussian_model_layer0 = GaussianVideo3D2D(
+                layer=0,
+                loss_type="L2", 
+                opt_type="adan", 
+                H=self.H, 
+                W=self.W, 
+                T=self.T, 
+                BLOCK_H=BLOCK_H, 
+                BLOCK_W=BLOCK_W, 
+                BLOCK_T=BLOCK_T, 
+                device=self.device, 
+                quantize=True,
+                num_points=self.num_points,
+                iterations=self.iterations,
+                lr=args.lr
+            )
+        self.gaussian_model_layer0._create_data_from_checkpoint(args.model_path_layer0, None)
+        self.gaussian_model_layer0.to(self.device)
+
         if self.model_name == "GV3D2D":
             self.gaussian_model = GaussianVideo3D2D(
                 layer=self.layer,
@@ -74,26 +93,6 @@ class GaussianVideo3D2DTrainerQuantize:
             self.gaussian_model.to(self.device)
 
         if self.model_name == "GVGI":
-
-            self.gaussian_model = GaussianVideo3D2D(
-                layer=0,
-                loss_type="L2", 
-                opt_type="adan", 
-                H=self.H, 
-                W=self.W, 
-                T=self.T, 
-                BLOCK_H=BLOCK_H, 
-                BLOCK_W=BLOCK_W, 
-                BLOCK_T=BLOCK_T, 
-                device=self.device, 
-                quantize=True,
-                num_points=self.num_points,
-                iterations=self.iterations,
-                lr=args.lr
-            )
-            self.gaussian_model._create_data_from_checkpoint(args.model_path_layer0, None)
-            self.gaussian_model.to(self.device)
-
             assert self.layer == 1, "GVGI is only able to process Layer 1 "
             checkpoint_layer0 = torch.load(args.model_path_layer0, map_location=self.device)
             self.init_num_points_layer1 = int((self.num_points * self.T) - checkpoint_layer0['_xyz_3D'].shape[0])
@@ -113,7 +112,7 @@ class GaussianVideo3D2DTrainerQuantize:
                     else:
                         num_points = num_points_per_frame
 
-                background_path = Path(f"{args.model_path_layer0.replace('layer_0_model.pth.tar', '')}/{self.video_name}_fitting_t{t}_layer0.png")
+                background_path = Path(f"{args.model_path_layer0.replace('layer_0_model.best.pth.tar', '')}/{self.video_name}_fitting_t{t}_layer0_codec_best.png")
                 background_img = image_path_to_tensor(background_path).squeeze(0).permute(1, 2, 0).to(self.device)
                 gaussian_model = GaussianImage_Cholesky(
                     background_image=background_img,
@@ -141,16 +140,13 @@ class GaussianVideo3D2DTrainerQuantize:
     def test_GV3D2D(self, gaussian_model, gt_image, layer=0):
         gaussian_model.eval()
         with torch.no_grad():
-            encoding_dicts = []
-            for layer_i in range(layer+1):
-                encoding_dict = gaussian_model.compress_wo_ec(layer=layer_i)
-                encoding_dicts.append(encoding_dict)
-            out = gaussian_model.decompress_wo_ec(encoding_dicts)
+            encoding_dict = gaussian_model.compress_wo_ec()
+            out = gaussian_model.decompress_wo_ec(encoding_dict)
             start_time = time.time()
             for i in range(100):
-                _ = gaussian_model.decompress_wo_ec(encoding_dicts)
+                _ = gaussian_model.decompress_wo_ec(encoding_dict)
             end_time = (time.time() - start_time) / 100
-        data_dict = gaussian_model.analysis_wo_ec(encoding_dicts)
+        data_dict = gaussian_model.analysis_wo_ec(encoding_dict)
 
         out_video = out["render"].float()  # Expected shape: [1, C, H, W, T]
         mse_loss = F.mse_loss(out_video, gt_image)
@@ -170,10 +166,10 @@ class GaussianVideo3D2DTrainerQuantize:
         data_dict["rendering_fps"] = 1 / end_time
 
         np.save(self.log_dir / f"test_layer_{layer}.npy", data_dict)
-        self.logwriter.write("Eval time:{:.8f}s, FPS:{:.4f}".format(end_time, 1 / end_time))
-        self.logwriter.write("PSNR:{:.4f}, MS_SSIM:{:.6f}, bpp:{:.4f}".format(psnr, ms_ssim_value, data_dict["bpp"]))
-        self.logwriter.write("position_bpp:{:.4f}, cholesky_bpp:{:.4f}, feature_dc_bpp:{:.4f}".format(
-            data_dict["position_bpp"], data_dict["cholesky_bpp"], data_dict["feature_dc_bpp"]))
+        self.logwriter.write("Layer {}: Eval time:{:.8f}s, FPS:{:.4f}".format(layer, end_time, 1 / end_time))
+        self.logwriter.write("Layer {}: PSNR:{:.4f}, MS_SSIM:{:.6f}, bpp:{:.4f}".format(layer, psnr, ms_ssim_value, data_dict["bpp"]))
+        self.logwriter.write("Layer {}: position_bpp:{:.4f}, cholesky_bpp:{:.4f}, feature_dc_bpp:{:.4f}".format(
+            layer, data_dict["position_bpp"], data_dict["cholesky_bpp"], data_dict["feature_dc_bpp"]))
         return data_dict
 
     def test_GVGI(self, gaussian_model, gt_image, t=0):
@@ -197,13 +193,13 @@ class GaussianVideo3D2DTrainerQuantize:
         data_dict["rendering_time"] = end_time
         data_dict["rendering_fps"] = 1/end_time
         np.save(self.log_dir / f"test_layer_{self.layer}.npy", data_dict)
-        self.logwriter.write("Eval time:{:.8f}s, FPS:{:.4f}".format(end_time, 1/end_time))
-        self.logwriter.write("PSNR:{:.4f}, MS_SSIM:{:.6f}, bpp:{:.4f}".format(psnr, ms_ssim_value, data_dict["bpp"]))
-        self.logwriter.write("position_bpp:{:.4f}, cholesky_bpp:{:.4f}, feature_dc_bpp:{:.4f}".format(data_dict["position_bpp"], data_dict["cholesky_bpp"], data_dict["feature_dc_bpp"]))
+        self.logwriter.write("Layer 1:Eval time:{:.8f}s, FPS:{:.4f}".format(end_time, 1/end_time))
+        self.logwriter.write("Layer 1: PSNR:{:.4f}, MS_SSIM:{:.6f}, bpp:{:.4f}".format(psnr, ms_ssim_value, data_dict["bpp"]))
+        self.logwriter.write("Layer 1: position_bpp:{:.4f}, cholesky_bpp:{:.4f}, feature_dc_bpp:{:.4f}".format(data_dict["position_bpp"], data_dict["cholesky_bpp"], data_dict["feature_dc_bpp"]))
         return data_dict
 
     def test(self):
-        data_dict = self.test_GV3D2D(self.gaussian_model, self.gt_video, layer=0)
+        data_dict = self.test_GV3D2D(self.gaussian_model_layer0, self.gt_video, layer=0)
 
         if self.model_name == "GV3D2D":
             data_dict_layer1 = self.test_GV3D2D(self.gaussian_model, self.gt_video, layer=1)
@@ -220,6 +216,7 @@ class GaussianVideo3D2DTrainerQuantize:
             ms_ssim_list = []
             rendering_time_list = []
             rendering_fps_list = []
+            bpp_list = []
             position_bpp_list = []
             cholesky_bpp_list = []
             feature_dc_bpp_list = []
@@ -229,6 +226,7 @@ class GaussianVideo3D2DTrainerQuantize:
                 ms_ssim_list.append(data_dict_layer1["ms-ssim"])
                 rendering_time_list.append(data_dict_layer1["rendering_time"])
                 rendering_fps_list.append(data_dict_layer1["rendering_fps"])
+                bpp_list.append(data_dict_layer1["bpp"])
                 position_bpp_list.append(data_dict_layer1["position_bpp"])
                 cholesky_bpp_list.append(data_dict_layer1["cholesky_bpp"])
                 feature_dc_bpp_list.append(data_dict_layer1["feature_dc_bpp"])
@@ -237,6 +235,7 @@ class GaussianVideo3D2DTrainerQuantize:
             data_dict["ms-ssim_layer1"] = sum(ms_ssim_list) / len(ms_ssim_list)
             data_dict["rendering_time_layer1"] = (sum(rendering_time_list) / len(rendering_time_list)) + data_dict["rendering_time"]
             data_dict["rendering_fps_layer1"] = 1 / data_dict["rendering_time_layer1"]
+            data_dict["bpp_layer1"] = (sum(bpp_list) / len(bpp_list)) + data_dict["bpp"]
             data_dict["position_bpp_layer1"] = (sum(position_bpp_list) / len(position_bpp_list)) + data_dict["position_bpp"]
             data_dict["cholesky_bpp_layer1"] = (sum(cholesky_bpp_list) / len(cholesky_bpp_list)) + data_dict["cholesky_bpp"]
             data_dict["feature_dc_bpp_layer1"] = (sum(feature_dc_bpp_list) / len(feature_dc_bpp_list)) + data_dict["feature_dc_bpp"]
@@ -318,7 +317,7 @@ def main(argv):
     if args.layer == 1:
         log_dir = log_dir / (f"{args.model_name}_i{args.iterations}_g{args.num_points}/")
     
-    logwriter = LogWriter(log_dir)
+    logwriter = LogWriter(log_dir, train=False)
 
     images_paths = []
     for i in range(args.start_frame, args.start_frame + args.num_frames):
@@ -328,11 +327,18 @@ def main(argv):
     trainer = GaussianVideo3D2DTrainerQuantize(layer=args.layer, images_paths=images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name, log_dir=log_dir)
     
     data_dict = trainer.test()
+    logwriter.write(f"Layer 0: {args.model_name}")
     logwriter.write("Video: {}x{}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, bpp:{:.4f}, Eval time:{:.8f}s, FPS:{:.4f}, position_bpp:{:.4f}, cholesky_bpp:{:.4f}, feature_dc_bpp:{:.4f}".format(
         trainer.H, trainer.W, trainer.T, data_dict["psnr"], data_dict["ms-ssim"], data_dict["bpp"],
         data_dict["rendering_time"], data_dict["rendering_fps"],
         data_dict["position_bpp"], data_dict["cholesky_bpp"], data_dict["feature_dc_bpp"]
     ))
-    
+
+    logwriter.write(f"Layer 1: {args.model_name}")
+    logwriter.write("Video: {}x{}x{}, PSNR:{:.4f}, MS-SSIM:{:.4f}, bpp:{:.4f}, Eval time:{:.8f}s, FPS:{:.4f}, position_bpp:{:.4f}, cholesky_bpp:{:.4f}, feature_dc_bpp:{:.4f}".format(
+        trainer.H, trainer.W, trainer.T, data_dict["psnr_layer1"], data_dict["ms-ssim_layer1"], data_dict["bpp_layer1"],
+        data_dict["rendering_time_layer1"], data_dict["rendering_fps_layer1"],
+        data_dict["position_bpp_layer1"], data_dict["cholesky_bpp_layer1"], data_dict["feature_dc_bpp_layer1"]
+    ))
 if __name__ == "__main__":
     main(sys.argv[1:])

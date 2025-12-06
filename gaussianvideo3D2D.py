@@ -439,11 +439,10 @@ class GaussianVideo3D2D(nn.Module):
         _, feature_dc_index_encoded = self.features_dc_quantizer_layer0.compress(self._features_dc_3D)
         quant_cholesky_elements_encoded, _ = self.cholesky_quantizer_layer0.compress(self._cholesky_3D)
 
-        decoded_xyz = self.xyz_quantizer.decompress(encoded_xyz)
         decoded_feature_dc_index = self.features_dc_quantizer_layer0.decompress(feature_dc_index_encoded)
         decoded_quant_cholesky_elements = self.cholesky_quantizer_layer0.decompress(quant_cholesky_elements_encoded)
 
-        self.decoded_xyz_layer0 = torch.tanh(decoded_xyz.float())
+        self.decoded_xyz_layer0 = torch.tanh(encoded_xyz.float())
         self.decoded_feature_dc_index_layer0 = decoded_feature_dc_index
         self.decoded_quant_cholesky_elements_layer0 = decoded_quant_cholesky_elements + self.cholesky_bound_3D
     

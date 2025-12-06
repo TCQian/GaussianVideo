@@ -165,9 +165,9 @@ class GaussianVideo3D2DTrainerQuantize:
             for i in range(100):
                 _ = gaussian_model.forward_quantize()
             test_end_time = (time.time() - test_start_time) / 100
-
+        FPS = self.T/test_end_time
         self.logwriter.write("Training Complete in {:.4f}s, Eval time:{:.8f}s, FPS:{:.4f}"
-                             .format(end_time, test_end_time, 1/test_end_time))
+                             .format(end_time, test_end_time, FPS))
         np.save(self.log_dir / f"training_layer_{gaussian_model.layer}.npy", {
             "iterations": iter_list,
             "training_psnr": psnr_list,
@@ -175,13 +175,13 @@ class GaussianVideo3D2DTrainerQuantize:
             "psnr": psnr_value,
             "ms-ssim": ms_ssim_value,
             "rendering_time": test_end_time,
-            "rendering_fps": 1/test_end_time,
+            "rendering_fps": FPS,
             "bpp": bpp,
             "best_psnr": best_psnr_value,
             "best_ms-ssim": best_ms_ssim_value,
             "best_bpp": best_bpp
         })
-        return psnr_value, ms_ssim_value, end_time, test_end_time, 1/test_end_time, bpp, best_psnr_value, best_ms_ssim_value, best_bpp
+        return psnr_value, ms_ssim_value, end_time, test_end_time, FPS, bpp, best_psnr_value, best_ms_ssim_value, best_bpp
 
     def train_GVGI(self, gaussian_model, gt_image, t=0):     
         psnr_list, iter_list = [], []

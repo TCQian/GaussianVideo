@@ -140,6 +140,8 @@ class GaussianVideo3D2DTrainerQuantize:
     def test_GV3D2D(self, gaussian_model, gt_image, layer=0):
         gaussian_model.eval()
         with torch.no_grad():
+            if layer == 1:
+                gaussian_model.create_en_decoded_layer0() 
             encoding_dict = gaussian_model.compress_wo_ec()
             out = gaussian_model.decompress_wo_ec(encoding_dict)
             start_time = time.time()
@@ -159,14 +161,14 @@ class GaussianVideo3D2DTrainerQuantize:
             frame_gt = gt_image[..., t]  # shape: [1, C, H, W]
             ms_ssim_total += ms_ssim(frame_pred, frame_gt, data_range=1, size_average=True).item()
         ms_ssim_value = ms_ssim_total / T
-
+        FPS = self.T/end_time
         data_dict["psnr"] = psnr
         data_dict["ms-ssim"] = ms_ssim_value
         data_dict["rendering_time"] = end_time
-        data_dict["rendering_fps"] = 1 / end_time
+        data_dict["rendering_fps"] = FPS
 
         np.save(self.log_dir / f"test_layer_{layer}.npy", data_dict)
-        self.logwriter.write("Layer {}: Eval time:{:.8f}s, FPS:{:.4f}".format(layer, end_time, 1 / end_time))
+        self.logwriter.write("Layer {}: Eval time:{:.8f}s, FPS:{:.4f}".format(layer, end_time, FPS))
         self.logwriter.write("Layer {}: PSNR:{:.4f}, MS_SSIM:{:.6f}, bpp:{:.4f}".format(layer, psnr, ms_ssim_value, data_dict["bpp"]))
         self.logwriter.write("Layer {}: position_bpp:{:.4f}, cholesky_bpp:{:.4f}, feature_dc_bpp:{:.4f}".format(
             layer, data_dict["position_bpp"], data_dict["cholesky_bpp"], data_dict["feature_dc_bpp"]))
@@ -233,12 +235,12 @@ class GaussianVideo3D2DTrainerQuantize:
 
             data_dict["psnr_layer1"] = sum(psnr_list) / len(psnr_list)
             data_dict["ms-ssim_layer1"] = sum(ms_ssim_list) / len(ms_ssim_list)
-            data_dict["rendering_time_layer1"] = (sum(rendering_time_list) / len(rendering_time_list)) + data_dict["rendering_time"]
-            data_dict["rendering_fps_layer1"] = 1 / data_dict["rendering_time_layer1"]
-            data_dict["bpp_layer1"] = (sum(bpp_list) / len(bpp_list)) + data_dict["bpp"]
-            data_dict["position_bpp_layer1"] = (sum(position_bpp_list) / len(position_bpp_list)) + data_dict["position_bpp"]
-            data_dict["cholesky_bpp_layer1"] = (sum(cholesky_bpp_list) / len(cholesky_bpp_list)) + data_dict["cholesky_bpp"]
-            data_dict["feature_dc_bpp_layer1"] = (sum(feature_dc_bpp_list) / len(feature_dc_bpp_list)) + data_dict["feature_dc_bpp"]
+            data_dict["rendering_time_layer1"] = sum(rendering_time_list) / len(rendering_time_list)
+            data_dict["rendering_fps_layer1"] = sum(rendering_fps_list) / len(rendering_fps_list)
+            data_dict["bpp_layer1"] = sum(bpp_list) / len(bpp_list)
+            data_dict["position_bpp_layer1"] = sum(position_bpp_list) / len(position_bpp_list)
+            data_dict["cholesky_bpp_layer1"] = sum(cholesky_bpp_list) / len(cholesky_bpp_list)
+            data_dict["feature_dc_bpp_layer1"] = sum(feature_dc_bpp_list) / len(feature_dc_bpp_list)
         
         return data_dict
 

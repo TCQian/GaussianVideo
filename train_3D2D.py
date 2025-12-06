@@ -178,13 +178,13 @@ class GaussianVideo3D2DTrainer:
             for i in range(100):
                 _ = gaussian_model()
             test_end_time = (time.time() - test_start_time)/100
-
-        self.logwriter.write("Training Complete in {:.4f}s, Eval time:{:.8f}s, FPS:{:.4f}".format(end_time, test_end_time, 1/test_end_time))
+        FPS = self.T/test_end_time
+        self.logwriter.write("Training Complete in {:.4f}s, Eval time:{:.8f}s, FPS:{:.4f}".format(end_time, test_end_time, FPS))
         gaussian_model.save_checkpoint(self.log_dir)
         np.save(self.log_dir / f"training_layer_{gaussian_model.layer}.npy", {"iterations": iter_list, "training_psnr": psnr_list, "training_time": end_time, 
-        "psnr": psnr_value, "ms-ssim": ms_ssim_value, "rendering_time": test_end_time, "rendering_fps": 1/test_end_time})
+            "psnr": psnr_value, "ms-ssim": ms_ssim_value, "rendering_time": test_end_time, "rendering_fps": FPS})
         
-        return psnr_value, ms_ssim_value, end_time, test_end_time, 1/test_end_time
+        return psnr_value, ms_ssim_value, end_time, test_end_time, FPS
 
     def train_GVGI(self, gaussian_model, gt_image, t=0):     
         psnr_list, iter_list = [], []

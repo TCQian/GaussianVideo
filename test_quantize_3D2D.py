@@ -74,7 +74,7 @@ class GaussianVideo3D2DTrainerQuantize:
 
         if self.model_name == "GV3D2D":
             self.gaussian_model = GaussianVideo3D2D(
-                layer=self.layer,
+                layer=1,
                 loss_type="L2", 
                 opt_type="adan", 
                 H=self.H, 
@@ -91,6 +91,7 @@ class GaussianVideo3D2DTrainerQuantize:
             )
             self.gaussian_model._create_data_from_checkpoint(args.model_path_layer0, args.model_path_layer1)
             self.gaussian_model.to(self.device)
+            self.gaussian_model.create_en_decoded_layer0() # initialize decoded layer 0 for layer 1 training
 
         if self.model_name == "GVGI":
             assert self.layer == 1, "GVGI is only able to process Layer 1 "

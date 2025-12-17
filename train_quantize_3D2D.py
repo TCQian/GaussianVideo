@@ -69,6 +69,10 @@ class GaussianVideo3D2DTrainerQuantize:
             self.gaussian_model._create_data_from_checkpoint(args.model_path_layer0, args.model_path_layer1)
             self.gaussian_model.to(self.device)
 
+            if self.layer == 1:
+                # ensure training of layer 1 is based on the decoded layer 0 
+                self.gaussian_model.create_en_decoded_layer0() # initialize decoded layer 0 
+
         elif self.model_name == "GVGI":
             assert self.layer == 1, "GVGI is only able to process Layer 1 "
             checkpoint_layer0 = torch.load(args.model_path_layer0, map_location=self.device)

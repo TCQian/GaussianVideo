@@ -55,17 +55,18 @@ class GaussianVideo3D2D(nn.Module):
 
         if self.quantize:
             self.xyz_quantizer = FakeQuantizationHalf.apply 
-            self.features_dc_quantizer_layer0 = None
-            self.features_dc_quantizer_layer1 = None
-            self.cholesky_quantizer_layer0 = None
-            self.cholesky_quantizer_layer1 = None
+            self.features_dc_quantizer_layer0 = VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5) 
+            self.features_dc_quantizer_layer1 = VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5) if self.layer == 1 else None
+            self.cholesky_quantizer_layer0 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=6)
+            self.cholesky_quantizer_layer1 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=6) if self.layer == 1 else None
             self.decoded_xyz_layer0 = None
             self.decoded_feature_dc_index_layer0 = None
             self.decoded_quant_cholesky_elements_layer0 = None
 
     def _create_data_from_checkpoint(self, checkpoint_path_layer0, checkpoint_path_layer1):
         if checkpoint_path_layer0 is not None:
-            checkpoint_layer0 = torch.load(checkpoint_path_layer0, map_location=self.device)
+            print(f"Loading layer 0 checkpoint from: {checkpoint_path_layer0}")
+            checkpoint_layer0 = torch.load(checkpoint_path_layer0)
                 
             self._xyz_3D = checkpoint_layer0['_xyz_3D'].requires_grad_(False)
             self._cholesky_3D = checkpoint_layer0['_cholesky_3D'].requires_grad_(False)
@@ -77,9 +78,8 @@ class GaussianVideo3D2D(nn.Module):
                     self.cholesky_quantizer_layer0.load_state_dict(checkpoint_layer0['cholesky_quantizer_layer0'])
                     self.features_dc_quantizer_layer0.load_state_dict(checkpoint_layer0['features_dc_quantizer_layer0'])
                 except:
-                    self.cholesky_quantizer_layer0 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=6)
-                    self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
-                    self.features_dc_quantizer_layer0 = VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5) 
+                    print("Layer 0 quantization parameters not found, initialized new quantization parameters")
+                self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
 
             print(f"Layer 0 checkpoint loaded successfully with {self._xyz_3D.shape[0]} gaussians")
         else:
@@ -87,7 +87,8 @@ class GaussianVideo3D2D(nn.Module):
                 self._init_layer0()
 
         if checkpoint_path_layer1 is not None:
-            checkpoint_layer1 = torch.load(checkpoint_path_layer1, map_location=self.device)
+            print(f"Loading layer 1 checkpoint from: {checkpoint_path_layer1}")
+            checkpoint_layer1 = torch.load(checkpoint_path_layer1)
             self.num_points_list = checkpoint_layer1['gaussian_num_list']
             self._ckpt_xyz_2D = checkpoint_layer1['_xyz_2D']
             H = len(self._ckpt_xyz_2D)
@@ -119,18 +120,13 @@ class GaussianVideo3D2D(nn.Module):
                     self.cholesky_quantizer_layer1.load_state_dict(checkpoint_layer1['cholesky_quantizer_layer1'])
                     self.features_dc_quantizer_layer1.load_state_dict(checkpoint_layer1['features_dc_quantizer_layer1'])
                 except:
-                    self.cholesky_quantizer_layer1 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=6)
-                    self.cholesky_quantizer_layer1._init_data(self._cholesky_2D)
-                    self.features_dc_quantizer_layer1 = VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5) 
+                    print("Layer 1 quantization parameters not found, initialized new quantization parameters")
+                self.cholesky_quantizer_layer1._init_data(self._cholesky_2D)
 
             print(f"Layer 1 checkpoint loaded successfully with {self._xyz_2D.shape[0]} gaussians")
         else:
             if self.layer == 1:
                 self._init_layer1()
-
-        if self.quantize and self.layer == 1:
-            # ensure training of layer 1 is based on the decoded layer 0 
-            self.create_en_decoded_layer0()
 
         self.trainable_params = []
         if self.layer == 0:
@@ -169,8 +165,6 @@ class GaussianVideo3D2D(nn.Module):
         self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points, 3))
 
         if self.quantize:
-            self.features_dc_quantizer_layer0 = VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5) 
-            self.cholesky_quantizer_layer0 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=6)
             self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
 
         self.layer = 0
@@ -203,8 +197,6 @@ class GaussianVideo3D2D(nn.Module):
         self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points, 3))
 
         if self.quantize:
-            self.features_dc_quantizer_layer1 = VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5) 
-            self.cholesky_quantizer_layer1 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=6)
             self.cholesky_quantizer_layer1._init_data(self._cholesky_2D)
             
         self.layer = 1

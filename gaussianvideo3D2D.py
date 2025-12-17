@@ -58,7 +58,8 @@ class GaussianVideo3D2D(nn.Module):
             self.features_dc_quantizer_layer0 = VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5) 
             self.features_dc_quantizer_layer1 = VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5) if self.layer == 1 else None
             self.cholesky_quantizer_layer0 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=6)
-            self.cholesky_quantizer_layer1 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=6) if self.layer == 1 else None
+            self.cholesky_quantizer_layer1 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=3) if self.layer == 1 else None
+            
             self.decoded_xyz_layer0 = None
             self.decoded_feature_dc_index_layer0 = None
             self.decoded_quant_cholesky_elements_layer0 = None
@@ -91,25 +92,10 @@ class GaussianVideo3D2D(nn.Module):
             checkpoint_layer1 = torch.load(checkpoint_path_layer1)
             self.num_points_list = checkpoint_layer1['gaussian_num_list']
             self._ckpt_xyz_2D = checkpoint_layer1['_xyz_2D']
-            H = len(self._ckpt_xyz_2D)
-            xyz = torch.zeros(H, 3)
-            xyz[:, :2] = self._ckpt_xyz_2D[:, :2]
-            for t, (start, end) in enumerate(self.num_points_list):
-                val = 2.0 * ((t + 0.5) / max(self.T, 1)) - 1.0
-                val = max(min(val, 1.0 - 1e-6), -1.0 + 1e-6)
-                xyz[start:end, 2] = torch.atanh(torch.tensor(val))
-            self._xyz_2D = nn.Parameter(xyz)
+            self._xyz_2D = nn.Parameter(self._ckpt_xyz_2D)
 
             self._ckpt_cholesky_2D = checkpoint_layer1['_cholesky_2D']
-            chol = torch.rand(H, 6)
-            for t, (start, end) in enumerate(self.num_points_list):
-                chol[start:end, 0] = self._ckpt_cholesky_2D[start:end, 0] # l11
-                chol[start:end, 1] = self._ckpt_cholesky_2D[start:end, 1] # l12
-                chol[start:end, 3] = self._ckpt_cholesky_2D[start:end, 2] # l22
-                chol[start:end, 2] = 0 
-                chol[start:end, 4] = 0
-                chol[start:end, 5] = 1
-            self._cholesky_2D = nn.Parameter(chol)
+            self._cholesky_2D = nn.Parameter(self._ckpt_cholesky_2D)
 
             self._features_dc_2D = checkpoint_layer1['_features_dc_2D']
             self._opacity_3D = nn.Parameter(checkpoint_layer1['_opacity_3D'])
@@ -183,15 +169,8 @@ class GaussianVideo3D2D(nn.Module):
                 end = start + num_points_per_frame
             self.num_points_list.append((start, end))
 
-        self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 3) - 0.5)))
-        for t, (start, end) in enumerate(self.num_points_list):
-            self._xyz_2D.data[start:end, 2] = torch.atanh(torch.tensor((2 * (t / self.T)) - 1.0)).item()
-
-        self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points, 6))
-        with torch.no_grad():
-            self._cholesky_2D.data[:, 2] = 0 # l31
-            self._cholesky_2D.data[:, 4] = 0 # l32
-            self._cholesky_2D.data[:, 5] = 1 # l33
+        self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 2) - 0.5)))
+        self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points, 3))
 
         self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points, 3))
@@ -201,20 +180,6 @@ class GaussianVideo3D2D(nn.Module):
             
         self.layer = 1
         print("GaussianVideo3D2D: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])
-
-    def _apply_2d_gaussian_constraints(self):
-        """Apply gradient constraints to 2D gaussian parameters during training"""
-        if self.layer == 1:
-            for name, param in self.named_parameters():
-                if param.grad is not None:
-                    if name == "_xyz_2D":
-                        # Freeze temporal dimension (z-coordinate)
-                        param.grad[:, 2] = 0
-                        param.grad[:, 2].requires_grad_(False)
-                    elif name == "_cholesky_2D":
-                        # Freeze L13, L23, L33 elements (indices 2, 4, 5)
-                        param.grad[:, [2, 4, 5]] = 0
-                        param.grad[:, [2, 4, 5]].requires_grad_(False)
         
     def save_checkpoint(self, path, best=False):
         if self.layer == 0:
@@ -228,8 +193,8 @@ class GaussianVideo3D2D(nn.Module):
             }
         elif self.layer == 1:
             state = {
-                '_xyz_2D': self._xyz_2D.data[:, :2],
-                '_cholesky_2D': self._cholesky_2D.data[:, [0, 1, 3]],
+                '_xyz_2D': self._xyz_2D.data,
+                '_cholesky_2D': self._cholesky_2D.data,
                 '_features_dc_2D': self._features_dc_2D.data,
                 '_opacity_2D': self._opacity_2D.data,
                 '_opacity_3D': self._opacity_3D.data,
@@ -244,12 +209,24 @@ class GaussianVideo3D2D(nn.Module):
             torch.save(state, path / f"layer_{self.layer}_model.pth.tar")
         print(f"Checkpoint saved to: {path / f'layer_{self.layer}_model.pth.tar'}")
 
+    def get_xyz_2d_temporal(self):
+        device = self._xyz_2D.device
+        dtype = self._xyz_2D.dtype
+        
+        xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=device, dtype=dtype)
+        for t, (start, end) in enumerate(self.num_points_list):
+            val = 2.0 * ((t + 0.5) / max(self.T, 1)) - 1.0
+            val = max(min(val, 1.0 - 1e-6), -1.0 + 1e-6)
+            xyz_2d_temporal[start:end] = torch.atanh(torch.tensor(val, device=device, dtype=dtype))
+        return xyz_2d_temporal
+
     @property
     def get_xyz(self):
         if self.layer == 0:
             return torch.tanh(self._xyz_3D)
         elif self.layer == 1:
-            return torch.tanh(torch.cat((self._xyz_3D, self._xyz_2D), dim=0))
+            xyz_2d_full = torch.cat((self._xyz_2D, self.get_xyz_2d_temporal()), dim=1)
+            return torch.tanh(torch.cat((self._xyz_3D, xyz_2d_full), dim=0))
         
     @property
     def get_xyz_quantize(self):
@@ -258,7 +235,9 @@ class GaussianVideo3D2D(nn.Module):
             xyz_quantized = self.xyz_quantizer(self._xyz_3D)
         elif self.layer == 1:
             assert self.decoded_xyz_layer0 is not None, "To get xyz of layer 1, decoded_xyz_layer0 is required for layer 1"
-            xyz_quantized = torch.cat((self.decoded_xyz_layer0, self.xyz_quantizer(self._xyz_2D)), dim=0)
+            xyz_2d_spatial_quantized = self.xyz_quantizer(self._xyz_2D)
+            xyz_2d_quantized = torch.cat((xyz_2d_spatial_quantized, self.get_xyz_2d_temporal()), dim=1)  # Shape: [N, 3]
+            xyz_quantized = torch.cat((self.decoded_xyz_layer0, xyz_2d_quantized), dim=0)
         return torch.tanh(xyz_quantized)
 
     @property
@@ -286,12 +265,26 @@ class GaussianVideo3D2D(nn.Module):
         elif self.layer == 1:
             return self.opacity_activation(torch.cat((self._opacity_3D, self._opacity_2D), dim=0))
     
+    def get_cholesky_2d_full(self, cholesky_2d_to_be_extended):
+        num_points_2d = cholesky_2d_to_be_extended.shape[0]
+        device = cholesky_2d_to_be_extended.device
+        dtype = cholesky_2d_to_be_extended.dtype
+        
+        zeros = torch.zeros((num_points_2d, 1), device=device, dtype=dtype)
+        ones  = torch.ones((num_points_2d, 1), device=device, dtype=dtype)
+        
+        l11 = cholesky_2d_to_be_extended[:, 0:1]
+        l12 = cholesky_2d_to_be_extended[:, 1:2]
+        l22 = cholesky_2d_to_be_extended[:, 2:3]
+        
+        return torch.cat([l11, l12, zeros, l22, zeros, ones], dim=1)
+
     @property
     def get_cholesky_elements(self):
         if self.layer == 0:
             return self._cholesky_3D + self.cholesky_bound_3D
         elif self.layer == 1:
-            merged_cholesky = torch.cat((self._cholesky_3D + self.cholesky_bound_3D, self._cholesky_2D + self.cholesky_bound_2D), dim=0)
+            merged_cholesky = torch.cat((self._cholesky_3D + self.cholesky_bound_3D, self.get_cholesky_2d_full(self._cholesky_2D) + self.cholesky_bound_2D), dim=0)
             return merged_cholesky
 
     @property
@@ -302,8 +295,8 @@ class GaussianVideo3D2D(nn.Module):
             cholesky = cholesky + self.cholesky_bound_3D
         elif self.layer == 1:
             assert self.decoded_quant_cholesky_elements_layer0 is not None, "To get cholesky of layer 1, decoded_quant_cholesky_elements_layer0 is required for layer 1"
-            cholesky_2d, self.l_vqs, self.s_bit = self.cholesky_quantizer_layer1(self._cholesky_2D)
-            cholesky = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, cholesky_2d + self.cholesky_bound_2D), dim=0)
+            cholesky_2d_used_quantized, self.l_vqs, self.s_bit = self.cholesky_quantizer_layer1(self._cholesky_2D)
+            cholesky = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, self.get_cholesky_2d_full(cholesky_2d_used_quantized) + self.cholesky_bound_2D), dim=0)
         return cholesky
     
     def prune(self, opac_threshold=0.2):
@@ -331,7 +324,6 @@ class GaussianVideo3D2D(nn.Module):
             for param_group in self.optimizer.param_groups:
                 param_group['params'] = [p for p in self.parameters() if p.requires_grad]
 
-            # update num_points_list
             new_num_points_list = []
             next_start = 0
             for start, end in self.num_points_list:
@@ -369,9 +361,6 @@ class GaussianVideo3D2D(nn.Module):
             mse_loss = F.mse_loss(image, gt_image)
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
 
-        if self.layer == 1:
-            self._apply_2d_gaussian_constraints()
-
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
         self.scheduler.step()
@@ -380,7 +369,8 @@ class GaussianVideo3D2D(nn.Module):
 
     def forward_quantize(self):
         num_points = self.get_xyz.shape[0]
-        self.l_vqm, self.m_bit = 0, 16 * num_points * 3
+        num_xyz_dims = 3 if self.layer == 0 else 2
+        self.l_vqm, self.m_bit = 0, 16 * num_points * num_xyz_dims
         self.l_vqr, self.r_bit = 0, 0 
         
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
@@ -429,9 +419,9 @@ class GaussianVideo3D2D(nn.Module):
         decoded_feature_dc_index = self.features_dc_quantizer_layer0.decompress(feature_dc_index_encoded)
         decoded_quant_cholesky_elements = self.cholesky_quantizer_layer0.decompress(quant_cholesky_elements_encoded)
 
-        self.decoded_xyz_layer0 = encoded_xyz.float()
-        self.decoded_feature_dc_index_layer0 = decoded_feature_dc_index
-        self.decoded_quant_cholesky_elements_layer0 = decoded_quant_cholesky_elements
+        self.decoded_xyz_layer0 = encoded_xyz.float().detach()
+        self.decoded_feature_dc_index_layer0 = decoded_feature_dc_index.detach()
+        self.decoded_quant_cholesky_elements_layer0 = decoded_quant_cholesky_elements.detach()
     
     def compress_wo_ec(self):
         if self.layer == 0:
@@ -458,9 +448,14 @@ class GaussianVideo3D2D(nn.Module):
             assert self.decoded_xyz_layer0 is not None, "decoded_xyz_layer0 is required for layer 1"
             assert self.decoded_feature_dc_index_layer0 is not None, "decoded_feature_dc_index_layer0 is required for layer 1"
             assert self.decoded_quant_cholesky_elements_layer0 is not None, "decoded_quant_cholesky_elements_layer0 is required for layer 1"
-            means = torch.tanh(torch.cat((self.decoded_xyz_layer0, xyz.float()), dim=0).float())
-            cholesky_elements = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, self.cholesky_quantizer_layer1.decompress(quant_cholesky_elements) + self.cholesky_bound_2D), dim=0)
-            colors = torch.cat((self.decoded_feature_dc_index_layer0, self.features_dc_quantizer_layer1.decompress(feature_dc_index)), dim=0)
+            xyz_2d_full = torch.cat((xyz.float(), self.get_xyz_2d_temporal()), dim=1)
+            means = torch.tanh(torch.cat((self.decoded_xyz_layer0, xyz_2d_full), dim=0).float())
+
+            cholesky_2d_decoded = self.cholesky_quantizer_layer1.decompress(quant_cholesky_elements)
+            cholesky_elements = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, self.get_cholesky_2d_full(cholesky_2d_decoded) + self.cholesky_bound_2D), dim=0)
+
+            features_dc_2d_decoded = self.features_dc_quantizer_layer1.decompress(feature_dc_index)
+            colors = torch.cat((self.decoded_feature_dc_index_layer0, features_dc_2d_decoded), dim=0)
         
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             means, cholesky_elements, self.H, self.W, self.T, self.tile_bounds

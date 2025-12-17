@@ -99,6 +99,13 @@ class GaussianVideo3D2DTrainerQuantize:
             num_points_per_frame = int(self.init_num_points_layer1 / self.T)
             print(f"GVGI: Available number of gaussians: {self.init_num_points_layer1} for layer 1")
 
+            # get the background image tensor of layer 0
+            self.gaussian_model_layer0.eval()
+            with torch.no_grad():
+                encoding_dict = self.gaussian_model_layer0.compress_wo_ec()
+                out = self.gaussian_model_layer0.decompress_wo_ec(encoding_dict)
+                bg_tensor = out["render"].float()
+
             self.gaussian_model_list = []
             for t in range(self.T):
                 if args.model_path_layer1 is not None:
@@ -112,10 +119,8 @@ class GaussianVideo3D2DTrainerQuantize:
                     else:
                         num_points = num_points_per_frame
 
-                background_path = Path(f"{args.model_path_layer0.replace('layer_0_model.best.pth.tar', '')}/{self.video_name}_fitting_t{t}_layer0_codec_best.png")
-                background_img = image_path_to_tensor(background_path).squeeze(0).permute(1, 2, 0).to(self.device)
                 gaussian_model = GaussianImage_Cholesky(
-                    background_image=background_img,
+                    background_image=bg_tensor[0, :, :, :, t].squeeze(0).permute(1, 2, 0),
                     loss_type="L2", 
                     opt_type="adan", 
                     num_points=num_points,
@@ -140,8 +145,6 @@ class GaussianVideo3D2DTrainerQuantize:
     def test_GV3D2D(self, gaussian_model, gt_image, layer=0):
         gaussian_model.eval()
         with torch.no_grad():
-            if layer == 1:
-                gaussian_model.create_en_decoded_layer0() 
             encoding_dict = gaussian_model.compress_wo_ec()
             out = gaussian_model.decompress_wo_ec(encoding_dict)
             start_time = time.time()
@@ -160,6 +163,13 @@ class GaussianVideo3D2DTrainerQuantize:
             frame_pred = out_video[..., t]  # shape: [1, C, H, W]
             frame_gt = gt_image[..., t]  # shape: [1, C, H, W]
             ms_ssim_total += ms_ssim(frame_pred, frame_gt, data_range=1, size_average=True).item()
+        
+            if self.save_imgs:
+                transform = transforms.ToPILImage()
+                img = transform(frame_pred.squeeze(0))
+                name = f"{self.video_name}_fitting_t{t}_layer{layer}_codec_best.png"
+                img.save(str(self.log_dir / name))
+
         ms_ssim_value = ms_ssim_total / T
         FPS = self.T/end_time
         data_dict["psnr"] = psnr
@@ -190,6 +200,12 @@ class GaussianVideo3D2DTrainerQuantize:
         psnr = 10 * math.log10(1.0 / mse_loss.item())
         ms_ssim_value = ms_ssim(out_img, gt_image, data_range=1, size_average=True).item()
         
+        if self.save_imgs:
+            transform = transforms.ToPILImage()
+            img = transform(out_img.squeeze(0))
+            name = f"{self.video_name}_fitting_t{t}_layer{self.layer}_codec_best.png"
+            img.save(str(self.log_dir / name))
+
         data_dict["psnr"] = psnr
         data_dict["ms-ssim"] = ms_ssim_value
         data_dict["rendering_time"] = end_time
@@ -319,6 +335,8 @@ def main(argv):
     if args.layer == 1:
         log_dir = log_dir / (f"{args.model_name}_i{args.iterations}_g{args.num_points}/")
     
+    log_dir = log_dir / 'test'
+    os.makedirs(log_dir, exist_ok=True)
     logwriter = LogWriter(log_dir, train=False)
 
     images_paths = []

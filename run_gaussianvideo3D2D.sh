@@ -142,7 +142,7 @@ python train_quantize_3D2D.py \
     --iterations "${TRAIN_ITERATIONS}" \
     --num_points "${NUM_POINTS}" \
     --lr "${LEARNING_RATE}" \
-    --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
+    --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
     --model_path_layer1 "${CHECKPOINT_PATH_LAYER1_GVGI}" \
     --save_imgs
 

@@ -65,14 +65,29 @@ class GaussianVideo3D2D(nn.Module):
             self.decoded_quant_cholesky_elements_layer0 = None
 
     def _create_data_from_checkpoint(self, checkpoint_path_layer0, checkpoint_path_layer1):
+        if self.layer == 0:
+            assert checkpoint_path_layer1 is None, "Layer 1 checkpoint is not required for Layer 0 training"
+        elif self.layer == 1:
+            assert checkpoint_path_layer0 is not None, "Layer 0 checkpoint is required for Layer 1 training"
+
         if checkpoint_path_layer0 is not None:
             print(f"Loading layer 0 checkpoint from: {checkpoint_path_layer0}")
             checkpoint_layer0 = torch.load(checkpoint_path_layer0)
-                
-            self._xyz_3D = checkpoint_layer0['_xyz_3D'].requires_grad_(False)
-            self._cholesky_3D = checkpoint_layer0['_cholesky_3D'].requires_grad_(False)
-            self._features_dc_3D = checkpoint_layer0['_features_dc_3D'].requires_grad_(False)
+            
+            xyz = checkpoint_layer0['_xyz_3D']
+            cholesky = checkpoint_layer0['_cholesky_3D']
+            features_dc = checkpoint_layer0['_features_dc_3D']
             self._opacity_3D = nn.Parameter(checkpoint_layer0['_opacity_3D'])
+
+            if self.layer == 0:
+                self._xyz_3D = nn.Parameter(xyz, requires_grad=True)
+                self._cholesky_3D = nn.Parameter(cholesky, requires_grad=True)
+                self._features_dc_3D = nn.Parameter(features_dc, requires_grad=True)
+            else:
+                self._xyz_3D = xyz.requires_grad_(False)
+                self._cholesky_3D = cholesky.requires_grad_(False)
+                self._features_dc_3D = features_dc.requires_grad_(False)
+                print(f'Layer 0 gaussians are frozen for Layer {self.layer} training')
 
             if self.quantize:
                 try:
@@ -80,7 +95,6 @@ class GaussianVideo3D2D(nn.Module):
                     self.features_dc_quantizer_layer0.load_state_dict(checkpoint_layer0['features_dc_quantizer_layer0'])
                 except:
                     print("Layer 0 quantization parameters not found, initialized new quantization parameters")
-                self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
 
             print(f"Layer 0 checkpoint loaded successfully with {self._xyz_3D.shape[0]} gaussians")
         else:
@@ -97,8 +111,8 @@ class GaussianVideo3D2D(nn.Module):
             self._ckpt_cholesky_2D = checkpoint_layer1['_cholesky_2D']
             self._cholesky_2D = nn.Parameter(self._ckpt_cholesky_2D)
 
-            self._features_dc_2D = checkpoint_layer1['_features_dc_2D']
-            self._opacity_3D = nn.Parameter(checkpoint_layer1['_opacity_3D'])
+            self._features_dc_2D = nn.Parameter(checkpoint_layer1['_features_dc_2D'])
+            self._opacity_3D = nn.Parameter(checkpoint_layer1['_opacity_3D']) # loading opacity_3D tuned in layer 1 training
             self._opacity_2D = nn.Parameter(checkpoint_layer1['_opacity_2D'])
 
             if self.quantize:
@@ -107,7 +121,6 @@ class GaussianVideo3D2D(nn.Module):
                     self.features_dc_quantizer_layer1.load_state_dict(checkpoint_layer1['features_dc_quantizer_layer1'])
                 except:
                     print("Layer 1 quantization parameters not found, initialized new quantization parameters")
-                self.cholesky_quantizer_layer1._init_data(self._cholesky_2D)
 
             print(f"Layer 1 checkpoint loaded successfully with {self._xyz_2D.shape[0]} gaussians")
         else:

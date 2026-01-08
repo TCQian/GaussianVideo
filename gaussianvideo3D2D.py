@@ -348,6 +348,45 @@ class GaussianVideo3D2D(nn.Module):
 
             self.num_points_list = new_num_points_list
             print(f"Pruned to {self._xyz_2D.shape[0]} Gaussians.")
+
+    def densify(self, num_new_gaussians=100):
+        assert self.layer == 1, "Densify is only supported for layer 1"
+        device = self._xyz_2D.device
+        num_new_per_frame = int(num_new_gaussians / self.T)
+        # create a new tensor with the new total number of points
+        new_total_num_points = self._xyz_2D.shape[0] + num_new_per_frame * self.T
+        new_xyz = torch.zeros(new_total_num_points, 2, device=device)
+        new_cholesky = torch.zeros(new_total_num_points, 3, device=device)
+        new_opacity = torch.zeros(new_total_num_points, 1, device=device)
+        new_features_dc = torch.zeros(new_total_num_points, 3, device=device)
+        new_num_points_list = []
+
+        # insert the new gaussians in between the existing gaussians
+        next_start = 0
+        for start, end in self.num_points_list:
+            cur_start = next_start
+            cur_end = cur_start + (end - start)
+
+            new_xyz[cur_start:cur_end] = self._xyz_2D[start:end]
+            new_xyz[cur_end:cur_end+num_new_per_frame] = torch.atanh(2 * (torch.rand(num_new_per_frame, 2, device=device) - 0.5))
+            new_cholesky[cur_start:cur_end] = self._cholesky_2D[start:end]
+            new_cholesky[cur_end:cur_end+num_new_per_frame] = torch.rand(num_new_per_frame, 3, device=device)
+            new_opacity[cur_start:cur_end] = self._opacity_2D[start:end]
+            new_opacity[cur_end:cur_end+num_new_per_frame] = torch.logit(0.1 * torch.ones(num_new_per_frame, 1, device=device))
+            new_features_dc[cur_start:cur_end] = self._features_dc_2D[start:end]
+            new_features_dc[cur_end:cur_end+num_new_per_frame] = torch.rand(num_new_per_frame, 3, device=device)
+
+            new_num_points_list.append((cur_start, cur_end+num_new_per_frame))
+            next_start = cur_end + num_new_per_frame
+
+        self._xyz_2D = torch.nn.Parameter(new_xyz)
+        self._cholesky_2D = torch.nn.Parameter(new_cholesky)
+        self._opacity_2D = torch.nn.Parameter(new_opacity)
+        self._features_dc_2D = torch.nn.Parameter(new_features_dc)
+        self.num_points_list = new_num_points_list
+        for param_group in self.optimizer.param_groups:
+            param_group['params'] = [p for p in self.parameters() if p.requires_grad]
+        print(f"Added {num_new_per_frame} new gaussians per frame. Total: {self._xyz_2D.shape[0]} Gaussians.")
     
     def forward(self):
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(

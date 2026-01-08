@@ -88,6 +88,25 @@ class GaussianImage_Cholesky(nn.Module):
         
         print(f"Pruned to {self._xyz.shape[0]} Gaussians.")
 
+    def densify(self, num_new_gaussians=1000):
+        device = self._xyz.device
+        
+        new_xyz = torch.atanh(2 * (torch.rand(num_new_gaussians, 2, device=device) - 0.5))
+        new_cholesky = torch.rand(num_new_gaussians, 3, device=device)
+        new_opacity = torch.logit(0.1 * torch.ones(num_new_gaussians, 1, device=device))
+        new_features_dc = torch.rand(num_new_gaussians, 3, device=device)
+        
+        self._xyz = torch.nn.Parameter(torch.cat([self._xyz, new_xyz], dim=0))
+        self._cholesky = torch.nn.Parameter(torch.cat([self._cholesky, new_cholesky], dim=0))
+        self._opacity = torch.nn.Parameter(torch.cat([self._opacity, new_opacity], dim=0))
+        self._features_dc = torch.nn.Parameter(torch.cat([self._features_dc, new_features_dc], dim=0))
+        
+        for param_group in self.optimizer.param_groups:
+            param_group['params'] = [p for p in self.parameters() if p.requires_grad]
+        
+        
+        print(f"Added {num_new_gaussians} new gaussians. Total: {self._xyz.shape[0]} Gaussians.")
+
 
     def forward(self):
         #assert torch.allclose(self.background, torch.ones(3, device=self.background.device) / 2.0), "Currently only support gray background"

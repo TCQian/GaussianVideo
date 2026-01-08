@@ -244,9 +244,15 @@ class GaussianVideo3D2DTrainerQuantize:
 
         end_time = time.time() - start_time
         progress_bar.close()
+
+        # remove background from state_dict
+        state_dict = gaussian_model.state_dict()
+        state_dict.pop('background')
+        best_model_dict.pop('background')
+        
         psnr_value, ms_ssim_value, bpp = self.test_GVGI(gaussian_model, gt_image, t, best=False)
         Path(self.log_dir / f'frame_{t+1:04}').mkdir(parents=True, exist_ok=True)
-        torch.save(gaussian_model.state_dict(), self.log_dir / f'frame_{t+1:04}' / f"gaussian_model.pth.tar")
+        torch.save(state_dict, self.log_dir / f'frame_{t+1:04}' / f"gaussian_model.pth.tar")
         gaussian_model.load_state_dict(best_model_dict)
         best_psnr_value, best_ms_ssim_value, best_bpp = self.test_GVGI(gaussian_model, gt_image, t, best=True)
         torch.save(best_model_dict, self.log_dir / f'frame_{t+1:04}' / f"gaussian_model.best.pth.tar")

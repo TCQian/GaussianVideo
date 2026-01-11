@@ -136,7 +136,7 @@ class GaussianVideo3D2DTrainerQuantize:
                 ).to(self.device)
 
                 if args.model_path_layer1:
-                    gaussian_model.load_state_dict(checkpoint)
+                    gaussian_model.load_state_dict(checkpoint, strict=False)
                     print(f"Loaded checkpoint from: {checkpoint_file_path}")
 
                 self.gaussian_model_list.append(gaussian_model)

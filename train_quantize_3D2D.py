@@ -139,7 +139,7 @@ class GaussianVideo3D2DTrainerQuantize:
                     model_dict = gaussian_model.state_dict()
                     pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict}
                     model_dict.update(pretrained_dict)
-                    gaussian_model.load_state_dict(model_dict)
+                    gaussian_model.load_state_dict(model_dict, strict=False)
                     gaussian_model._init_data()
                     print(f"Loaded checkpoint from: {checkpoint_file_path}")
 
@@ -184,7 +184,7 @@ class GaussianVideo3D2DTrainerQuantize:
         psnr_value, ms_ssim_value, bpp = self.test(best=False)
         gaussian_model.save_checkpoint(self.log_dir)
         
-        gaussian_model.load_state_dict(best_model_dict)
+        gaussian_model.load_state_dict(best_model_dict, strict=False)
         best_psnr_value, best_ms_ssim_value, best_bpp = self.test(best=True)
         gaussian_model.save_checkpoint(self.log_dir, best=True)
 
@@ -253,7 +253,7 @@ class GaussianVideo3D2DTrainerQuantize:
         psnr_value, ms_ssim_value, bpp = self.test_GVGI(gaussian_model, gt_image, t, best=False)
         Path(self.log_dir / f'frame_{t+1:04}').mkdir(parents=True, exist_ok=True)
         torch.save(state_dict, self.log_dir / f'frame_{t+1:04}' / f"gaussian_model.pth.tar")
-        gaussian_model.load_state_dict(best_model_dict)
+        gaussian_model.load_state_dict(best_model_dict, strict=False)
         best_psnr_value, best_ms_ssim_value, best_bpp = self.test_GVGI(gaussian_model, gt_image, t, best=True)
         torch.save(best_model_dict, self.log_dir / f'frame_{t+1:04}' / f"gaussian_model.best.pth.tar")
         

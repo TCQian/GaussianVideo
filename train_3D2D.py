@@ -131,7 +131,7 @@ class GaussianVideo3D2DTrainer:
                     model_dict = gaussian_model.state_dict()
                     pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict}
                     model_dict.update(pretrained_dict)
-                    gaussian_model.load_state_dict(model_dict)
+                    gaussian_model.load_state_dict(model_dict, strict=False)
                     gaussian_model._init_data()
                     print(f"Loaded checkpoint from: {checkpoint_file_path}")
 
@@ -155,10 +155,9 @@ class GaussianVideo3D2DTrainer:
 
             if (iter % 1000 == 1 and iter > 1):
                 gaussian_model.prune(opac_threshold=0.05)
-            
-            if (iter % 2000 == 1 and iter > 1 and self.layer == 1):
-                num_new_gaussians = max(100, int(gaussian_model._xyz_2D.shape[0] * 0.1))
-                gaussian_model.densify(num_new_gaussians=num_new_gaussians)
+                if self.layer == 1:
+                    num_new_gaussians = max(100, int(gaussian_model._xyz_2D.shape[0] * 0.1))
+                    gaussian_model.densify(num_new_gaussians=num_new_gaussians)
 
             loss, psnr = gaussian_model.train_iter(gt_image)
             
@@ -206,10 +205,9 @@ class GaussianVideo3D2DTrainer:
 
             if (iter % 1000 == 1 and iter > 1):
                 gaussian_model.prune(opac_threshold=0.05)
-            
-            if (iter % 2000 == 1 and iter > 1 and self.layer == 1):
-                num_new_gaussians = max(100, int(gaussian_model.get_xyz.shape[0] * 0.1))
-                gaussian_model.densify(num_new_gaussians=num_new_gaussians)
+                if self.layer == 1:
+                    num_new_gaussians = max(100, int(gaussian_model.get_xyz.shape[0] * 0.1))
+                    gaussian_model.densify(num_new_gaussians=num_new_gaussians)
 
             loss, psnr = gaussian_model.train_iter(gt_image)
 

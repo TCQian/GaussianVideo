@@ -17,28 +17,28 @@ from gaussianvideo3D2D import GaussianVideo3D2D
 
 class EarlyStopping:
     def __init__(self, patience=100, min_delta=1e-10):
-        self.patience = patience  # Number of tolerated iterations with no improvement
-        self.min_delta = min_delta  # Minimum improvement threshold
-        self.best_loss = None  # Stores the best loss value
-        self.counter = 0  # Tracks the number of iterations without improvement
+        self.patience = patience  
+        self.min_delta = min_delta 
+        self.best_loss = None  
+        self.counter = 0  
 
     def __call__(self, current_loss):
         if self.best_loss is None:
             self.best_loss = current_loss
-            return False  # Do not stop training
+            return False  
 
-        # If the improvement over the previous best loss is less than min_delta, consider it no improvement
-        if self.best_loss - current_loss > self.min_delta:
+        if math.abs(self.best_loss - current_loss) > self.min_delta:
+            # math.abs allow current loss > best loss
+            # Reset best loss to avoid premature stopping after densification spikes
             self.best_loss = current_loss
-            self.counter = 0  # Reset counter
+            self.counter = 0  
         else:
             self.counter += 1
 
-        # If the counter exceeds patience, stop training
         if self.counter >= self.patience:
-            return True  # Stop training
+            return True  
 
-        return False  # Continue training
+        return False  
 
 class GaussianVideo3D2DTrainer:
     """Trains 3D and 2D gaussians layer by layer to fit a video."""
@@ -56,6 +56,8 @@ class GaussianVideo3D2DTrainer:
 
         self.early_stopping_patience = 1000
         self.early_stopping_min_delta = 1e-10
+        self.densify_until_iter = self.iterations - 5000
+        self.densify_factor = 0.1
 
         self.layer = layer
         self.video_name = video_name
@@ -155,8 +157,8 @@ class GaussianVideo3D2DTrainer:
 
             if (iter % 1000 == 1 and iter > 1):
                 gaussian_model.prune(opac_threshold=0.05)
-                if self.layer == 1:
-                    num_new_gaussians = max(100, int(gaussian_model._xyz_2D.shape[0] * 0.1))
+                if self.layer == 1 and iter < self.densify_until_iter:
+                    num_new_gaussians = max(100, int(gaussian_model._xyz_2D.shape[0] * self.densify_factor))
                     gaussian_model.densify(num_new_gaussians=num_new_gaussians)
 
             loss, psnr = gaussian_model.train_iter(gt_image)
@@ -205,8 +207,8 @@ class GaussianVideo3D2DTrainer:
 
             if (iter % 1000 == 1 and iter > 1):
                 gaussian_model.prune(opac_threshold=0.05)
-                if self.layer == 1:
-                    num_new_gaussians = max(100, int(gaussian_model.get_xyz.shape[0] * 0.1))
+                if self.layer == 1 and iter < self.densify_until_iter:
+                    num_new_gaussians = max(100, int(gaussian_model.get_xyz.shape[0] * self.densify_factor))
                     gaussian_model.densify(num_new_gaussians=num_new_gaussians)
 
             loss, psnr = gaussian_model.train_iter(gt_image)

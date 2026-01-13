@@ -21,19 +21,26 @@ class EarlyStopping:
         self.min_delta = min_delta 
         self.best_loss = None  
         self.counter = 0  
+        self.spike_tolerance = None
 
     def __call__(self, current_loss):
         if self.best_loss is None:
             self.best_loss = current_loss
+            self.spike_tolerance = current_loss
             return False  
 
-        if math.abs(self.best_loss - current_loss) > self.min_delta:
-            # math.abs allow current loss > best loss
-            # Reset best loss to avoid premature stopping after densification spikes
-            self.best_loss = current_loss
-            self.counter = 0  
-        else:
-            self.counter += 1
+        if self.best_loss >= current_loss: 
+            if self.best_loss - current_loss > self.min_delta:
+                self.best_loss = current_loss
+                self.counter = 0  
+            else:
+                self.counter += 1
+        else: # current loss > best loss, happens after densification
+            if current_loss > self.spike_tolerance:
+                raise ValueError("Spike detected in loss and even higher than the initial loss")
+            else: 
+                # reset counter and continue training until the loss recovers to the best loss
+                self.counter = 0 
 
         if self.counter >= self.patience:
             return True  
@@ -54,11 +61,6 @@ class GaussianVideo3D2DTrainer:
         log_dir: Path = None,
     ):
 
-        self.early_stopping_patience = 1000
-        self.early_stopping_min_delta = 1e-10
-        self.densify_until_iter = self.iterations - 5000
-        self.densify_factor = 0.1
-
         self.layer = layer
         self.video_name = video_name
         self.model_name = model_name
@@ -71,6 +73,11 @@ class GaussianVideo3D2DTrainer:
         self.num_points = args.num_points
         self.save_imgs = args.save_imgs
         self.log_dir = log_dir
+
+        self.early_stopping_patience = 1000
+        self.early_stopping_min_delta = 1e-10
+        self.densify_until_iter = self.iterations - 5000
+        self.densify_factor = 0.1
         
         if self.model_name == "GV3D2D":
             self.gaussian_model = GaussianVideo3D2D(

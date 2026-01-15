@@ -222,33 +222,14 @@ class GaussianVideo3D2D(nn.Module):
             torch.save(state, path / f"layer_{self.layer}_model.pth.tar")
         print(f"Checkpoint saved to: {path / f'layer_{self.layer}_model.pth.tar'}")
 
-    def get_xyz_2d_temporal(self):
-        device = self._xyz_2D.device
-        dtype = self._xyz_2D.dtype
-        
-        xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=device, dtype=dtype)
-        for t, (start, end) in enumerate(self.num_points_list):
-            # Return normalized temporal coordinate in [-1, 1] range
-            # After projection: center.z = 0.5 * T * val + 0.5 * T
-            # To get center.z = t (exact frame index), we need: val = 2t/T - 1
-            # This maps frame index t to center.z = t after projection
-            if self.T > 1:
-                val = 2.0 * t / self.T - 1.0
-            else:
-                val = 0.0  # Single frame case
-            val = max(min(val, 1.0 - 1e-6), -1.0 + 1e-6)
-            xyz_2d_temporal[start:end] = torch.tensor(val, device=device, dtype=dtype)
-        return xyz_2d_temporal
-
     @property
     def get_xyz(self):
         if self.layer == 0:
             return torch.tanh(self._xyz_3D)
         elif self.layer == 1:
-            # Apply tanh only to spatial coordinates, not to temporal component
             xyz_3D_tanh = torch.tanh(self._xyz_3D)
             xyz_2D_spatial_tanh = torch.tanh(self._xyz_2D)
-            xyz_2d_temporal = self.get_xyz_2d_temporal()  # Already in [-1, 1], no tanh needed
+            xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
             xyz_2d_full = torch.cat((xyz_2D_spatial_tanh, xyz_2d_temporal), dim=1)
             return torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
         
@@ -261,10 +242,9 @@ class GaussianVideo3D2D(nn.Module):
         elif self.layer == 1:
             assert self.decoded_xyz_layer0 is not None, "To get xyz of layer 1, decoded_xyz_layer0 is required for layer 1"
             xyz_2d_spatial_quantized = self.xyz_quantizer(self._xyz_2D)
-            xyz_2d_temporal = self.get_xyz_2d_temporal()  # Already in [-1, 1], no tanh needed
-            # Apply tanh only to spatial coordinates, not to temporal component
+            xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
             xyz_2d_spatial_tanh = torch.tanh(xyz_2d_spatial_quantized)
-            xyz_2d_quantized = torch.cat((xyz_2d_spatial_tanh, xyz_2d_temporal), dim=1)  # Shape: [N, 3]
+            xyz_2d_quantized = torch.cat((xyz_2d_spatial_tanh, xyz_2d_temporal), dim=1)
             xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0)
             xyz_quantized = torch.cat((xyz_3D_tanh, xyz_2d_quantized), dim=0)
             return xyz_quantized
@@ -403,25 +383,37 @@ class GaussianVideo3D2D(nn.Module):
         for param_group in self.optimizer.param_groups:
             param_group['params'] = [p for p in self.parameters() if p.requires_grad]
         print(f"Added {num_new_per_frame} new gaussians per frame. Total: {self._xyz_2D.shape[0]} Gaussians.")
-    
+
+    def _fix_temporal_coords_after_projection(self, xys):
+        if self.layer != 1 or self.num_points_list is None:
+            return xys
+        
+        xys_fixed = xys.clone()
+        layer1_start = self._xyz_3D.shape[0] if self._xyz_3D.shape[0] > 0 else 0
+        
+        for t, (start, end) in enumerate(self.num_points_list):
+            idx_start = layer1_start + start
+            idx_end = layer1_start + end
+            xys_fixed[idx_start:idx_end, 2] = float(t)
+        
+        return xys_fixed
+
     def forward(self):
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz, self.get_cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
+        # Fix temporal coordinates to exact frame indices after projection
+        self.xys = self._fix_temporal_coords_after_projection(self.xys)
+    
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, radii, conics, num_tiles_hit,
             self.get_features, self.get_opacity, self.H, self.W, self.T,
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )
-        if self.debug_mode:
-            first_index = self._xyz_3D.shape[0]
-            print('0', self.xys[first_index + self.num_points_list[0][1]][-1].item(), '1', self.xys[first_index + self.num_points_list[1][1]][-1].item(), '2', self.xys[first_index + self.num_points_list[2][1]][-1].item(), '3', self.xys[first_index + self.num_points_list[3][1]][-1].item(), '4', self.xys[first_index + self.num_points_list[-1][1]][-1].item())
-        self.debug_mode = False
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
         return {"render": out_img}
-
 
     def train_iter(self, gt_image):
         render_pkg = self.forward()
@@ -448,6 +440,7 @@ class GaussianVideo3D2D(nn.Module):
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz_quantize, self.get_cholesky_elements_quantize, self.H, self.W, self.T, self.tile_bounds
         )
+        self.xys = self._fix_temporal_coords_after_projection(self.xys)
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, radii, conics, num_tiles_hit,
             self.get_features_quantize, self.get_opacity, self.H, self.W, self.T,
@@ -536,7 +529,7 @@ class GaussianVideo3D2D(nn.Module):
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             means, cholesky_elements, self.H, self.W, self.T, self.tile_bounds
         )
-        
+        self.xys = self._fix_temporal_coords_after_projection(self.xys)
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, self.radii, conics, num_tiles_hit,
             colors, self.get_opacity, self.H, self.W, self.T,

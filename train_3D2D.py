@@ -101,10 +101,14 @@ class GaussianVideo3D2DTrainer:
 
         elif self.model_name == "GVGI":
             assert self.layer == 1, "GVGI is only able to process Layer 1 "
-            checkpoint_layer0 = torch.load(args.model_path_layer0, map_location=self.device)
-            self.init_num_points_layer1 = int((self.num_points * self.T) - checkpoint_layer0['_xyz_3D'].shape[0])
+            if args.model_path_layer0 is not None:
+                checkpoint_layer0 = torch.load(args.model_path_layer0, map_location=self.device)
+                num_points_layer0 = checkpoint_layer0['_xyz_3D'].shape[0] if checkpoint_layer0['_xyz_3D'].shape[0] > 0 else 0
+            else:
+                num_points_layer0 = 0
+            self.init_num_points_layer1 = int((self.num_points * self.T) - num_points_layer0)
             num_points_per_frame = int(self.init_num_points_layer1 / self.T)
-            print(f"GVGI: Available number of gaussians: {self.init_num_points_layer1} for layer 1")
+            print(f"GVGI: Available number of gaussians: {self.init_num_points_layer1} for layer 1 (layer 0 has {num_points_layer0} gaussians)")
 
             self.gaussian_model_list = []
             for t in range(self.T):
@@ -162,11 +166,11 @@ class GaussianVideo3D2DTrainer:
             else:
                 gaussian_model.debug_mode = False
 
-            if (iter % 1000 == 1 and iter > 1):
-                gaussian_model.prune(opac_threshold=0.05)
-                if self.layer == 1 and iter < self.densify_until_iter:
-                    num_new_gaussians = max(100, int(gaussian_model._xyz_2D.shape[0] * self.densify_factor))
-                    gaussian_model.densify(num_new_gaussians=num_new_gaussians)
+            # if (iter % 1000 == 1 and iter > 1):
+            #     gaussian_model.prune(opac_threshold=0.05)
+            #     if self.layer == 1 and iter < self.densify_until_iter:
+            #         num_new_gaussians = max(100, int(gaussian_model._xyz_2D.shape[0] * self.densify_factor))
+            #         gaussian_model.densify(num_new_gaussians=num_new_gaussians)
 
             loss, psnr = gaussian_model.train_iter(gt_image)
             
@@ -212,11 +216,11 @@ class GaussianVideo3D2DTrainer:
             else:
                 gaussian_model.debug_mode = False
 
-            if (iter % 1000 == 1 and iter > 1):
-                gaussian_model.prune(opac_threshold=0.05)
-                if self.layer == 1 and iter < self.densify_until_iter:
-                    num_new_gaussians = max(100, int(gaussian_model.get_xyz.shape[0] * self.densify_factor))
-                    gaussian_model.densify(num_new_gaussians=num_new_gaussians)
+            # if (iter % 1000 == 1 and iter > 1):
+            #     gaussian_model.prune(opac_threshold=0.05)
+            #     if self.layer == 1 and iter < self.densify_until_iter:
+            #         num_new_gaussians = max(100, int(gaussian_model.get_xyz.shape[0] * self.densify_factor))
+            #         gaussian_model.densify(num_new_gaussians=num_new_gaussians)
 
             loss, psnr = gaussian_model.train_iter(gt_image)
 

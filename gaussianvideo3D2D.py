@@ -228,9 +228,16 @@ class GaussianVideo3D2D(nn.Module):
         
         xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=device, dtype=dtype)
         for t, (start, end) in enumerate(self.num_points_list):
-            val = 2.0 * ((t + 0.5) / max(self.T, 1)) - 1.0
+            # Return normalized temporal coordinate in [-1, 1] range
+            # After projection: center.z = 0.5 * T * val + 0.5 * T
+            # To get center.z = t (exact frame index), we need: val = 2t/T - 1
+            # This maps frame index t to center.z = t after projection
+            if self.T > 1:
+                val = 2.0 * t / self.T - 1.0
+            else:
+                val = 0.0  # Single frame case
             val = max(min(val, 1.0 - 1e-6), -1.0 + 1e-6)
-            xyz_2d_temporal[start:end] = torch.atanh(torch.tensor(val, device=device, dtype=dtype))
+            xyz_2d_temporal[start:end] = torch.tensor(val, device=device, dtype=dtype)
         return xyz_2d_temporal
 
     @property
@@ -238,20 +245,29 @@ class GaussianVideo3D2D(nn.Module):
         if self.layer == 0:
             return torch.tanh(self._xyz_3D)
         elif self.layer == 1:
-            xyz_2d_full = torch.cat((self._xyz_2D, self.get_xyz_2d_temporal()), dim=1)
-            return torch.tanh(torch.cat((self._xyz_3D, xyz_2d_full), dim=0))
+            # Apply tanh only to spatial coordinates, not to temporal component
+            xyz_3D_tanh = torch.tanh(self._xyz_3D)
+            xyz_2D_spatial_tanh = torch.tanh(self._xyz_2D)
+            xyz_2d_temporal = self.get_xyz_2d_temporal()  # Already in [-1, 1], no tanh needed
+            xyz_2d_full = torch.cat((xyz_2D_spatial_tanh, xyz_2d_temporal), dim=1)
+            return torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
         
     @property
     def get_xyz_quantize(self):
         assert self.quantize, "Quantization is not enabled"
         if self.layer == 0:
             xyz_quantized = self.xyz_quantizer(self._xyz_3D)
+            return torch.tanh(xyz_quantized)
         elif self.layer == 1:
             assert self.decoded_xyz_layer0 is not None, "To get xyz of layer 1, decoded_xyz_layer0 is required for layer 1"
             xyz_2d_spatial_quantized = self.xyz_quantizer(self._xyz_2D)
-            xyz_2d_quantized = torch.cat((xyz_2d_spatial_quantized, self.get_xyz_2d_temporal()), dim=1)  # Shape: [N, 3]
-            xyz_quantized = torch.cat((self.decoded_xyz_layer0, xyz_2d_quantized), dim=0)
-        return torch.tanh(xyz_quantized)
+            xyz_2d_temporal = self.get_xyz_2d_temporal()  # Already in [-1, 1], no tanh needed
+            # Apply tanh only to spatial coordinates, not to temporal component
+            xyz_2d_spatial_tanh = torch.tanh(xyz_2d_spatial_quantized)
+            xyz_2d_quantized = torch.cat((xyz_2d_spatial_tanh, xyz_2d_temporal), dim=1)  # Shape: [N, 3]
+            xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0)
+            xyz_quantized = torch.cat((xyz_3D_tanh, xyz_2d_quantized), dim=0)
+            return xyz_quantized
 
     @property
     def get_features(self):
@@ -398,6 +414,10 @@ class GaussianVideo3D2D(nn.Module):
             self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
             background=self.background, return_alpha=False
         )
+        if self.debug_mode:
+            first_index = self._xyz_3D.shape[0]
+            print('0', self.xys[first_index + self.num_points_list[0][1]][-1].item(), '1', self.xys[first_index + self.num_points_list[1][1]][-1].item(), '2', self.xys[first_index + self.num_points_list[2][1]][-1].item(), '3', self.xys[first_index + self.num_points_list[3][1]][-1].item(), '4', self.xys[first_index + self.num_points_list[-1][1]][-1].item())
+        self.debug_mode = False
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
         return {"render": out_img}
@@ -500,8 +520,12 @@ class GaussianVideo3D2D(nn.Module):
             assert self.decoded_xyz_layer0 is not None, "decoded_xyz_layer0 is required for layer 1"
             assert self.decoded_feature_dc_index_layer0 is not None, "decoded_feature_dc_index_layer0 is required for layer 1"
             assert self.decoded_quant_cholesky_elements_layer0 is not None, "decoded_quant_cholesky_elements_layer0 is required for layer 1"
-            xyz_2d_full = torch.cat((xyz.float(), self.get_xyz_2d_temporal()), dim=1)
-            means = torch.tanh(torch.cat((self.decoded_xyz_layer0, xyz_2d_full), dim=0).float())
+            # Apply tanh only to spatial coordinates, not to temporal component
+            xyz_2D_spatial_tanh = torch.tanh(xyz.float())
+            xyz_2d_temporal = self.get_xyz_2d_temporal()  # Already in [-1, 1], no tanh needed
+            xyz_2d_full = torch.cat((xyz_2D_spatial_tanh, xyz_2d_temporal), dim=1)
+            xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0.float())
+            means = torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
 
             cholesky_2d_decoded = self.cholesky_quantizer_layer1.decompress(quant_cholesky_elements)
             cholesky_elements = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, self.get_cholesky_2d_full(cholesky_2d_decoded) + self.cholesky_bound_2D), dim=0)

@@ -22,7 +22,7 @@ import torchvision.transforms as transforms
 from utils import image_path_to_tensor, images_paths_to_tensor
 from gaussianvideo3D2D import GaussianVideo3D2D
 from gaussianimage_cholesky import GaussianImage_Cholesky
-
+from analyze_quantizers import analyze_quantizer_similarity, plot_quantizer_distributions
 class GaussianVideo3D2DTrainerQuantize:
     """Tests quantized GaussianVideo models on a video (i.e. a set of frames)."""
     def __init__(
@@ -154,6 +154,108 @@ class GaussianVideo3D2DTrainerQuantize:
             end_time = (time.time() - start_time) / 100
         data_dict = gaussian_model.analysis_wo_ec(encoding_dict)
 
+        # Perform quantizer similarity analysis (only if quantization is enabled)
+        try:
+            if not gaussian_model.quantize:
+                print(f"Skipping quantizer analysis for layer {layer}: quantization not enabled")
+            else:
+                print(f"\n{'='*80}")
+                print(f"Quantizer Similarity Analysis - Layer {layer}")
+                print(f"{'='*80}")
+                print(f"Log directory: {self.log_dir}")
+                
+                quantizer_results = analyze_quantizer_similarity(gaussian_model, layer=layer)
+                
+                if quantizer_results is None:
+                    print(f"Warning: analyze_quantizer_similarity returned None for layer {layer}")
+                else:
+                    # Save analysis results (convert to serializable format)
+                    def convert_to_serializable(obj):
+                        if isinstance(obj, np.ndarray):
+                            return obj.tolist()
+                        elif isinstance(obj, (np.integer, np.floating)):
+                            return float(obj) if isinstance(obj, np.floating) else int(obj)
+                        elif isinstance(obj, dict):
+                            return {k: convert_to_serializable(v) for k, v in obj.items()}
+                        elif isinstance(obj, (list, tuple)):
+                            return [convert_to_serializable(item) for item in obj]
+                        elif isinstance(obj, torch.Tensor):
+                            return obj.cpu().numpy().tolist()
+                        return obj
+                    
+                    serializable_results = convert_to_serializable(quantizer_results)
+                    analysis_file = self.log_dir / f"quantizer_analysis_layer_{layer}.npy"
+                    
+                    # Ensure directory exists
+                    analysis_file.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    print(f"Saving analysis results to: {analysis_file}")
+                    print(f"  File exists before save: {analysis_file.exists()}")
+                    print(f"  Directory exists: {analysis_file.parent.exists()}")
+                    print(f"  Directory is writable: {os.access(analysis_file.parent, os.W_OK)}")
+                    
+                    try:
+                        np.save(str(analysis_file), serializable_results)
+                        print(f"  np.save completed")
+                    except Exception as save_error:
+                        print(f"  ERROR during np.save: {save_error}")
+                        raise
+                    
+                    # Verify file was created
+                    if analysis_file.exists():
+                        file_size = analysis_file.stat().st_size
+                        print(f"✓ Analysis file saved successfully: {analysis_file} ({file_size} bytes)")
+                    else:
+                        print(f"✗ ERROR: Analysis file was not created: {analysis_file}")
+                        print(f"  Current working directory: {os.getcwd()}")
+                        print(f"  Absolute path: {analysis_file.absolute()}")
+                    
+                    # Create visualizations
+                    try:
+                        plot_file = self.log_dir / f"quantizer_distributions_layer_{layer}.png"
+                        
+                        # Ensure directory exists
+                        plot_file.parent.mkdir(parents=True, exist_ok=True)
+                        
+                        print(f"Creating visualization: {plot_file}")
+                        print(f"  File exists before save: {plot_file.exists()}")
+                        print(f"  Directory exists: {plot_file.parent.exists()}")
+                        
+                        plot_quantizer_distributions(quantizer_results, output_path=str(plot_file))
+                        
+                        # Verify plot was created
+                        if plot_file.exists():
+                            file_size = plot_file.stat().st_size
+                            print(f"✓ Visualization saved successfully: {plot_file} ({file_size} bytes)")
+                        else:
+                            print(f"✗ ERROR: Visualization file was not created: {plot_file}")
+                            print(f"  Current working directory: {os.getcwd()}")
+                            print(f"  Absolute path: {plot_file.absolute()}")
+                    except Exception as e:
+                        print(f"ERROR: Could not create quantizer visualizations: {e}")
+                        import traceback
+                        traceback.print_exc()
+                    
+                    # Add key metrics to data_dict for logging
+                    if 'cholesky' in quantizer_results:
+                        cholesky_util = quantizer_results['cholesky']['utilization']
+                        data_dict['cholesky_utilization'] = cholesky_util
+                        data_dict['cholesky_compression_ratio'] = quantizer_results['cholesky']['compression_ratio']
+                        self.logwriter.write(f"Layer {layer}: Cholesky utilization: {cholesky_util*100:.1f}%, compression ratio: {quantizer_results['cholesky']['compression_ratio']:.2f}x")
+                    
+                    if 'features' in quantizer_results:
+                        features_util = quantizer_results['features']['utilization']
+                        data_dict['features_utilization'] = features_util
+                        data_dict['features_compression_ratio'] = quantizer_results['features']['compression_ratio']
+                        optimal_codebook = max([s['unique_count'] for s in quantizer_results['features']['per_quantizer_stats']])
+                        current_codebook = quantizer_results['features']['codebook_size']
+                        self.logwriter.write(f"Layer {layer}: Features utilization: {features_util*100:.1f}%, compression ratio: {quantizer_results['features']['compression_ratio']:.2f}x")
+                        self.logwriter.write(f"Layer {layer}: Features codebook usage: {optimal_codebook}/{current_codebook} entries")
+        except Exception as e:
+            print(f"ERROR: Quantizer analysis failed for layer {layer}: {e}")
+            import traceback
+            traceback.print_exc()
+
         out_video = out["render"].float()  # Expected shape: [1, C, H, W, T]
         mse_loss = F.mse_loss(out_video, gt_image)
         psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
@@ -195,6 +297,36 @@ class GaussianVideo3D2DTrainerQuantize:
                 _ = gaussian_model.decompress_wo_ec(encoding_dict)
             end_time = (time.time() - start_time)/100
         data_dict = gaussian_model.analysis_wo_ec(encoding_dict)
+
+        # Perform quantizer similarity analysis for GVGI (GaussianImage_Cholesky)
+        try:
+            if not gaussian_model.quantize:
+                print(f"Skipping quantizer analysis for frame {t}: quantization not enabled")
+            else:
+                print(f"\n{'='*80}")
+                print(f"Quantizer Similarity Analysis - GVGI Frame {t}")
+                print(f"{'='*80}")
+                
+                # Analyze cholesky quantizer
+                if hasattr(gaussian_model, 'cholesky_quantizer') and gaussian_model.cholesky_quantizer is not None:
+                    cholesky_results = gaussian_model.cholesky_quantizer.analyze(gaussian_model._cholesky, verbose=True)
+                    data_dict['cholesky_utilization'] = cholesky_results['utilization']
+                    data_dict['cholesky_compression_ratio'] = cholesky_results['compression_ratio']
+                    self.logwriter.write(f"Frame {t}: Cholesky utilization: {cholesky_results['utilization']*100:.1f}%, compression ratio: {cholesky_results['compression_ratio']:.2f}x")
+                
+                # Analyze features quantizer
+                if hasattr(gaussian_model, 'features_dc_quantizer') and gaussian_model.features_dc_quantizer is not None:
+                    features_results = gaussian_model.features_dc_quantizer.analyze(gaussian_model._features_dc, verbose=True)
+                    data_dict['features_utilization'] = features_results['utilization']
+                    data_dict['features_compression_ratio'] = features_results['compression_ratio']
+                    optimal_codebook = max([s['unique_count'] for s in features_results['per_quantizer_stats']])
+                    current_codebook = features_results['codebook_size']
+                    self.logwriter.write(f"Frame {t}: Features utilization: {features_results['utilization']*100:.1f}%, compression ratio: {features_results['compression_ratio']:.2f}x")
+                    self.logwriter.write(f"Frame {t}: Features codebook usage: {optimal_codebook}/{current_codebook} entries")
+        except Exception as e:
+            print(f"Warning: Quantizer analysis failed for frame {t}: {e}")
+            import traceback
+            traceback.print_exc()
     
         out_img = out["render"].float()
         mse_loss = F.mse_loss(out_img, gt_image)

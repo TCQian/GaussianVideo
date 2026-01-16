@@ -68,14 +68,7 @@ class GaussianVideo3D2D(nn.Module):
         if self.layer == 0:
             assert checkpoint_path_layer1 is None, "Layer 1 checkpoint is not required for Layer 0 training"
         elif self.layer == 1:
-            # Allow layer 1 training without layer 0 checkpoint (0 gaussians in layer 0)
-            if checkpoint_path_layer0 is None:
-                print("No layer 0 checkpoint provided. Initializing layer 1 with 0 gaussians in layer 0.")
-                # Initialize empty tensors for layer 0
-                self._xyz_3D = torch.empty(0, 3, device=self.device).requires_grad_(False)
-                self._cholesky_3D = torch.empty(0, 6, device=self.device).requires_grad_(False)
-                self._features_dc_3D = torch.empty(0, 3, device=self.device).requires_grad_(False)
-                self._opacity_3D = nn.Parameter(torch.empty(0, 1, device=self.device))
+            assert checkpoint_path_layer0 is not None, "Layer 0 checkpoint is required for Layer 1 training"
 
         if checkpoint_path_layer0 is not None:
             print(f"Loading layer 0 checkpoint from: {checkpoint_path_layer0}")
@@ -94,10 +87,7 @@ class GaussianVideo3D2D(nn.Module):
                 self._xyz_3D = xyz.requires_grad_(False)
                 self._cholesky_3D = cholesky.requires_grad_(False)
                 self._features_dc_3D = features_dc.requires_grad_(False)
-                if self._xyz_3D.shape[0] > 0:
-                    print(f'Layer 0 gaussians are frozen for Layer {self.layer} training')
-                else:
-                    print(f'Layer 0 has 0 gaussians for Layer {self.layer} training')
+                print(f'Layer 0 gaussians are frozen for Layer {self.layer} training')
 
             if self.quantize:
                 try:
@@ -110,9 +100,6 @@ class GaussianVideo3D2D(nn.Module):
         else:
             if self.layer == 0:
                 self._init_layer0()
-            elif self.layer == 1:
-                # Layer 1 without layer 0 checkpoint - already initialized empty tensors above
-                pass
 
         if checkpoint_path_layer1 is not None:
             print(f"Loading layer 1 checkpoint from: {checkpoint_path_layer1}")
@@ -152,8 +139,7 @@ class GaussianVideo3D2D(nn.Module):
                 self.trainable_params.extend(self.features_dc_quantizer_layer0.parameters())
 
         elif self.layer == 1:
-            # Only add opacity_3D if layer 0 has gaussians
-            if self._xyz_3D is not None and self._xyz_3D.shape[0] > 0:
+            if self._xyz_3D.shape[0] > 0:
                 self.trainable_params.append(self._opacity_3D)
             self.trainable_params.append(self._xyz_2D)
             self.trainable_params.append(self._cholesky_2D)
@@ -184,15 +170,7 @@ class GaussianVideo3D2D(nn.Module):
         print("Layer 0 initialized, number of gaussians: ", self._xyz_3D.shape[0])
 
     def _init_layer1(self):
-        # Handle case where layer 0 has 0 gaussians
-        if self._xyz_3D is None or self._xyz_3D.shape[0] == 0:
-            self.num_points_layer0 = 0
-            self._xyz_3D = torch.empty(0, 3, device=self.device).requires_grad_(False)
-            self._cholesky_3D = torch.empty(0, 6, device=self.device).requires_grad_(False)
-            self._features_dc_3D = torch.empty(0, 3, device=self.device).requires_grad_(False)
-            self._opacity_3D = nn.Parameter(torch.empty(0, 1, device=self.device))
-        else:
-            self.num_points_layer0 = self._xyz_3D.shape[0]
+        self.num_points_layer0 = self._xyz_3D.shape[0]
         self.init_num_points = int((self.num_points * self.T) - self.num_points_layer0)
         num_points_per_frame = int(self.init_num_points / self.T)
         self.num_points_list = []
@@ -249,15 +227,11 @@ class GaussianVideo3D2D(nn.Module):
         if self.layer == 0:
             return torch.tanh(self._xyz_3D)
         elif self.layer == 1:
+            xyz_3D_tanh = torch.tanh(self._xyz_3D)
             xyz_2D_spatial_tanh = torch.tanh(self._xyz_2D)
             xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
             xyz_2d_full = torch.cat((xyz_2D_spatial_tanh, xyz_2d_temporal), dim=1)
-            # Handle case where layer 0 has 0 gaussians
-            if self._xyz_3D is not None and self._xyz_3D.shape[0] > 0:
-                xyz_3D_tanh = torch.tanh(self._xyz_3D)
-                return torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
-            else:
-                return xyz_2d_full
+            return torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
         
     @property
     def get_xyz_quantize(self):
@@ -266,16 +240,13 @@ class GaussianVideo3D2D(nn.Module):
             xyz_quantized = self.xyz_quantizer(self._xyz_3D)
             return torch.tanh(xyz_quantized)
         elif self.layer == 1:
+            assert self.decoded_xyz_layer0 is not None, "To get xyz of layer 1, decoded_xyz_layer0 is required for layer 1"
             xyz_2d_spatial_quantized = self.xyz_quantizer(self._xyz_2D)
             xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
             xyz_2d_spatial_tanh = torch.tanh(xyz_2d_spatial_quantized)
             xyz_2d_quantized = torch.cat((xyz_2d_spatial_tanh, xyz_2d_temporal), dim=1)
-            # Handle case where layer 0 has 0 gaussians
-            if self.decoded_xyz_layer0 is not None and self.decoded_xyz_layer0.shape[0] > 0:
-                xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0)
-                xyz_quantized = torch.cat((xyz_3D_tanh, xyz_2d_quantized), dim=0)
-            else:
-                xyz_quantized = xyz_2d_quantized
+            xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0)
+            xyz_quantized = torch.cat((xyz_3D_tanh, xyz_2d_quantized), dim=0)
             return xyz_quantized
 
     @property
@@ -283,11 +254,7 @@ class GaussianVideo3D2D(nn.Module):
         if self.layer == 0:
             return self._features_dc_3D
         elif self.layer == 1:
-            # Handle case where layer 0 has 0 gaussians
-            if self._features_dc_3D is not None and self._features_dc_3D.shape[0] > 0:
-                return torch.cat((self._features_dc_3D, self._features_dc_2D), dim=0)
-            else:
-                return self._features_dc_2D
+            return torch.cat((self._features_dc_3D, self._features_dc_2D), dim=0)
     
     @property
     def get_features_quantize(self):
@@ -295,12 +262,9 @@ class GaussianVideo3D2D(nn.Module):
         if self.layer == 0:
             feature_quantized, self.l_vqc, self.c_bit = self.features_dc_quantizer_layer0(self._features_dc_3D)
         elif self.layer == 1:
+            assert self.decoded_feature_dc_index_layer0 is not None, "To get features of layer 1, decoded_feature_dc_index_layer0 is required for layer 1"
             features_quantized_2D, self.l_vqc, self.c_bit  = self.features_dc_quantizer_layer1(self._features_dc_2D)
-            # Handle case where layer 0 has 0 gaussians
-            if self.decoded_feature_dc_index_layer0 is not None and self.decoded_feature_dc_index_layer0.shape[0] > 0:
-                feature_quantized = torch.cat((self.decoded_feature_dc_index_layer0, features_quantized_2D), dim=0)
-            else:
-                feature_quantized = features_quantized_2D
+            feature_quantized = torch.cat((self.decoded_feature_dc_index_layer0, features_quantized_2D), dim=0)
         return feature_quantized
     
     @property
@@ -308,11 +272,7 @@ class GaussianVideo3D2D(nn.Module):
         if self.layer == 0:
             return self.opacity_activation(self._opacity_3D)
         elif self.layer == 1:
-            # Handle case where layer 0 has 0 gaussians
-            if self._opacity_3D is not None and self._opacity_3D.shape[0] > 0:
-                return self.opacity_activation(torch.cat((self._opacity_3D, self._opacity_2D), dim=0))
-            else:
-                return self.opacity_activation(self._opacity_2D)
+            return self.opacity_activation(torch.cat((self._opacity_3D, self._opacity_2D), dim=0))
     
     def get_cholesky_2d_full(self, cholesky_2d_to_be_extended):
         num_points_2d = cholesky_2d_to_be_extended.shape[0]
@@ -333,13 +293,8 @@ class GaussianVideo3D2D(nn.Module):
         if self.layer == 0:
             return self._cholesky_3D + self.cholesky_bound_3D
         elif self.layer == 1:
-            cholesky_2d_full = self.get_cholesky_2d_full(self._cholesky_2D) + self.cholesky_bound_2D
-            # Handle case where layer 0 has 0 gaussians
-            if self._cholesky_3D is not None and self._cholesky_3D.shape[0] > 0:
-                merged_cholesky = torch.cat((self._cholesky_3D + self.cholesky_bound_3D, cholesky_2d_full), dim=0)
-                return merged_cholesky
-            else:
-                return cholesky_2d_full
+            merged_cholesky = torch.cat((self._cholesky_3D + self.cholesky_bound_3D, self.get_cholesky_2d_full(self._cholesky_2D) + self.cholesky_bound_2D), dim=0)
+            return merged_cholesky
 
     @property
     def get_cholesky_elements_quantize(self):
@@ -348,13 +303,9 @@ class GaussianVideo3D2D(nn.Module):
             cholesky, self.l_vqs, self.s_bit = self.cholesky_quantizer_layer0(self._cholesky_3D)
             cholesky = cholesky + self.cholesky_bound_3D
         elif self.layer == 1:
+            assert self.decoded_quant_cholesky_elements_layer0 is not None, "To get cholesky of layer 1, decoded_quant_cholesky_elements_layer0 is required for layer 1"
             cholesky_2d_used_quantized, self.l_vqs, self.s_bit = self.cholesky_quantizer_layer1(self._cholesky_2D)
-            cholesky_2d_full = self.get_cholesky_2d_full(cholesky_2d_used_quantized) + self.cholesky_bound_2D
-            # Handle case where layer 0 has 0 gaussians
-            if self.decoded_quant_cholesky_elements_layer0 is not None and self.decoded_quant_cholesky_elements_layer0.shape[0] > 0:
-                cholesky = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, cholesky_2d_full), dim=0)
-            else:
-                cholesky = cholesky_2d_full
+            cholesky = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, self.get_cholesky_2d_full(cholesky_2d_used_quantized) + self.cholesky_bound_2D), dim=0)
         return cholesky
     
     def prune(self, opac_threshold=0.2):
@@ -438,11 +389,7 @@ class GaussianVideo3D2D(nn.Module):
             return xys
         
         xys_fixed = xys.clone()
-        # Handle case where layer 0 has 0 gaussians
-        if self._xyz_3D is not None and self._xyz_3D.shape[0] > 0:
-            layer1_start = self._xyz_3D.shape[0]
-        else:
-            layer1_start = 0
+        layer1_start = self._xyz_3D.shape[0] if self._xyz_3D.shape[0] > 0 else 0
         
         for t, (start, end) in enumerate(self.num_points_list):
             idx_start = layer1_start + start
@@ -530,22 +477,16 @@ class GaussianVideo3D2D(nn.Module):
         '''
         To stimulate the analysis of encoder and decoder for layer 1, we need to get the encoded and decoded attributes for layer 0
         '''
-        # Handle case where layer 0 has 0 gaussians
-        if self._xyz_3D is None or self._xyz_3D.shape[0] == 0:
-            self.decoded_xyz_layer0 = torch.empty(0, 3, device=self.device)
-            self.decoded_feature_dc_index_layer0 = torch.empty(0, 3, device=self.device)
-            self.decoded_quant_cholesky_elements_layer0 = torch.empty(0, 6, device=self.device)
-        else:
-            encoded_xyz = self._xyz_3D.half()
-            _, feature_dc_index_encoded = self.features_dc_quantizer_layer0.compress(self._features_dc_3D)
-            quant_cholesky_elements_encoded, _ = self.cholesky_quantizer_layer0.compress(self._cholesky_3D)
+        encoded_xyz = self._xyz_3D.half()
+        _, feature_dc_index_encoded = self.features_dc_quantizer_layer0.compress(self._features_dc_3D)
+        quant_cholesky_elements_encoded, _ = self.cholesky_quantizer_layer0.compress(self._cholesky_3D)
 
-            decoded_feature_dc_index = self.features_dc_quantizer_layer0.decompress(feature_dc_index_encoded)
-            decoded_quant_cholesky_elements = self.cholesky_quantizer_layer0.decompress(quant_cholesky_elements_encoded)
+        decoded_feature_dc_index = self.features_dc_quantizer_layer0.decompress(feature_dc_index_encoded)
+        decoded_quant_cholesky_elements = self.cholesky_quantizer_layer0.decompress(quant_cholesky_elements_encoded)
 
-            self.decoded_xyz_layer0 = encoded_xyz.float().detach()
-            self.decoded_feature_dc_index_layer0 = decoded_feature_dc_index.detach()
-            self.decoded_quant_cholesky_elements_layer0 = decoded_quant_cholesky_elements.detach()
+        self.decoded_xyz_layer0 = encoded_xyz.float().detach()
+        self.decoded_feature_dc_index_layer0 = decoded_feature_dc_index.detach()
+        self.decoded_quant_cholesky_elements_layer0 = decoded_quant_cholesky_elements.detach()
     
     def compress_wo_ec(self):
         if self.layer == 0:
@@ -569,31 +510,21 @@ class GaussianVideo3D2D(nn.Module):
             cholesky_elements = self.cholesky_quantizer_layer0.decompress(quant_cholesky_elements) + self.cholesky_bound_3D
             colors = self.features_dc_quantizer_layer0.decompress(feature_dc_index)
         elif self.layer == 1:
+            assert self.decoded_xyz_layer0 is not None, "decoded_xyz_layer0 is required for layer 1"
+            assert self.decoded_feature_dc_index_layer0 is not None, "decoded_feature_dc_index_layer0 is required for layer 1"
+            assert self.decoded_quant_cholesky_elements_layer0 is not None, "decoded_quant_cholesky_elements_layer0 is required for layer 1"
             # Apply tanh only to spatial coordinates, not to temporal component
             xyz_2D_spatial_tanh = torch.tanh(xyz.float())
-            xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
+            xyz_2d_temporal = self.get_xyz_2d_temporal()  # Already in [-1, 1], no tanh needed
             xyz_2d_full = torch.cat((xyz_2D_spatial_tanh, xyz_2d_temporal), dim=1)
-            # Handle case where layer 0 has 0 gaussians
-            if self.decoded_xyz_layer0 is not None and self.decoded_xyz_layer0.shape[0] > 0:
-                xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0.float())
-                means = torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
-            else:
-                means = xyz_2d_full
+            xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0.float())
+            means = torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
 
             cholesky_2d_decoded = self.cholesky_quantizer_layer1.decompress(quant_cholesky_elements)
-            cholesky_2d_full = self.get_cholesky_2d_full(cholesky_2d_decoded) + self.cholesky_bound_2D
-            # Handle case where layer 0 has 0 gaussians
-            if self.decoded_quant_cholesky_elements_layer0 is not None and self.decoded_quant_cholesky_elements_layer0.shape[0] > 0:
-                cholesky_elements = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, cholesky_2d_full), dim=0)
-            else:
-                cholesky_elements = cholesky_2d_full
+            cholesky_elements = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, self.get_cholesky_2d_full(cholesky_2d_decoded) + self.cholesky_bound_2D), dim=0)
 
             features_dc_2d_decoded = self.features_dc_quantizer_layer1.decompress(feature_dc_index)
-            # Handle case where layer 0 has 0 gaussians
-            if self.decoded_feature_dc_index_layer0 is not None and self.decoded_feature_dc_index_layer0.shape[0] > 0:
-                colors = torch.cat((self.decoded_feature_dc_index_layer0, features_dc_2d_decoded), dim=0)
-            else:
-                colors = features_dc_2d_decoded
+            colors = torch.cat((self.decoded_feature_dc_index_layer0, features_dc_2d_decoded), dim=0)
         
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
             means, cholesky_elements, self.H, self.W, self.T, self.tile_bounds

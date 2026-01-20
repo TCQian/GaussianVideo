@@ -19,7 +19,7 @@ NUM_FRAMES=5
 
 NUM_POINTS=12000
 TRAIN_ITERATIONS=50000
-LEARNING_RATE=0.001
+LEARNING_RATE=0.01
 
 # Parse command-line arguments.
 # Usage: ./script.sh --data_name MyData --num_points 30000 --start_frame 40 --num_frames 15
@@ -66,17 +66,17 @@ CHECKPOINT_QUANT_PATH_LAYER1_GV3D2D="${CHECKPOINT_DIR_PATH_QUANT}/layer1/GV3D2D_
 CHECKPOINT_QUANT_PATH_LAYER1_GVGI="${CHECKPOINT_DIR_PATH_QUANT}/layer1/GVGI_i${TRAIN_ITERATIONS}_g${NUM_POINTS}/"
 
 # Run the training script with the required arguments.
-python train_3D2D.py \
-    --layer 0 \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --model_name "GV3D2D" \
-    --iterations "${TRAIN_ITERATIONS}" \
-    --num_points "${NUM_POINTS}" \
-    --lr "${LEARNING_RATE}" \
-    --save_imgs
+# python train_3D2D.py \
+#     --layer 0 \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --model_name "GV3D2D" \
+#     --iterations "${TRAIN_ITERATIONS}" \
+#     --num_points "${NUM_POINTS}" \
+#     --lr "${LEARNING_RATE}" \
+#     --save_imgs
 
 python train_3D2D.py \
     --layer 1 \

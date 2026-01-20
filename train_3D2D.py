@@ -164,9 +164,9 @@ class GaussianVideo3D2DTrainer:
 
             if (iter % 1000 == 1 and iter > 1):
                 gaussian_model.prune(opac_threshold=0.05)
-                if self.layer == 1 and iter < self.densify_until_iter:
-                    num_new_gaussians = max(100, int(gaussian_model._xyz_2D.shape[0] * self.densify_factor))
-                    gaussian_model.densify(num_new_gaussians=num_new_gaussians)
+                # if self.layer == 1 and iter < self.densify_until_iter:
+                #     num_new_gaussians = max(100, int(gaussian_model._xyz_2D.shape[0] * self.densify_factor))
+                #     gaussian_model.densify(num_new_gaussians=num_new_gaussians)
 
             loss, psnr = gaussian_model.train_iter(gt_image)
             

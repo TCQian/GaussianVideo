@@ -231,20 +231,13 @@ class VectorQuantizer(nn.Module):
         # embed_index should be a tensor with shape [num_points, num_quantizers]
         embed_index_np = embed_index.int().cpu().numpy()
         
+        # Get entropy coding info
+        compressed, histogram_table, unique = compress_matrix_flatten_categorical(embed_index_np.flatten().tolist())
+        
         # Compute statistics
         total_vectors = embed_index_np.shape[0]
         num_quantizers = embed_index_np.shape[1]
-        
-        # Find unique index combinations (pairs/tuples)
-        # Use numpy unique with axis=0 to find unique rows (combinations)
-        unique_combinations, unique_inverse, unique_counts = np.unique(
-            embed_index_np, return_inverse=True, return_counts=True, axis=0
-        )
-        unique_indices = len(unique_combinations)
-        
-        # For entropy coding, we still need to flatten for the compression function
-        # But we'll track combinations separately for display
-        compressed, histogram_table, unique = compress_matrix_flatten_categorical(embed_index_np.flatten().tolist())
+        unique_indices = len(unique)
         
         # Codebook size
         if self.num_quantizers == 1:
@@ -290,7 +283,7 @@ class VectorQuantizer(nn.Module):
             'compression_ratio': current_total / actual_bits if actual_bits > 0 else 1.0,
             'per_quantizer_stats': index_distributions,
             'most_common_indices': sorted(
-                zip(unique_combinations.tolist(), unique_counts.tolist()),
+                zip(unique.tolist(), histogram_table.tolist()),
                 key=lambda x: x[1], reverse=True
             )[:10]
         }
@@ -304,7 +297,7 @@ class VectorQuantizer(nn.Module):
             print(f"Codebook size: {codebook_size}")
             print(f"Unique index combinations: {unique_indices} / {max_possible_indices} ({results['utilization']*100:.1f}% utilization)")
             print(f"Entropy: {entropy_bits:.3f} bits/index")
-            print(f"Current (fixed): {current_total:,.0f} bits")
+            print(f"Current (fixed): {current_bits:,.0f} bits")
             print(f"Theoretical (entropy): {entropy_coded_bits:,.0f} bits")
             print(f"Actual (with overhead): {actual_bits:,.0f} bits")
             print(f"Compression ratio: {results['compression_ratio']:.2f}x")
@@ -315,12 +308,8 @@ class VectorQuantizer(nn.Module):
             
             print(f"\nTop 10 most common index combinations:")
             for idx_combo, count in results['most_common_indices']:
-                pct = count / total_vectors * 100  # Percentage of vectors, not total indices
-                # Format as [idx0, idx1, ...] for readability
-                if isinstance(idx_combo, (list, tuple, np.ndarray)):
-                    idx_str = "[" + ", ".join(map(str, idx_combo)) + "]"
-                else:
-                    idx_str = f"[{idx_combo}]"
+                pct = count / (total_vectors * num_quantizers) * 100
+                idx_str = str(idx_combo) if isinstance(idx_combo, (list, tuple, np.ndarray)) else f"[{idx_combo}]"
                 print(f"  {idx_str}: {count:,} times ({pct:.1f}%)")
         
         return results

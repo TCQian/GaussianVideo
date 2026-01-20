@@ -77,7 +77,7 @@ class GaussianVideo3D2D(nn.Module):
             xyz = checkpoint_layer0['_xyz_3D']
             cholesky = checkpoint_layer0['_cholesky_3D']
             features_dc = checkpoint_layer0['_features_dc_3D']
-            self._opacity_3D = nn.Parameter(checkpoint_layer0['_opacity_3D'])
+            self._opacity_3D = nn.Parameter(self.opacity_activation(checkpoint_layer0['_opacity_3D']))
 
             if self.layer == 0:
                 self._xyz_3D = nn.Parameter(xyz, requires_grad=True)
@@ -113,7 +113,7 @@ class GaussianVideo3D2D(nn.Module):
 
             self._features_dc_2D = nn.Parameter(checkpoint_layer1['_features_dc_2D'])
             self._opacity_3D = nn.Parameter(checkpoint_layer1['_opacity_3D']) # loading opacity_3D tuned in layer 1 training
-            self._opacity_2D = nn.Parameter(checkpoint_layer1['_opacity_2D'])
+            self._opacity_2D = nn.Parameter(checkpoint_layer1['_opacity_2D']).requires_grad_(False)
 
             if self.quantize:
                 try:
@@ -144,7 +144,7 @@ class GaussianVideo3D2D(nn.Module):
             self.trainable_params.append(self._xyz_2D)
             self.trainable_params.append(self._cholesky_2D)
             self.trainable_params.append(self._features_dc_2D)
-            self.trainable_params.append(self._opacity_2D)
+            # self.trainable_params.append(self._opacity_2D)
             if self.quantize:
                 self.trainable_params.append(self.cholesky_quantizer_layer1.scale)
                 self.trainable_params.append(self.cholesky_quantizer_layer1.beta)
@@ -184,8 +184,7 @@ class GaussianVideo3D2D(nn.Module):
 
         self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 2) - 0.5)))
         self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points, 3))
-
-        self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
+        self._opacity_2D = nn.Parameter(torch.ones(self.init_num_points, 1)).requires_grad_(False)
         self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points, 3))
 
         if self.quantize:
@@ -272,7 +271,7 @@ class GaussianVideo3D2D(nn.Module):
         if self.layer == 0:
             return self.opacity_activation(self._opacity_3D)
         elif self.layer == 1:
-            return self.opacity_activation(torch.cat((self._opacity_3D, self._opacity_2D), dim=0))
+            return torch.cat((self._opacity_3D, self._opacity_2D), dim=0)
     
     def get_cholesky_2d_full(self, cholesky_2d_to_be_extended):
         num_points_2d = cholesky_2d_to_be_extended.shape[0]

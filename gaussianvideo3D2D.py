@@ -513,8 +513,9 @@ class GaussianVideo3D2D(nn.Module):
             assert self.decoded_xyz_layer0 is not None, "decoded_xyz_layer0 is required for layer 1"
             assert self.decoded_feature_dc_index_layer0 is not None, "decoded_feature_dc_index_layer0 is required for layer 1"
             assert self.decoded_quant_cholesky_elements_layer0 is not None, "decoded_quant_cholesky_elements_layer0 is required for layer 1"
+            # Apply tanh only to spatial coordinates, not to temporal component
             xyz_2D_spatial_tanh = torch.tanh(xyz.float())
-            xyz_2d_temporal = torch.zeros(xyz.shape[0], 1, device=xyz.device, dtype=xyz.dtype)
+            xyz_2d_temporal = self.get_xyz_2d_temporal()  # Already in [-1, 1], no tanh needed
             xyz_2d_full = torch.cat((xyz_2D_spatial_tanh, xyz_2d_temporal), dim=1)
             xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0.float())
             means = torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
@@ -559,75 +560,26 @@ class GaussianVideo3D2D(nn.Module):
             features_dc_quantizer = self.features_dc_quantizer_layer1
             cholesky_quantizer = self.cholesky_quantizer_layer1
 
-        print(f"\n{'='*80}")
-        print(f"ANALYSIS_WO_EC - Layer {self.layer} Bit Calculation Comparison")
-        print(f"{'='*80}")
-
-        # Calculate codebook bits
         for layer in features_dc_quantizer.quantizer.layers:
             codebook_bits += layer._codebook.embed.numel() * torch.finfo(layer._codebook.embed.dtype).bits
 
-        # Calculate initial bits (overhead)
-        cholesky_scale_bits = cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits
-        cholesky_beta_bits = cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits
-        initial_bits += cholesky_scale_bits
-        initial_bits += cholesky_beta_bits
+        initial_bits += cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits
+        initial_bits += cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits
         initial_bits += codebook_bits
-
-        print(f"\n[INITIAL BITS - Overhead]")
-        print(f"  Cholesky scale: {cholesky_scale_bits:,} bits ({cholesky_quantizer.scale.numel()} elements × {torch.finfo(cholesky_quantizer.scale.dtype).bits} bits)")
-        print(f"  Cholesky beta:  {cholesky_beta_bits:,} bits ({cholesky_quantizer.beta.numel()} elements × {torch.finfo(cholesky_quantizer.beta.dtype).bits} bits)")
-        print(f"  Codebook:       {codebook_bits:,} bits")
-        print(f"  Total initial:  {initial_bits:,} bits")
 
         total_bits += initial_bits
 
-        # Position bits
         position_bits = xyz.numel() * 16
         total_bits += position_bits
-        print(f"\n[POSITION BITS]")
-        print(f"  Calculated: {position_bits:,} bits ({xyz.numel()} elements × 16 bits)")
-        print(f"  (No quantizer.size() method for position - using fixed 16 bits/element)")
 
-        # Feature DC index bits
         feature_dc_index_np = feature_dc_index.int().cpu().numpy()
         index_max = np.max(feature_dc_index_np)
         max_bit = np.ceil(np.log2(index_max + 1))
-        feature_dc_index_bits_calculated = feature_dc_index_np.size * max_bit
-        total_bits += feature_dc_index_bits_calculated
+        total_bits += feature_dc_index_np.size * max_bit
 
-        # Get actual size from quantizer
-        features_dc_actual_bits = features_dc_quantizer.size(feature_dc_index)
-        features_dc_index_bits_actual = features_dc_actual_bits - codebook_bits  # Remove codebook from actual to compare index bits
-
-        print(f"\n[FEATURE DC INDEX BITS]")
-        print(f"  Index shape: {feature_dc_index_np.shape}")
-        print(f"  Max index value: {index_max}")
-        print(f"  Bits per index (calculated): {max_bit:.1f} bits (ceil(log2({index_max + 1})))")
-        print(f"  Calculated (wo_ec): {feature_dc_index_bits_calculated:,} bits ({feature_dc_index_np.size} indices × {max_bit:.1f} bits)")
-        print(f"  Actual (with EC):  {features_dc_index_bits_actual:,} bits (from quantizer.size() - codebook)")
-        print(f"  Difference:        {feature_dc_index_bits_calculated - features_dc_index_bits_actual:,.0f} bits")
-        print(f"  Compression ratio: {feature_dc_index_bits_calculated / features_dc_index_bits_actual:.2f}x" if features_dc_index_bits_actual > 0 else "  Compression ratio: N/A")
-        print(f"  Full actual size:  {features_dc_actual_bits:,} bits (includes codebook)")
-
-        # Cholesky quantized elements bits
         quant_cholesky_elements_np = quant_cholesky_elements.cpu().numpy()
-        cholesky_elements_bits_calculated = quant_cholesky_elements_np.size * 6
-        total_bits += cholesky_elements_bits_calculated
+        total_bits += quant_cholesky_elements_np.size * 6
 
-        # Get actual size from quantizer
-        cholesky_actual_bits = cholesky_quantizer.size(quant_cholesky_elements)
-        cholesky_elements_bits_actual = cholesky_actual_bits - cholesky_scale_bits - cholesky_beta_bits  # Remove overhead
-
-        print(f"\n[CHOLESKY QUANTIZED ELEMENTS BITS]")
-        print(f"  Elements shape: {quant_cholesky_elements_np.shape}")
-        print(f"  Calculated (wo_ec): {cholesky_elements_bits_calculated:,} bits ({quant_cholesky_elements_np.size} elements × 6 bits)")
-        print(f"  Actual (with EC):   {cholesky_elements_bits_actual:,} bits (from quantizer.size() - scale - beta)")
-        print(f"  Difference:         {cholesky_elements_bits_calculated - cholesky_elements_bits_actual:,.0f} bits")
-        print(f"  Compression ratio: {cholesky_elements_bits_calculated / cholesky_elements_bits_actual:.2f}x" if cholesky_elements_bits_actual > 0 else "  Compression ratio: N/A")
-        print(f"  Full actual size:   {cholesky_actual_bits:,} bits (includes scale + beta)")
-
-        # Component-wise breakdown
         cholesky_bits = (
             cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits +
             cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits +
@@ -636,45 +588,10 @@ class GaussianVideo3D2D(nn.Module):
 
         feature_dc_bits = codebook_bits + feature_dc_index_np.size * max_bit
 
-        # Total comparison
-        total_bits_actual = (
-            initial_bits +
-            position_bits +
-            features_dc_actual_bits +
-            cholesky_elements_bits_actual
-        )
-
-        print(f"\n[TOTAL BITS COMPARISON]")
-        print(f"  Calculated (wo_ec): {total_bits:,} bits")
-        print(f"  Actual (with EC):   {total_bits_actual:,} bits")
-        print(f"  Difference:         {total_bits - total_bits_actual:,.0f} bits")
-        print(f"  Compression ratio: {total_bits / total_bits_actual:.2f}x" if total_bits_actual > 0 else "  Compression ratio: N/A")
-
-        # BPP calculation
         bpp = total_bits / (self.H * self.W * self.T)
         position_bpp = position_bits / (self.H * self.W * self.T)
         cholesky_bpp = cholesky_bits / (self.H * self.W * self.T)
         feature_dc_bpp = feature_dc_bits / (self.H * self.W * self.T)
-        
-        bpp_actual = total_bits_actual / (self.H * self.W * self.T)
-        cholesky_bpp_actual = cholesky_actual_bits / (self.H * self.W * self.T)
-        feature_dc_bpp_actual = features_dc_actual_bits / (self.H * self.W * self.T)
-
-        print(f"\n[BITS PER PIXEL (BPP) COMPARISON]")
-        print(f"  Video dimensions: {self.H} × {self.W} × {self.T} = {self.H * self.W * self.T:,} pixels")
-        print(f"  Position BPP:      {position_bpp:.6f} (same for both)")
-        print(f"  Cholesky BPP:")
-        print(f"    Calculated:     {cholesky_bpp:.6f}")
-        print(f"    Actual:         {cholesky_bpp_actual:.6f}")
-        print(f"  Feature DC BPP:")
-        print(f"    Calculated:     {feature_dc_bpp:.6f}")
-        print(f"    Actual:         {feature_dc_bpp_actual:.6f}")
-        print(f"  Total BPP:")
-        print(f"    Calculated:     {bpp:.6f}")
-        print(f"    Actual:         {bpp_actual:.6f}")
-        print(f"    Difference:     {bpp - bpp_actual:.6f} ({((bpp - bpp_actual) / bpp * 100):.1f}% reduction)")
-
-        print(f"\n{'='*80}\n")
 
         return {
             "bpp": bpp,

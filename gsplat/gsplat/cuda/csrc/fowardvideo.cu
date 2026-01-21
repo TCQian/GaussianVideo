@@ -70,7 +70,30 @@ __global__ void project_gaussians_video_forward_kernel(
 
     // Computes the conic and radius of the gaussian based on the covariance matrix
     // radius is in pixel space
-    bool ok = compute_cov3d_bounds(cov3d, conic, radius);
+    bool ok;
+    if (l31 == 0.0f && l32 == 0.0f && l33 == 1.0f) {
+        // Layer-1: 2D Cholesky extended with (0,0,1). Use 2D conic then map to 3D.
+        // cov2d = (Cxx, Cxy, Cyy) for the (x,y) block; conic2d = (invCxx, invCxy, invCyy).
+        // 3D cov is block-diag([A, 0; 0, 1]) so 3D conic = block-diag([A^-1, 0; 0, 1]).
+        float3 cov2d = {
+            l11*l11,
+            l11*l21,
+            l21*l21 + l22*l22
+        };
+        float3 conic2d;
+        ok = compute_cov2d_bounds(cov2d, conic2d, radius);
+        if (ok) {
+            // float6 conic: (invCxx, invCxy, invCxz, invCyy, invCyz, invCzz)
+            conic.x = conic2d.x;   // invCxx
+            conic.y = conic2d.y;   // invCxy
+            conic.z = 0.0f;       // invCxz
+            conic.w = conic2d.z;   // invCyy
+            conic.u = 0.0f;       // invCyz
+            conic.v = 1.0f;       // invCzz
+        }
+    } else {
+        ok = compute_cov3d_bounds(cov3d, conic, radius);
+    }
     if (!ok) {
         return; // zero determinant
     }

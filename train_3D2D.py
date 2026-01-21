@@ -17,35 +17,28 @@ from gaussianvideo3D2D import GaussianVideo3D2D
 
 class EarlyStopping:
     def __init__(self, patience=100, min_delta=1e-10):
-        self.patience = patience  
-        self.min_delta = min_delta 
-        self.best_loss = None  
-        self.counter = 0  
-        self.spike_tolerance = None
+        self.patience = patience  # Number of tolerated iterations with no improvement
+        self.min_delta = min_delta  # Minimum improvement threshold
+        self.best_loss = None  # Stores the best loss value
+        self.counter = 0  # Tracks the number of iterations without improvement
 
     def __call__(self, current_loss):
         if self.best_loss is None:
             self.best_loss = current_loss
-            self.spike_tolerance = current_loss
-            return False  
+            return False  # Do not stop training
 
-        if self.best_loss >= current_loss: 
-            if self.best_loss - current_loss > self.min_delta:
-                self.best_loss = current_loss
-                self.counter = 0  
-            else:
-                self.counter += 1
-        else: # current loss > best loss, happens after densification
-            if current_loss > self.spike_tolerance:
-                raise ValueError("Spike detected in loss and even higher than the initial loss")
-            else: 
-                # reset counter and continue training until the loss recovers to the best loss
-                self.counter = 0 
+        # If the improvement over the previous best loss is less than min_delta, consider it no improvement
+        if self.best_loss - current_loss > self.min_delta:
+            self.best_loss = current_loss
+            self.counter = 0  # Reset counter
+        else:
+            self.counter += 1
 
+        # If the counter exceeds patience, stop training
         if self.counter >= self.patience:
-            return True  
+            return True  # Stop training
 
-        return False  
+        return False  # Continue training
 
 class GaussianVideo3D2DTrainer:
     """Trains 3D and 2D gaussians layer by layer to fit a video."""

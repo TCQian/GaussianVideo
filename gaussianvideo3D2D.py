@@ -421,11 +421,11 @@ class GaussianVideo3D2D(nn.Module):
         loss = loss_fn(image, gt_image, self.loss_type, lambda_value=0.7)
         loss.backward()
 
-        if self.debug_mode:
-            for name, param in self.named_parameters():
-                if param.grad is not None:
-                    grad_norm = param.grad.data.norm().item()
-                    print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
+        # if self.debug_mode:
+        #     for name, param in self.named_parameters():
+        #         if param.grad is not None:
+        #             grad_norm = param.grad.data.norm().item()
+        #             print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         with torch.no_grad():
             mse_loss = F.mse_loss(image, gt_image)
@@ -599,6 +599,68 @@ class GaussianVideo3D2D(nn.Module):
         cholesky_bpp = cholesky_bits / (self.H * self.W * self.T)
         feature_dc_bpp = feature_dc_bits / (self.H * self.W * self.T)
 
+        return {
+            "bpp": bpp,
+            "position_bpp": position_bpp,
+            "cholesky_bpp": cholesky_bpp,
+            "feature_dc_bpp": feature_dc_bpp,
+        }
+
+    def analysis(self, encoding_dict):
+        quant_cholesky_elements = encoding_dict["quant_cholesky_elements"]
+        feature_dc_index = encoding_dict["feature_dc_index"]
+        
+        if self.layer == 0:
+            xyz = self._xyz_3D
+            features_dc_quantizer = self.features_dc_quantizer_layer0
+            cholesky_quantizer = self.cholesky_quantizer_layer0 
+        elif self.layer == 1:
+            xyz = self._xyz_2D
+            features_dc_quantizer = self.features_dc_quantizer_layer1
+            cholesky_quantizer = self.cholesky_quantizer_layer1
+
+        cholesky_compressed, cholesky_histogram_table, cholesky_unique = compress_matrix_flatten_categorical(
+            quant_cholesky_elements.int().flatten().tolist()
+        )
+        feature_dc_compressed, feature_dc_histogram_table, feature_dc_unique = compress_matrix_flatten_categorical(
+            feature_dc_index.int().flatten().tolist()
+        )
+        
+        codebook_bits = 0
+        for layer in features_dc_quantizer.quantizer.layers:
+            codebook_bits += layer._codebook.embed.numel() * torch.finfo(layer._codebook.embed.dtype).bits
+
+        initial_bits = 0
+        initial_bits += cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits
+        initial_bits += cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits
+        initial_bits += get_np_size(cholesky_histogram_table) * 8
+        initial_bits += get_np_size(cholesky_unique) * 8
+        initial_bits += get_np_size(feature_dc_histogram_table) * 8
+        initial_bits += get_np_size(feature_dc_unique) * 8
+        initial_bits += codebook_bits
+
+        total_bits = initial_bits
+        total_bits += xyz.numel() * 16 
+        total_bits += get_np_size(cholesky_compressed) * 8
+        total_bits += get_np_size(feature_dc_compressed) * 8
+
+        position_bits = xyz.numel() * 16
+
+        cholesky_bits = (
+            cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits +
+            cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits +
+            get_np_size(cholesky_histogram_table) * 8 +
+            get_np_size(cholesky_unique) * 8 +
+            get_np_size(cholesky_compressed) * 8
+        )
+
+        feature_dc_bits = codebook_bits + get_np_size(feature_dc_histogram_table) * 8 + get_np_size(feature_dc_unique) * 8 + get_np_size(feature_dc_compressed) * 8
+
+        bpp = total_bits / (self.H * self.W * self.T)
+        position_bpp = position_bits / (self.H * self.W * self.T)
+        cholesky_bpp = cholesky_bits / (self.H * self.W * self.T)
+        feature_dc_bpp = feature_dc_bits / (self.H * self.W * self.T)
+        
         return {
             "bpp": bpp,
             "position_bpp": position_bpp,

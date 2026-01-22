@@ -46,6 +46,7 @@ class GaussianVideo3D2DTrainer:
         self,
         layer: int,
         images_paths: list[Path],
+        test_images_paths: list[Path],
         model_name:str = "GV3D2D",
         args = None,
         video_name: str = "Jockey",
@@ -59,6 +60,7 @@ class GaussianVideo3D2DTrainer:
         self.model_name = model_name
         self.device = torch.device("cuda:0")
         self.gt_image = images_paths_to_tensor(images_paths).to(self.device)
+        self.test_gt_image = images_paths_to_tensor(test_images_paths).to(self.device)
 
         BLOCK_H, BLOCK_W, BLOCK_T = 16, 16, 1
         self.H, self.W, self.T = self.gt_image.shape[2], self.gt_image.shape[3], self.gt_image.shape[4]
@@ -226,7 +228,7 @@ class GaussianVideo3D2DTrainer:
         print(f"Number of gaussians at the end of training: {gaussian_model.get_xyz.shape[0]}")
         end_time = time.time() - start_time
         progress_bar.close()
-        psnr_value, ms_ssim_value = self.test_GVGI(gaussian_model, gt_image, t)
+        psnr_value, ms_ssim_value = self.test_GVGI(gaussian_model, self.test_gt_image[...,t], t)
         with torch.no_grad():
             gaussian_model.eval()
             test_start_time = time.time()
@@ -331,12 +333,12 @@ class GaussianVideo3D2DTrainer:
 
     def test(self):
         if self.layer == 0 or self.model_name == "GV3D2D":
-            psnr_value, ms_ssim_value = self.test_GV3D2D(self.gaussian_model, self.gt_image)
+            psnr_value, ms_ssim_value = self.test_GV3D2D(self.gaussian_model, self.test_gt_image)
         elif self.layer == 1:
             psnr_value_list = []
             ms_ssim_value_list = []
             for t in range(self.T):
-                psnr_value, ms_ssim_value = self.test_GVGI(self.gaussian_model_list[t], self.gt_image[...,t], t)
+                psnr_value, ms_ssim_value = self.test_GVGI(self.gaussian_model_list[t], self.test_gt_image[...,t], t)
                 psnr_value_list.append(psnr_value)
                 ms_ssim_value_list.append(ms_ssim_value)
             psnr_value = sum(psnr_value_list) / len(psnr_value_list)
@@ -421,25 +423,35 @@ def main(argv):
     image_length, start = args.num_frames, args.start_frame
 
     images_paths = []
+    test_images_paths = []
     if args.layer == 0:
-        downsampled_dir = os.path.join(os.path.dirname(args.dataset), f'{os.path.basename(args.dataset)}_downsampled')
-        os.makedirs(downsampled_dir, exist_ok=True)
         for i in range(start, start+image_length):
-            downsampled_image_path = os.path.join(downsampled_dir, f'frame_{i+1:04}.png')
-            if not os.path.exists(downsampled_image_path):
-                image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
-                image = Image.open(image_path)
-                original_width, original_height = image.width, image.height
-                image = image.resize((original_width // 2, original_height // 2), Image.LANCZOS)
-                image = image.resize((original_width, original_height), Image.LANCZOS)
-                image.save(downsampled_image_path)
-            images_paths.append(Path(downsampled_image_path))
+            image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
+            downsampled_image_path = os.path.join(os.path.dirname(args.dataset), f'{os.path.basename(args.dataset)}_downsampled/frame_{i+1:04}.png')
+            
+            image = Image.open(image_path)
+            transform = transforms.ToTensor()
+            image_tensor = transform(image).unsqueeze(0)
+            _, _, H, W = image_tensor.shape
+            
+            downsampled = F.interpolate(image_tensor, scale_factor=0.5, mode='area')
+            resized_back = F.interpolate(downsampled, size=(H, W), mode='bilinear', align_corners=False)
+            resized_back = resized_back.squeeze(0)
+            transform_to_pil = transforms.ToPILImage()
+            blurred_image = transform_to_pil(resized_back)
+            
+            os.makedirs(os.path.dirname(downsampled_image_path), exist_ok=True)
+            blurred_image.save(downsampled_image_path)
+
+            images_paths.append(downsampled_image_path)
+            test_images_paths.append(image_path)
     elif args.layer == 1:
         for i in range(start, start+image_length):
             image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
             images_paths.append(image_path)
+            test_images_paths.append(image_path)
 
-    trainer = GaussianVideo3D2DTrainer(layer=args.layer, images_paths=images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name, log_dir=log_dir)
+    trainer = GaussianVideo3D2DTrainer(layer=args.layer, images_paths=images_paths, test_images_paths=test_images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name, log_dir=log_dir)
     psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
 
     logwriter.write("Average: {}x{} for layer {}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(

@@ -421,9 +421,23 @@ def main(argv):
     image_length, start = args.num_frames, args.start_frame
 
     images_paths = []
-    for i in range(start, start+image_length):
-        image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
-        images_paths.append(image_path)
+    if args.layer == 0:
+        downsampled_dir = os.path.join(os.path.dirname(args.dataset), f'{os.path.basename(args.dataset)}_downsampled')
+        os.makedirs(downsampled_dir, exist_ok=True)
+        for i in range(start, start+image_length):
+            downsampled_image_path = os.path.join(downsampled_dir, f'frame_{i+1:04}.png')
+            if not os.path.exists(downsampled_image_path):
+                image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
+                image = Image.open(image_path)
+                original_width, original_height = image.width, image.height
+                image = image.resize((original_width // 2, original_height // 2), Image.LANCZOS)
+                image = image.resize((original_width, original_height), Image.LANCZOS)
+                image.save(downsampled_image_path)
+            images_paths.append(Path(downsampled_image_path))
+    elif args.layer == 1:
+        for i in range(start, start+image_length):
+            image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
+            images_paths.append(image_path)
 
     trainer = GaussianVideo3D2DTrainer(layer=args.layer, images_paths=images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name, log_dir=log_dir)
     psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()

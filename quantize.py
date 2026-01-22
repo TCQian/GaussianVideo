@@ -44,8 +44,10 @@ class UniformQuantizer(nn.Module):
     def _init_data(self, tensor):
         device = tensor.device
         t_min, t_max = tensor.min(dim=0)[0], tensor.max(dim=0)[0]
-        scale = (t_max - t_min) / (self.qmax-self.qmin)
-        self.beta.data = t_min.to(device)
+        range_ = (t_max - t_min).clamp(min=1e-6)
+        scale = range_ / (self.qmax - self.qmin)
+        # Map [t_min, t_max] -> [qmin, qmax]: (t_min - beta)/scale = qmin => beta = t_min - qmin*scale
+        self.beta.data = (t_min - self.qmin * scale).to(device)
         self.scale.data = scale.to(device)
 
     def forward(self, x):

@@ -451,9 +451,6 @@ class GaussianVideo3D2D(nn.Module):
         return loss, psnr
 
     def forward_quantize(self):
-        num_points = self.get_xyz.shape[0]
-        num_xyz_dims = 3 if self.layer == 0 else 2
-        self.l_vqm, self.m_bit = 0, 16 * num_points * num_xyz_dims
         self.l_vqr, self.r_bit = 0, 0 
         
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
@@ -481,6 +478,12 @@ class GaussianVideo3D2D(nn.Module):
         loss = loss_fn(video, gt_video, self.loss_type, lambda_value=0.7) + render_pkg["vq_loss"]
 
         loss.backward()
+
+        if self.debug_mode:
+            for name, param in self.named_parameters():
+                if param.grad is not None:
+                    grad_norm = param.grad.data.norm().item()
+                    print(f"[Gradient Norm] {name}: {grad_norm:.6e}")
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)

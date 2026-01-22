@@ -334,7 +334,7 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         np.random.seed(args.seed)
 
-    log_dir = Path(f"./checkpoints_quant/{args.data_name}/ProgressiveGaussianVideo_i{args.iterations}_g{args.num_points}_f{args.num_frames}_s{args.start_frame}/layer{args.layer}/")
+    log_dir = Path(f"./checkpoints_quant_LOD/{args.data_name}/ProgressiveGaussianVideo_i{args.iterations}_g{args.num_points}_f{args.num_frames}_s{args.start_frame}/layer{args.layer}/")
     if args.layer == 1:
         log_dir = log_dir / (f"{args.model_name}_i{args.iterations}_g{args.num_points}/")
     

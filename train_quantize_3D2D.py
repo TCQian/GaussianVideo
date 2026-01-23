@@ -253,6 +253,7 @@ class GaussianVideo3D2DTrainerQuantize:
         psnr_value, ms_ssim_value, bpp = self.test_GVGI(gaussian_model, gt_image, t, best=False)
         Path(self.log_dir / f'frame_{t+1:04}').mkdir(parents=True, exist_ok=True)
         torch.save(state_dict, self.log_dir / f'frame_{t+1:04}' / f"gaussian_model.pth.tar")
+        
         gaussian_model.load_state_dict(best_model_dict, strict=False)
         best_psnr_value, best_ms_ssim_value, best_bpp = self.test_GVGI(gaussian_model, gt_image, t, best=True)
         torch.save(best_model_dict, self.log_dir / f'frame_{t+1:04}' / f"gaussian_model.best.pth.tar")
@@ -331,6 +332,7 @@ class GaussianVideo3D2DTrainerQuantize:
         m_bit, s_bit, r_bit, c_bit = out["unit_bit"]
         bpp = (m_bit + s_bit + r_bit + c_bit) / (self.H * self.W * self.T)
         tag = "Best Test" if best else "Test"
+        print(tag, bpp, m_bit, s_bit, r_bit, c_bit)
         self.logwriter.write(f"{tag} PSNR:{psnr:.4f}, MS_SSIM:{ms_ssim_value:.6f}, bpp:{bpp:.4f}")
 
         if self.save_imgs:

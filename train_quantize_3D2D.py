@@ -332,7 +332,6 @@ class GaussianVideo3D2DTrainerQuantize:
         m_bit, s_bit, r_bit, c_bit = out["unit_bit"]
         bpp = (m_bit + s_bit + r_bit + c_bit) / (self.H * self.W * self.T)
         tag = "Best Test" if best else "Test"
-        print(tag, bpp, m_bit, s_bit, r_bit, c_bit)
         self.logwriter.write(f"{tag} PSNR:{psnr:.4f}, MS_SSIM:{ms_ssim_value:.6f}, bpp:{bpp:.4f}")
 
         if self.save_imgs:

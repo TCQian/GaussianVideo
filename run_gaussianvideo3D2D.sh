@@ -59,10 +59,10 @@ echo "Starting ProgressiveGaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${N
 # Define dataset and checkpoint paths using the variables.
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
 DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
-CHECKPOINT_DIR_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/ProgressiveGaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}"
-CHECKPOINT_DIR_PATH_QUANT="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/ProgressiveGaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}"
+CHECKPOINT_DIR_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/ProgressiveGaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}_L0x${DOWN_SAMPLING_FACTOR}"
+CHECKPOINT_DIR_PATH_QUANT="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/ProgressiveGaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}_L0x${DOWN_SAMPLING_FACTOR}"
 
-CHECKPOINT_PATH_LAYER0="${CHECKPOINT_DIR_PATH}/layer0/downsampled_${DOWN_SAMPLING_FACTOR}/layer_0_model.pth.tar"
+CHECKPOINT_PATH_LAYER0="${CHECKPOINT_DIR_PATH}/layer0/layer_0_model.pth.tar"
 CHECKPOINT_PATH_LAYER1_GV3D2D="${CHECKPOINT_DIR_PATH}/layer1/GV3D2D_i${TRAIN_ITERATIONS}_g${NUM_POINTS}/layer_1_model.pth.tar"
 CHECKPOINT_PATH_LAYER1_GVGI="${CHECKPOINT_DIR_PATH}/layer1/GVGI_i${TRAIN_ITERATIONS}_g${NUM_POINTS}/"
 

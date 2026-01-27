@@ -46,6 +46,7 @@ class GaussianVideo3D2DTrainer:
         self,
         layer: int,
         images_paths: list[Path],
+        test_images_paths: list[Path],
         model_name:str = "GV3D2D",
         args = None,
         video_name: str = "Jockey",
@@ -59,6 +60,7 @@ class GaussianVideo3D2DTrainer:
         self.model_name = model_name
         self.device = torch.device("cuda:0")
         self.gt_image = images_paths_to_tensor(images_paths).to(self.device)
+        self.test_gt_image = images_paths_to_tensor(test_images_paths).to(self.device)
 
         BLOCK_H, BLOCK_W, BLOCK_T = 16, 16, 1
         self.H, self.W, self.T = self.gt_image.shape[2], self.gt_image.shape[3], self.gt_image.shape[4]
@@ -176,7 +178,7 @@ class GaussianVideo3D2DTrainer:
         print(f"Number of gaussians at the end of training: {gaussian_model.get_xyz.shape[0]}")
         end_time = time.time() - start_time
         progress_bar.close()
-        psnr_value, ms_ssim_value = self.test()
+        psnr_value, ms_ssim_value, gt_psnr_value, gt_ms_ssim_value = self.test()
         with torch.no_grad():
             gaussian_model.eval()
             test_start_time = time.time()
@@ -189,7 +191,7 @@ class GaussianVideo3D2DTrainer:
         np.save(self.log_dir / f"training_layer_{gaussian_model.layer}.npy", {"iterations": iter_list, "training_psnr": psnr_list, "training_time": end_time, 
             "psnr": psnr_value, "ms-ssim": ms_ssim_value, "rendering_time": test_end_time, "rendering_fps": FPS})
         
-        return psnr_value, ms_ssim_value, end_time, test_end_time, FPS
+        return psnr_value, ms_ssim_value, end_time, test_end_time, FPS, gt_psnr_value, gt_ms_ssim_value
 
     def train_GVGI(self, gaussian_model, gt_image, t=0):     
         psnr_list, iter_list = [], []
@@ -207,9 +209,9 @@ class GaussianVideo3D2DTrainer:
 
             if (iter % 1000 == 1 and iter > 1):
                 gaussian_model.prune(opac_threshold=0.05)
-                if self.layer == 1 and iter < self.densify_until_iter:
-                    num_new_gaussians = max(100, int(gaussian_model.get_xyz.shape[0] * self.densify_factor))
-                    gaussian_model.densify(num_new_gaussians=num_new_gaussians)
+                # if self.layer == 1 and iter < self.densify_until_iter:
+                #     num_new_gaussians = max(100, int(gaussian_model.get_xyz.shape[0] * self.densify_factor))
+                #     gaussian_model.densify(num_new_gaussians=num_new_gaussians)
 
             loss, psnr = gaussian_model.train_iter(gt_image)
 
@@ -226,7 +228,8 @@ class GaussianVideo3D2DTrainer:
         print(f"Number of gaussians at the end of training: {gaussian_model.get_xyz.shape[0]}")
         end_time = time.time() - start_time
         progress_bar.close()
-        psnr_value, ms_ssim_value = self.test_GVGI(gaussian_model, gt_image, t)
+        psnr_value, ms_ssim_value = self.test_GVGI(gaussian_model, self.test_gt_image[...,t], t)
+        gt_psnr_value, gt_ms_ssim_value = self.test_GVGI(gaussian_model, self.gt_image[...,t], t)
         with torch.no_grad():
             gaussian_model.eval()
             test_start_time = time.time()
@@ -242,33 +245,37 @@ class GaussianVideo3D2DTrainer:
         torch.save(state_dict, self.log_dir / f'frame_{t+1:04}' / f"gaussian_model.pth.tar")
         np.save(self.log_dir / f'frame_{t+1:04}' / f"training.npy", {"iterations": iter_list, "training_psnr": psnr_list, "training_time": end_time, 
         "psnr": psnr_value, "ms-ssim": ms_ssim_value, "rendering_time": test_end_time, "rendering_fps": 1/test_end_time})
-        return psnr_value, ms_ssim_value, end_time, test_end_time, 1/test_end_time
+        return psnr_value, ms_ssim_value, end_time, test_end_time, 1/test_end_time, gt_psnr_value, gt_ms_ssim_value
 
     def train(self):  
         if self.layer == 0 or self.model_name == "GV3D2D":
-            psnr_value, ms_ssim_value, end_time, test_end_time, eval_fps = self.train_GV3D2D(self.gaussian_model, self.gt_image)
+            psnr_value, ms_ssim_value, end_time, test_end_time, eval_fps, gt_psnr_value, gt_ms_ssim_value = self.train_GV3D2D(self.gaussian_model, self.gt_image)
         elif self.layer == 1:
             psnr_value_list = []
             ms_ssim_value_list = []
             end_time_list = []
             test_end_time_list = []
             eval_fps_list = []
-
+            gt_psnr_value_list = []
+            gt_ms_ssim_value_list = []
             for t in range(self.T):
-                psnr_value, ms_ssim_value, end_time, test_end_time, eval_fps = self.train_GVGI(self.gaussian_model_list[t], self.gt_image[...,t], t)
+                psnr_value, ms_ssim_value, end_time, test_end_time, eval_fps, gt_psnr_value, gt_ms_ssim_value = self.train_GVGI(self.gaussian_model_list[t], self.gt_image[...,t], t)
                 psnr_value_list.append(psnr_value)
                 ms_ssim_value_list.append(ms_ssim_value)
                 end_time_list.append(end_time)
                 test_end_time_list.append(test_end_time)
                 eval_fps_list.append(eval_fps)
+                gt_psnr_value_list.append(gt_psnr_value)
+                gt_ms_ssim_value_list.append(gt_ms_ssim_value)
         
             psnr_value = sum(psnr_value_list) / len(psnr_value_list)
             ms_ssim_value = sum(ms_ssim_value_list) / len(ms_ssim_value_list)
             end_time = sum(end_time_list) / len(end_time_list)
             test_end_time = sum(test_end_time_list) / len(test_end_time_list)
             eval_fps = sum(eval_fps_list) / len(eval_fps_list)
-
-        return psnr_value, ms_ssim_value, end_time, test_end_time, eval_fps
+            gt_psnr_value = sum(gt_psnr_value_list) / len(gt_psnr_value_list)
+            gt_ms_ssim_value = sum(gt_ms_ssim_value_list) / len(gt_ms_ssim_value_list)
+        return psnr_value, ms_ssim_value, end_time, test_end_time, eval_fps, gt_psnr_value, gt_ms_ssim_value
 
     def test_GV3D2D(self, gaussian_model, gt_image):
         gaussian_model.eval()
@@ -331,17 +338,23 @@ class GaussianVideo3D2DTrainer:
 
     def test(self):
         if self.layer == 0 or self.model_name == "GV3D2D":
-            psnr_value, ms_ssim_value = self.test_GV3D2D(self.gaussian_model, self.gt_image)
+            psnr_value, ms_ssim_value = self.test_GV3D2D(self.gaussian_model, self.test_gt_image)
+            gt_psnr_value, gt_ms_ssim_value = self.test_GV3D2D(self.gaussian_model, self.gt_image)
         elif self.layer == 1:
             psnr_value_list = []
             ms_ssim_value_list = []
+            gt_psnr_value_list = []
+            gt_ms_ssim_value_list = []
             for t in range(self.T):
-                psnr_value, ms_ssim_value = self.test_GVGI(self.gaussian_model_list[t], self.gt_image[...,t], t)
+                psnr_value, ms_ssim_value = self.test_GVGI(self.gaussian_model_list[t], self.test_gt_image[...,t], t)
+                gt_psnr_value, gt_ms_ssim_value = self.test_GVGI(self.gaussian_model_list[t], self.gt_image[...,t], t)
                 psnr_value_list.append(psnr_value)
                 ms_ssim_value_list.append(ms_ssim_value)
+                gt_psnr_value_list.append(gt_psnr_value)
+                gt_ms_ssim_value_list.append(gt_ms_ssim_value)
             psnr_value = sum(psnr_value_list) / len(psnr_value_list)
             ms_ssim_value = sum(ms_ssim_value_list) / len(ms_ssim_value_list)
-        return psnr_value, ms_ssim_value
+        return psnr_value, ms_ssim_value, gt_psnr_value, gt_ms_ssim_value
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Train GaussianVideo model layer by layer.")
@@ -349,6 +362,7 @@ def parse_args(argv):
     # Parameters for training
     parser.add_argument("--seed", type=int, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--save_imgs", action="store_true", help="Save image")
+    parser.add_argument("--downsampling_factor", type=float, default=0.25, help="Downsampling factor (default: %(default)s)")
     
     # Progressively training parameters
     parser.add_argument("--layer", type=int, default=0, help="Target layer to train (default: %(default)s)")
@@ -413,7 +427,9 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         np.random.seed(args.seed)
 
-    log_dir = Path(f"./checkpoints/{args.data_name}/ProgressiveGaussianVideo_i{args.iterations}_g{args.num_points}_f{args.num_frames}_s{args.start_frame}/layer{args.layer}/")
+    log_dir = Path(f"./checkpoints_LOD/{args.data_name}/ProgressiveGaussianVideo_i{args.iterations}_g{args.num_points}_f{args.num_frames}_s{args.start_frame}/layer{args.layer}/")
+    if args.layer == 0:
+        log_dir = log_dir / (f"downsampled_{args.downsampling_factor}/")
     if args.layer == 1:
         log_dir = log_dir / (f"{args.model_name}_i{args.iterations}_g{args.num_points}/")
 
@@ -421,18 +437,43 @@ def main(argv):
     image_length, start = args.num_frames, args.start_frame
 
     images_paths = []
-    for i in range(start, start+image_length):
-        image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
-        images_paths.append(image_path)
+    test_images_paths = []
+    if args.layer == 0:
+        downsampled_dataset_path = os.path.join(os.path.dirname(args.dataset), f'{args.data_name}_downsampled_{args.downsampling_factor}/')
+        os.makedirs(downsampled_dataset_path, exist_ok=True)
+        for i in range(start, start+image_length):
+            image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
+            downsampled_image_path = downsampled_dataset_path / f'frame_{i+1:04}.png'
+            
+            image = Image.open(image_path)
+            transform = transforms.ToTensor()
+            image_tensor = transform(image).unsqueeze(0)
+            _, _, H, W = image_tensor.shape
+            
+            downsampled = F.interpolate(image_tensor, scale_factor=args.downsampling_factor, mode='area')
+            resized_back = F.interpolate(downsampled, size=(H, W), mode='bilinear', align_corners=False)
+            resized_back = resized_back.squeeze(0)
+            transform_to_pil = transforms.ToPILImage()
+            blurred_image = transform_to_pil(resized_back)
+            
+            os.makedirs(os.path.dirname(downsampled_image_path), exist_ok=True)
+            blurred_image.save(downsampled_image_path)
 
-    trainer = GaussianVideo3D2DTrainer(layer=args.layer, images_paths=images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name, log_dir=log_dir)
-    psnr, ms_ssim, training_time, eval_time, eval_fps = trainer.train()
+            images_paths.append(downsampled_image_path)
+            test_images_paths.append(image_path)
+    elif args.layer == 1:
+        for i in range(start, start+image_length):
+            image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
+            images_paths.append(image_path)
+            test_images_paths.append(image_path)
 
+    trainer = GaussianVideo3D2DTrainer(layer=args.layer, images_paths=images_paths, test_images_paths=test_images_paths, model_name=args.model_name, args=args, num_frames=args.num_frames, start_frame=args.start_frame, video_name=args.data_name, log_dir=log_dir)
+    psnr, ms_ssim, training_time, eval_time, eval_fps, gt_psnr, gt_ms_ssim = trainer.train()
+
+    logwriter.write("Average Rendered VS Train_GT: {}x{} for layer {}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
+        trainer.H, trainer.H, args.layer, gt_psnr, gt_ms_ssim, training_time, eval_time, eval_fps))    
     logwriter.write("Average: {}x{} for layer {}, PSNR:{:.4f}, MS-SSIM:{:.4f}, Training:{:.4f}s, Eval:{:.8f}s, FPS:{:.4f}".format(
         trainer.H, trainer.H, args.layer, psnr, ms_ssim, training_time, eval_time, eval_fps))    
-
-    # psnr, ms_ssim = trainer.test()
-    # print(f"Test PSNR:{psnr:.4f}, MS-SSIM:{ms_ssim:.6f}")
 
 if __name__ == "__main__":
     main(sys.argv[1:])

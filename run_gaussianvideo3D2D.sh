@@ -111,77 +111,77 @@ python train_3D2D.py \
     --save_imgs
 
 # # Run the quantization training script.
-python train_quantize_3D2D.py \
-    --layer 0 \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --model_name "GV3D2D" \
-    --iterations "${TRAIN_ITERATIONS}" \
-    --num_points "${NUM_POINTS}" \
-    --lr "${LEARNING_RATE}" \
-    --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
-    --save_imgs
+# python train_quantize_3D2D.py \
+#     --layer 0 \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --model_name "GV3D2D" \
+#     --iterations "${TRAIN_ITERATIONS}" \
+#     --num_points "${NUM_POINTS}" \
+#     --lr "${LEARNING_RATE}" \
+#     --model_path_layer0 "${CHECKPOINT_PATH_LAYER0}" \
+#     --save_imgs
 
-python train_quantize_3D2D.py \
-    --layer 1 \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --model_name "GV3D2D" \
-    --iterations "${TRAIN_ITERATIONS}" \
-    --num_points "${NUM_POINTS}" \
-    --lr "${LEARNING_RATE}" \
-    --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
-    --model_path_layer1 "${CHECKPOINT_PATH_LAYER1_GV3D2D}" \
-    --save_imgs
+# python train_quantize_3D2D.py \
+#     --layer 1 \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --model_name "GV3D2D" \
+#     --iterations "${TRAIN_ITERATIONS}" \
+#     --num_points "${NUM_POINTS}" \
+#     --lr "${LEARNING_RATE}" \
+#     --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
+#     --model_path_layer1 "${CHECKPOINT_PATH_LAYER1_GV3D2D}" \
+#     --save_imgs
 
-python train_quantize_3D2D.py \
-    --layer 1 \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --model_name "GVGI" \
-    --iterations "${TRAIN_ITERATIONS}" \
-    --num_points "${NUM_POINTS}" \
-    --lr "${LEARNING_RATE}" \
-    --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
-    --model_path_layer1 "${CHECKPOINT_PATH_LAYER1_GVGI}" \
-    --save_imgs
+# python train_quantize_3D2D.py \
+#     --layer 1 \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --model_name "GVGI" \
+#     --iterations "${TRAIN_ITERATIONS}" \
+#     --num_points "${NUM_POINTS}" \
+#     --lr "${LEARNING_RATE}" \
+#     --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
+#     --model_path_layer1 "${CHECKPOINT_PATH_LAYER1_GVGI}" \
+#     --save_imgs
 
 
-# # Run the quantization testing script. 
-# #Only test with higher layer, the lower layer will be tested in the higher layer testing.
-python test_quantize_3D2D.py \
-    --layer 1 \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --model_name "GV3D2D" \
-    --iterations "${TRAIN_ITERATIONS}" \
-    --num_points "${NUM_POINTS}" \
-    --lr "${LEARNING_RATE}" \
-    --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
-    --model_path_layer1 "${CHECKPOINT_QUANT_PATH_LAYER1_GV3D2D}" \
-    --save_imgs
+# # # Run the quantization testing script. 
+# # #Only test with higher layer, the lower layer will be tested in the higher layer testing.
+# python test_quantize_3D2D.py \
+#     --layer 1 \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --model_name "GV3D2D" \
+#     --iterations "${TRAIN_ITERATIONS}" \
+#     --num_points "${NUM_POINTS}" \
+#     --lr "${LEARNING_RATE}" \
+#     --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
+#     --model_path_layer1 "${CHECKPOINT_QUANT_PATH_LAYER1_GV3D2D}" \
+#     --save_imgs
 
-python test_quantize_3D2D.py \
-    --layer 1 \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --model_name "GVGI" \
-    --iterations "${TRAIN_ITERATIONS}" \
-    --num_points "${NUM_POINTS}" \
-    --lr "${LEARNING_RATE}" \
-    --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
-    --model_path_layer1 "${CHECKPOINT_QUANT_PATH_LAYER1_GVGI}" \
-    --save_imgs
+# python test_quantize_3D2D.py \
+#     --layer 1 \
+#     --dataset "${DATASET_PATH}" \
+#     --data_name "${DATA_NAME}" \
+#     --start_frame "${START_FRAME}" \
+#     --num_frames "${NUM_FRAMES}" \
+#     --model_name "GVGI" \
+#     --iterations "${TRAIN_ITERATIONS}" \
+#     --num_points "${NUM_POINTS}" \
+#     --lr "${LEARNING_RATE}" \
+#     --model_path_layer0 "${CHECKPOINT_QUANT_PATH_LAYER0}" \
+#     --model_path_layer1 "${CHECKPOINT_QUANT_PATH_LAYER1_GVGI}" \
+#     --save_imgs
 
 
 echo "Done"

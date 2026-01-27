@@ -52,7 +52,7 @@ class GaussianVideo3D2DTrainerQuantize:
         if self.model_name == "GV3D2D":
             self.gaussian_model = GaussianVideo3D2D(
                 layer=self.layer,
-                loss_type="L2", 
+                loss_type="Fusion1", 
                 opt_type="adan", 
                 H=self.H, 
                 W=self.W, 
@@ -82,7 +82,7 @@ class GaussianVideo3D2DTrainerQuantize:
 
             self.gaussian_model_layer0 = GaussianVideo3D2D(
                 layer=0,
-                loss_type="L2", 
+                loss_type="Fusion1", 
                 opt_type="adan", 
                 H=self.H, 
                 W=self.W, 
@@ -122,7 +122,7 @@ class GaussianVideo3D2DTrainerQuantize:
 
                 gaussian_model = GaussianImage_Cholesky(
                     background_image=bg_tensor[0, :, :, :, t].squeeze(0).permute(1, 2, 0),
-                    loss_type="L2", 
+                    loss_type="Fusion1", 
                     opt_type="adan", 
                     num_points=num_points,
                     H=self.H, 

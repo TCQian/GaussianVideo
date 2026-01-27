@@ -77,7 +77,7 @@ class GaussianVideo3D2DTrainer:
         if self.model_name == "GV3D2D":
             self.gaussian_model = GaussianVideo3D2D(
                 layer=self.layer,
-                loss_type="L2", 
+                loss_type="Fusion1", 
                 opt_type="adan", 
                 H=self.H, 
                 W=self.W, 
@@ -118,7 +118,7 @@ class GaussianVideo3D2DTrainer:
                 background_img = image_path_to_tensor(background_path).squeeze(0).permute(1, 2, 0).to(self.device)
                 gaussian_model = GaussianImage_Cholesky(
                     background_image=background_img,
-                    loss_type="L2", 
+                    loss_type="Fusion1", 
                     opt_type="adan", 
                     num_points=num_points,
                     H=self.H, 

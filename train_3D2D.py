@@ -437,11 +437,11 @@ def main(argv):
     images_paths = []
     test_images_paths = []
     if args.layer == 0:
-        downsampled_dataset_path = os.path.join(os.path.dirname(args.dataset), f'{args.data_name}_downsampled_{args.downsampling_factor}/')
+        downsampled_dataset_path = os.path.join(args.dataset, args.dataset.replace(args.data_name, f'{args.data_name}_downsampled_{args.downsampling_factor}/'))
         os.makedirs(downsampled_dataset_path, exist_ok=True)
         for i in range(start, start+image_length):
             image_path = Path(args.dataset) / f'frame_{i+1:04}.png'
-            downsampled_image_path = downsampled_dataset_path / f'frame_{i+1:04}.png'
+            downsampled_image_path = Path(downsampled_dataset_path) / f'frame_{i+1:04}.png'
             
             image = Image.open(image_path)
             transform = transforms.ToTensor()

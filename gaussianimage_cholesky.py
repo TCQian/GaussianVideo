@@ -123,7 +123,7 @@ class GaussianImage_Cholesky(nn.Module):
     def train_iter(self, gt_image):
         render_pkg = self.forward()
         image = render_pkg["render"]
-        loss = loss_fn(image, gt_image, self.loss_type, lambda_value=0.7)
+        loss = loss_fn(image, gt_image, self.loss_type, lambda_value=0.2)
         loss.backward()
         with torch.no_grad():
             mse_loss = F.mse_loss(image, gt_image)
@@ -159,7 +159,7 @@ class GaussianImage_Cholesky(nn.Module):
     def train_iter_quantize(self, gt_image):
         render_pkg = self.forward_quantize()
         image = render_pkg["render"]
-        loss = loss_fn(image, gt_image, self.loss_type, lambda_value=0.7) + render_pkg["vq_loss"]
+        loss = loss_fn(image, gt_image, self.loss_type, lambda_value=0.2) + render_pkg["vq_loss"]
         loss.backward()
         with torch.no_grad():
             mse_loss = F.mse_loss(image, gt_image)

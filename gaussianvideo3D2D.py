@@ -94,6 +94,7 @@ class GaussianVideo3D2D(nn.Module):
                     self.cholesky_quantizer_layer0.load_state_dict(checkpoint_layer0['cholesky_quantizer_layer0'])
                     self.features_dc_quantizer_layer0.load_state_dict(checkpoint_layer0['features_dc_quantizer_layer0'])
                 except:
+                    self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
                     print("Layer 0 quantization parameters not found, initialized new quantization parameters")
 
             print(f"Layer 0 checkpoint loaded successfully with {self._xyz_3D.shape[0]} gaussians")
@@ -120,6 +121,7 @@ class GaussianVideo3D2D(nn.Module):
                     self.cholesky_quantizer_layer1.load_state_dict(checkpoint_layer1['cholesky_quantizer_layer1'])
                     self.features_dc_quantizer_layer1.load_state_dict(checkpoint_layer1['features_dc_quantizer_layer1'])
                 except:
+                    self.cholesky_quantizer_layer1._init_data(self._cholesky_2D)
                     print("Layer 1 quantization parameters not found, initialized new quantization parameters")
 
             print(f"Layer 1 checkpoint loaded successfully with {self._xyz_2D.shape[0]} gaussians")
@@ -140,6 +142,7 @@ class GaussianVideo3D2D(nn.Module):
 
         elif self.layer == 1:
             if self._xyz_3D.shape[0] > 0:
+                self._opacity_3D.register_hook(lambda g: g / self.T)
                 self.trainable_params.append(self._opacity_3D)
             self.trainable_params.append(self._xyz_2D)
             self.trainable_params.append(self._cholesky_2D)
@@ -157,19 +160,19 @@ class GaussianVideo3D2D(nn.Module):
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20000, gamma=0.5)
 
     def _init_layer0(self):
+        assert self.quantize, "Quantization can only be done on trained gaussians. Please load a checkpoint first."
+
         self.init_num_points = int(self.num_points * self.T / 2)
         self._xyz_3D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 3) - 0.5)))
         self._cholesky_3D = nn.Parameter(torch.rand(self.init_num_points, 6))
         self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         self._features_dc_3D = nn.Parameter(torch.rand(self.init_num_points, 3))
 
-        if self.quantize:
-            self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
-
         self.layer = 0
         print("Layer 0 initialized, number of gaussians: ", self._xyz_3D.shape[0])
 
     def _init_layer1(self):
+        assert self.quantize, "Quantization can only be done on trained gaussians. Please load a checkpoint first."
         self.num_points_layer0 = self._xyz_3D.shape[0]
         self.init_num_points = int((self.num_points * self.T) - self.num_points_layer0)
         num_points_per_frame = int(self.init_num_points / self.T)
@@ -187,9 +190,6 @@ class GaussianVideo3D2D(nn.Module):
 
         self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points, 3))
-
-        if self.quantize:
-            self.cholesky_quantizer_layer1._init_data(self._cholesky_2D)
             
         self.layer = 1
         print("GaussianVideo3D2D: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])

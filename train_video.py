@@ -13,6 +13,7 @@ from utils import *
 from tqdm import tqdm
 import random
 import torchvision.transforms as transforms
+from train_3D2D import EarlyStopping
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -73,16 +74,24 @@ class VideoTrainer:
         progress_bar = tqdm(range(1, self.iterations+1), desc="Training progress")
         best_psnr = 0
         self.gaussian_model.train()
+        self.early_stopping = EarlyStopping(patience=self.early_stopping_patience, min_delta=self.early_stopping_min_delta)
+
         start_time = time.time()
         for iter in range(1, self.iterations+1):
             if iter == 1 or iter % 1000 == 0:
                 self.gaussian_model.debug_mode = True
             else:
                 self.gaussian_model.debug_mode = False
-            # if iter % 5000 == 1 and iter > 1:
-            #     self.gaussian_model.prune(tile_threshold=2.0) # prune gaussians affecting <= 2 tiles
+
+            if (iter % 1000 == 1 and iter > 1):
+                self.gaussian_model.prune(opac_threshold=0.05)
 
             loss, psnr = self.gaussian_model.train_iter(self.gt_image)
+            
+            if self.early_stopping(loss.item()):
+                print(f"Early stopping at iteration {iter}")
+                break
+
             psnr_list.append(psnr)
             iter_list.append(iter)
             with torch.no_grad():

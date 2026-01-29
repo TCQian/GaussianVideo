@@ -37,10 +37,6 @@ class GaussianVideo(nn.Module):
         # self.register_buffer('_opacity', torch.ones((self.init_num_points, 1)))
         self._opacity = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         
-        # Increase L33 (the last element in each row) to boost temporal variance.
-        with torch.no_grad():
-            self._cholesky.data[:, 5] += self.T  # adjust the constant as needed
-        
         # Color
         self._features_dc = nn.Parameter(torch.rand(self.init_num_points, 3))
         self.last_size = (self.H, self.W, self.T)
@@ -50,7 +46,7 @@ class GaussianVideo(nn.Module):
         self.rgb_activation = torch.sigmoid
         self.register_buffer('bound', torch.tensor([0.5, 0.5]).view(1, 2))
         # self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5]).view(1, 3))
-        self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0.5, 0.5, 0, 0.5]).view(1, 6))
+        self.register_buffer('cholesky_bound', torch.tensor([0.5, 0, 0, 0.5, 0, 0.5]).view(1, 6))
         
         if self.quantize:
             self.xyz_quantizer = FakeQuantizationHalf.apply 

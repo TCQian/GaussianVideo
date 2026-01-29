@@ -15,6 +15,8 @@ import random
 import copy
 import torchvision.transforms as transforms
 
+from train_3D2D import EarlyStopping
+
 def image_path_to_tensor(image_path: Path):
     img = Image.open(image_path)
     transform = transforms.ToTensor()
@@ -97,10 +99,17 @@ class SimpleTrainerVideoQuantize:
         progress_bar = tqdm(range(1, self.iterations+1), desc="Training progress")
         best_psnr = 0
         self.gaussian_model.train()
+        self.early_stopping = EarlyStopping(patience=self.early_stopping_patience, min_delta=self.early_stopping_min_delta)
+
         start_time = time.time()
         best_model_dict = None
         for iter in range(1, self.iterations+1):
             loss, psnr = self.gaussian_model.train_iter_quantize(self.gt_video)
+
+            if self.early_stopping(loss.item()):
+                print(f"Early stopping at iteration {iter}")
+                break
+            
             psnr_list.append(psnr)
             iter_list.append(iter)
             if psnr > best_psnr:

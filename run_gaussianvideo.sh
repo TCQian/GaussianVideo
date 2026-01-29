@@ -15,8 +15,8 @@ conda activate gv_h100
 # Default variable values.
 DATA_NAME="Beauty"
 MODEL_NAME="GaussianVideo"
-TRAIN_ITERATIONS=20000
-QUANT_ITERATIONS=10000
+TRAIN_ITERATIONS=50000
+QUANT_ITERATIONS=50000
 LEARNING_RATE=0.001
 
 # Default values for parameters to be overridden.

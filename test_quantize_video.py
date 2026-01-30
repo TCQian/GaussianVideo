@@ -65,7 +65,7 @@ class SimpleTrainerVideoQuantize:
         )
 
         if model_path is not None:
-            full_model_path = os.path.join(model_path, args.data_name, "gaussian_model.pth.tar")
+            full_model_path = os.path.join(model_path, args.data_name, "gaussian_model.best.pth.tar")
             print(f"Getting number of points from checkpoint:{full_model_path}")
             checkpoint = torch.load(full_model_path, map_location=self.device)
             num_points = checkpoint['_xyz'].shape[0]

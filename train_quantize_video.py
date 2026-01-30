@@ -51,7 +51,7 @@ class SimpleTrainerVideoQuantize:
         num_frames: int = 50,
         start_frame: int = 0,
     ):
-        self.early_stopping_patience = 1000
+        self.early_stopping_patience = 100
         self.early_stopping_min_delta = 1e-9
 
         self.device = torch.device("cuda:0")
@@ -81,7 +81,7 @@ class SimpleTrainerVideoQuantize:
         self.gaussian_model = GaussianVideo(
             loss_type="L2",
             opt_type="adan",
-            num_points=self.num_points,
+            num_points=num_points,
             H=self.H,
             W=self.W,
             T=self.T,

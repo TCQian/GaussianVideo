@@ -51,7 +51,7 @@ class SimpleTrainerVideoQuantize:
         num_frames: int = 50,
         start_frame: int = 0,
     ):
-        self.early_stopping_patience = 100
+        self.early_stopping_patience = 1000
         self.early_stopping_min_delta = 1e-9
 
         self.device = torch.device("cuda:0")
@@ -68,6 +68,13 @@ class SimpleTrainerVideoQuantize:
             f"./checkpoints_quant/{args.data_name}/{model_name}_i{args.iterations_3d}_g{num_points}_f{num_frames}_s{start_frame}/{video_name}"
         )
         self.save_imgs = args.save_imgs
+
+        if model_path is not None:
+            full_model_path = os.path.join(model_path, args.data_name, "gaussian_model.pth.tar")
+            print(f"Getting number of points from checkpoint:{full_model_path}")
+            checkpoint = torch.load(full_model_path, map_location=self.device)
+            num_points = checkpoint['_xyz'].shape[0]
+            print(f"Number of points: {num_points}")
 
         # Instantiate the video model (with quantization enabled)
         from gaussianvideo import GaussianVideo
@@ -88,9 +95,6 @@ class SimpleTrainerVideoQuantize:
 
         self.logwriter = LogWriter(self.log_dir)
         if model_path is not None:
-            full_model_path = os.path.join(model_path, args.data_name, "gaussian_model.pth.tar")
-            print(f"loading model path:{full_model_path}")
-            checkpoint = torch.load(full_model_path, map_location=self.device)
             model_dict = self.gaussian_model.state_dict()
             pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict}
             model_dict.update(pretrained_dict)

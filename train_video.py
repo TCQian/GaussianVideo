@@ -31,7 +31,7 @@ class VideoTrainer:
         num_frames: int = 50,
         start_frame: int = 0,
     ):
-        self.early_stopping_patience = 100
+        self.early_stopping_patience = 1000
         self.early_stopping_min_delta = 1e-9
 
         self.video_name = video_name

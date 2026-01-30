@@ -31,6 +31,9 @@ class VideoTrainer:
         num_frames: int = 50,
         start_frame: int = 0,
     ):
+        self.early_stopping_patience = 100
+        self.early_stopping_min_delta = 1e-9
+
         self.video_name = video_name
         self.device = torch.device("cuda:0")
         self.gt_image = images_paths_to_tensor(images_paths).to(self.device)

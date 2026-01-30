@@ -51,6 +51,9 @@ class SimpleTrainerVideoQuantize:
         num_frames: int = 50,
         start_frame: int = 0,
     ):
+        self.early_stopping_patience = 100
+        self.early_stopping_min_delta = 1e-9
+
         self.device = torch.device("cuda:0")
         self.gt_video = images_paths_to_tensor(images_paths).to(self.device)  # [1, C, H, W, T]
         self.num_points = num_points

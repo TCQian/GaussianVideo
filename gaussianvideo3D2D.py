@@ -79,16 +79,16 @@ class GaussianVideo3D2D(nn.Module):
                 cholesky = checkpoint_layer0['_cholesky_3D']
                 features_dc = checkpoint_layer0['_features_dc_3D']
                 opacity = checkpoint_layer0['_opacity_3D']
-                layer0_format = "3D2D"
+                self.layer0_format = "3D2D"
             elif '_xyz' in checkpoint_layer0:
                 xyz = checkpoint_layer0['_xyz']
                 cholesky = checkpoint_layer0['_cholesky']
                 features_dc = checkpoint_layer0['_features_dc']
                 opacity = checkpoint_layer0['_opacity']
-                layer0_format = "GaussianVideo"
+                self.layer0_format = "GaussianVideo"
             else:
                 raise KeyError("Layer 0 checkpoint must contain either 3D2D keys (_xyz_3D, ...) or GaussianVideo keys (_xyz, _cholesky, _features_dc, _opacity)")
-            print(f"Detected Layer 0 format: {layer0_format}")
+            print(f"Detected Layer 0 format: {self.layer0_format}")
 
             self._opacity_3D = nn.Parameter(opacity)
 
@@ -185,9 +185,14 @@ class GaussianVideo3D2D(nn.Module):
 
     def _init_layer1(self):
         assert not self.quantize, "Quantization can only be done on trained gaussians. Please load a checkpoint first."
-        self.num_points_layer0 = self._xyz_3D.shape[0]
-        self.init_num_points = int((self.num_points * self.T) - self.num_points_layer0)
-        num_points_per_frame = int(self.init_num_points / self.T)
+        if self.layer0_format == "3D2D":
+            self.num_points_layer0 = self._xyz_3D.shape[0]
+            self.init_num_points = int((self.num_points * self.T) - self.num_points_layer0)
+            num_points_per_frame = int(self.init_num_points / self.T)
+        elif self.layer0_format == "GaussianVideo":
+            self.num_points_layer0 = self._xyz.shape[0]
+            self.init_num_points = int(((self.num_points * 2) - self.num_points_layer0) / self.T)
+            num_points_per_frame = int(self.init_num_points / self.T)
         self.num_points_list = []
         for t in range(self.T):
             start = t * num_points_per_frame

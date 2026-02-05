@@ -52,7 +52,7 @@ class GaussianVideo3D2DTrainerQuantize:
         if self.model_name == "GV3D2D":
             self.gaussian_model = GaussianVideo3D2D(
                 layer=self.layer,
-                loss_type="Fusion1", 
+                loss_type="L2", 
                 opt_type="adan", 
                 H=self.H, 
                 W=self.W, 
@@ -82,7 +82,7 @@ class GaussianVideo3D2DTrainerQuantize:
 
             self.gaussian_model_layer0 = GaussianVideo3D2D(
                 layer=0,
-                loss_type="Fusion1", 
+                loss_type="L2", 
                 opt_type="adan", 
                 H=self.H, 
                 W=self.W, 
@@ -122,7 +122,7 @@ class GaussianVideo3D2DTrainerQuantize:
 
                 gaussian_model = GaussianImage_Cholesky(
                     background_image=bg_tensor[0, :, :, :, t].squeeze(0).permute(1, 2, 0),
-                    loss_type="Fusion1", 
+                    loss_type="L2", 
                     opt_type="adan", 
                     num_points=num_points,
                     H=self.H, 
@@ -391,7 +391,6 @@ def parse_args(argv):
     # Parameters for training
     parser.add_argument("--seed", type=int, default=1, help="Set random seed for reproducibility")
     parser.add_argument("--save_imgs", action="store_true", help="Save image")
-    parser.add_argument("--downsampling_factor", type=float, default=0.25, help="Downsampling factor (default: %(default)s)")
 
     # Progressively training parameters
     parser.add_argument("--layer", type=int, default=0, help="Target layer to train (default: %(default)s)")
@@ -458,7 +457,7 @@ def main(argv):
         torch.backends.cudnn.benchmark = False
         np.random.seed(args.seed)
 
-    log_dir = Path(f"./checkpoints_quant/{args.data_name}/ProgressiveGaussianVideo_i{args.iterations}_g{args.num_points}_f{args.num_frames}_s{args.start_frame}_L0x{args.downsampling_factor}/layer{args.layer}/")
+    log_dir = Path(f"./checkpoints_quant/{args.data_name}/ProgressiveGaussianVideo_i{args.iterations}_g{args.num_points}_f{args.num_frames}_s{args.start_frame}/layer{args.layer}/")
     if args.layer == 1:
         log_dir = log_dir / (f"{args.model_name}_i{args.iterations}_g{args.num_points}/")
 

@@ -453,16 +453,7 @@ class GaussianVideo3D2D(nn.Module):
     def train_iter(self, gt_image):
         render_pkg = self.forward()
         image = render_pkg["render"]
-
-        loss_per_frame = []
-        for t in range(self.T):
-            loss_per_frame.append(loss_fn(image[..., t], gt_image[..., t], self.loss_type, lambda_value=0.2))
-
-        if self.layer == 0:
-            loss = sum(loss_per_frame) / self.T
-        elif self.layer == 1:
-            loss = sum(loss_per_frame) # sum instead because gaussian are trained independently for each frame
-        
+        loss = loss_fn(image, gt_image, self.loss_type, lambda_value=0.7)
         loss.backward()
 
         # if self.debug_mode:
@@ -513,16 +504,7 @@ class GaussianVideo3D2D(nn.Module):
         render_pkg = self.forward_quantize()
         video = render_pkg["render"]
 
-        loss_per_frame = []
-        for t in range(self.T):
-            loss_per_frame.append(loss_fn(video[..., t], gt_video[..., t], self.loss_type, lambda_value=0.2))
-
-        if self.layer == 0:
-            loss = sum(loss_per_frame) / self.T
-        elif self.layer == 1:
-            loss = sum(loss_per_frame) # sum instead because gaussian are trained independently for each frame
-            
-        loss += render_pkg["vq_loss"]
+        loss = loss_fn(video, gt_video, self.loss_type, lambda_value=0.7) + render_pkg["vq_loss"]
 
         loss.backward()
 

@@ -56,16 +56,9 @@ class GaussianVideo3D2D(nn.Module):
         if self.quantize:
             self.xyz_quantizer = FakeQuantizationHalf.apply 
             self.features_dc_quantizer_layer0 = VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5) 
-            # Layer 1: T quantizers (one per frame)
-            self.features_dc_quantizer_layer1 = nn.ModuleList([
-                VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5)
-                for _ in range(self.T)
-            ]) if self.layer == 1 else None
+            self.features_dc_quantizer_layer1 = VectorQuantizer(codebook_dim=3, codebook_size=8, num_quantizers=2, vector_type="vector", kmeans_iters=5) if self.layer == 1 else None
             self.cholesky_quantizer_layer0 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=6)
-            self.cholesky_quantizer_layer1 = nn.ModuleList([
-                UniformQuantizer(signed=False, bits=6, learned=True, num_channels=3)
-                for _ in range(self.T)
-            ]) if self.layer == 1 else None
+            self.cholesky_quantizer_layer1 = UniformQuantizer(signed=False, bits=6, learned=True, num_channels=3) if self.layer == 1 else None
             
             self.decoded_xyz_layer0 = None
             self.decoded_feature_dc_index_layer0 = None
@@ -111,17 +104,11 @@ class GaussianVideo3D2D(nn.Module):
 
             if self.quantize:
                 try:
-                    # 3D2D format uses cholesky_quantizer_layer0 / features_dc_quantizer_layer0
                     self.cholesky_quantizer_layer0.load_state_dict(checkpoint_layer0['cholesky_quantizer_layer0'])
                     self.features_dc_quantizer_layer0.load_state_dict(checkpoint_layer0['features_dc_quantizer_layer0'])
-                except (KeyError, TypeError):
-                    try:
-                        # GaussianVideo format uses cholesky_quantizer / features_dc_quantizer
-                        self.cholesky_quantizer_layer0.load_state_dict(checkpoint_layer0['cholesky_quantizer'])
-                        self.features_dc_quantizer_layer0.load_state_dict(checkpoint_layer0['features_dc_quantizer'])
-                    except (KeyError, TypeError):
-                        self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
-                        print("Layer 0 quantization parameters not found, initialized new quantization parameters")
+                except:
+                    self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
+                    print("Layer 0 quantization parameters not found, initialized new quantization parameters")
 
             print(f"Layer 0 checkpoint loaded successfully with {self._xyz_3D.shape[0]} gaussians")
         else:
@@ -144,22 +131,11 @@ class GaussianVideo3D2D(nn.Module):
 
             if self.quantize:
                 try:
-                    ckpt_cholesky = checkpoint_layer1['cholesky_quantizer_layer1']
-                    ckpt_features = checkpoint_layer1['features_dc_quantizer_layer1']
-                    # New format: list of T state dicts (per-frame quantizers)
-                    if isinstance(ckpt_cholesky, list):
-                        for t in range(self.T):
-                            self.cholesky_quantizer_layer1[t].load_state_dict(ckpt_cholesky[t])
-                            self.features_dc_quantizer_layer1[t].load_state_dict(ckpt_features[t])
-                    else:
-                        # Legacy: single state dict -> load into all T quantizers
-                        for t in range(self.T):
-                            self.cholesky_quantizer_layer1[t].load_state_dict(ckpt_cholesky)
-                            self.features_dc_quantizer_layer1[t].load_state_dict(ckpt_features)
-                except Exception:
-                    for t, (start, end) in enumerate(self.num_points_list):
-                        self.cholesky_quantizer_layer1[t]._init_data(self._cholesky_2D[start:end])
-                    print("Layer 1 quantization parameters not found, initialized new per-frame quantization parameters")
+                    self.cholesky_quantizer_layer1.load_state_dict(checkpoint_layer1['cholesky_quantizer_layer1'])
+                    self.features_dc_quantizer_layer1.load_state_dict(checkpoint_layer1['features_dc_quantizer_layer1'])
+                except:
+                    self.cholesky_quantizer_layer1._init_data(self._cholesky_2D)
+                    print("Layer 1 quantization parameters not found, initialized new quantization parameters")
 
             print(f"Layer 1 checkpoint loaded successfully with {self._xyz_2D.shape[0]} gaussians")
         else:
@@ -186,10 +162,9 @@ class GaussianVideo3D2D(nn.Module):
             self.trainable_params.append(self._features_dc_2D)
             self.trainable_params.append(self._opacity_2D)
             if self.quantize:
-                for t in range(self.T):
-                    self.trainable_params.append(self.cholesky_quantizer_layer1[t].scale)
-                    self.trainable_params.append(self.cholesky_quantizer_layer1[t].beta)
-                    self.trainable_params.extend(self.features_dc_quantizer_layer1[t].parameters())
+                self.trainable_params.append(self.cholesky_quantizer_layer1.scale)
+                self.trainable_params.append(self.cholesky_quantizer_layer1.beta)
+                self.trainable_params.extend(self.features_dc_quantizer_layer1.parameters())
 
         if self.opt_type == "adam":
             self.optimizer = torch.optim.Adam(self.trainable_params, lr=self.lr)
@@ -250,8 +225,8 @@ class GaussianVideo3D2D(nn.Module):
                 '_opacity_2D': self._opacity_2D.data,
                 '_opacity_3D': self._opacity_3D.data,
                 'gaussian_num_list': self.num_points_list,
-                'cholesky_quantizer_layer1': [self.cholesky_quantizer_layer1[t].state_dict() for t in range(self.T)] if self.quantize else None,
-                'features_dc_quantizer_layer1': [self.features_dc_quantizer_layer1[t].state_dict() for t in range(self.T)] if self.quantize else None,
+                'cholesky_quantizer_layer1': self.cholesky_quantizer_layer1.state_dict() if self.quantize else None,
+                'features_dc_quantizer_layer1': self.features_dc_quantizer_layer1.state_dict() if self.quantize else None,
             }
 
         if best:
@@ -301,15 +276,7 @@ class GaussianVideo3D2D(nn.Module):
             feature_quantized, self.l_vqc, self.c_bit = self.features_dc_quantizer_layer0(self._features_dc_3D)
         elif self.layer == 1:
             assert self.decoded_feature_dc_index_layer0 is not None, "To get features of layer 1, decoded_feature_dc_index_layer0 is required for layer 1"
-            features_quantized_list = []
-            self.l_vqc = 0
-            self.c_bit = 0
-            for t, (start, end) in enumerate(self.num_points_list):
-                fq_t, l_vqc_t, c_bit_t = self.features_dc_quantizer_layer1[t](self._features_dc_2D[start:end])
-                features_quantized_list.append(fq_t)
-                self.l_vqc += l_vqc_t
-                self.c_bit += c_bit_t
-            features_quantized_2D = torch.cat(features_quantized_list, dim=0)
+            features_quantized_2D, self.l_vqc, self.c_bit  = self.features_dc_quantizer_layer1(self._features_dc_2D)
             feature_quantized = torch.cat((self.decoded_feature_dc_index_layer0, features_quantized_2D), dim=0)
         return feature_quantized
     
@@ -350,15 +317,7 @@ class GaussianVideo3D2D(nn.Module):
             cholesky = cholesky + self.cholesky_bound_3D
         elif self.layer == 1:
             assert self.decoded_quant_cholesky_elements_layer0 is not None, "To get cholesky of layer 1, decoded_quant_cholesky_elements_layer0 is required for layer 1"
-            cholesky_2d_list = []
-            self.l_vqs = 0
-            self.s_bit = 0
-            for t, (start, end) in enumerate(self.num_points_list):
-                ch_t, l_vqs_t, s_bit_t = self.cholesky_quantizer_layer1[t](self._cholesky_2D[start:end])
-                cholesky_2d_list.append(ch_t)
-                self.l_vqs += l_vqs_t
-                self.s_bit += s_bit_t
-            cholesky_2d_used_quantized = torch.cat(cholesky_2d_list, dim=0)
+            cholesky_2d_used_quantized, self.l_vqs, self.s_bit = self.cholesky_quantizer_layer1(self._cholesky_2D)
             cholesky = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, self.get_cholesky_2d_full(cholesky_2d_used_quantized) + self.cholesky_bound_2D), dim=0)
         return cholesky
     
@@ -560,14 +519,9 @@ class GaussianVideo3D2D(nn.Module):
             return {"xyz": xyz, "feature_dc_index": feature_dc_index, "quant_cholesky_elements": quant_cholesky_elements}
         elif self.layer == 1:
             xyz = self._xyz_2D.half()
-            feature_dc_index_list = []
-            quant_cholesky_elements_list = []
-            for t, (start, end) in enumerate(self.num_points_list):
-                _, feature_dc_index_t = self.features_dc_quantizer_layer1[t].compress(self._features_dc_2D[start:end])
-                quant_cholesky_t, _ = self.cholesky_quantizer_layer1[t].compress(self._cholesky_2D[start:end])
-                feature_dc_index_list.append(feature_dc_index_t)
-                quant_cholesky_elements_list.append(quant_cholesky_t)
-            return {"xyz": xyz, "feature_dc_index": feature_dc_index_list, "quant_cholesky_elements": quant_cholesky_elements_list}
+            _, feature_dc_index = self.features_dc_quantizer_layer1.compress(self._features_dc_2D)
+            quant_cholesky_elements, _ = self.cholesky_quantizer_layer1.compress(self._cholesky_2D)
+            return {"xyz": xyz, "feature_dc_index": feature_dc_index, "quant_cholesky_elements": quant_cholesky_elements}
 
     def decompress_wo_ec(self, encoding_dict):
         xyz = encoding_dict["xyz"]
@@ -589,21 +543,10 @@ class GaussianVideo3D2D(nn.Module):
             xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0.float())
             means = torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
 
-            # Per-frame decompress (support legacy single-tensor encoding)
-            cholesky_2d_decoded_list = []
-            features_dc_2d_decoded_list = []
-            if isinstance(quant_cholesky_elements, list):
-                for t in range(self.T):
-                    cholesky_2d_decoded_list.append(self.cholesky_quantizer_layer1[t].decompress(quant_cholesky_elements[t]))
-                    features_dc_2d_decoded_list.append(self.features_dc_quantizer_layer1[t].decompress(feature_dc_index[t]))
-            else:
-                # Legacy: single tensor -> use quantizer 0 for all (or slice by num_points_list)
-                for t, (start, end) in enumerate(self.num_points_list):
-                    cholesky_2d_decoded_list.append(self.cholesky_quantizer_layer1[t].decompress(quant_cholesky_elements[start:end]))
-                    features_dc_2d_decoded_list.append(self.features_dc_quantizer_layer1[t].decompress(feature_dc_index[start:end]))
-            cholesky_2d_decoded = torch.cat(cholesky_2d_decoded_list, dim=0)
-            features_dc_2d_decoded = torch.cat(features_dc_2d_decoded_list, dim=0)
+            cholesky_2d_decoded = self.cholesky_quantizer_layer1.decompress(quant_cholesky_elements)
             cholesky_elements = torch.cat((self.decoded_quant_cholesky_elements_layer0 + self.cholesky_bound_3D, self.get_cholesky_2d_full(cholesky_2d_decoded) + self.cholesky_bound_2D), dim=0)
+
+            features_dc_2d_decoded = self.features_dc_quantizer_layer1.decompress(feature_dc_index)
             colors = torch.cat((self.decoded_feature_dc_index_layer0, features_dc_2d_decoded), dim=0)
         
         self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
@@ -630,72 +573,43 @@ class GaussianVideo3D2D(nn.Module):
         total_bits = 0
         initial_bits = 0
         codebook_bits = 0
-        position_bits = 0
-        cholesky_bits = 0
-        feature_dc_bits = 0
 
         if self.layer == 0:
             xyz = self._xyz_3D
             features_dc_quantizer = self.features_dc_quantizer_layer0
-            cholesky_quantizer = self.cholesky_quantizer_layer0
-
-            for layer in features_dc_quantizer.quantizer.layers:
-                codebook_bits += layer._codebook.embed.numel() * torch.finfo(layer._codebook.embed.dtype).bits
-            initial_bits += cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits
-            initial_bits += cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits
-            initial_bits += codebook_bits
-            total_bits += initial_bits
-
-            position_bits = xyz.numel() * 16
-            total_bits += position_bits
-
-            feature_dc_index_np = feature_dc_index.int().cpu().numpy()
-            index_max = np.max(feature_dc_index_np)
-            max_bit = np.ceil(np.log2(index_max + 1))
-            total_bits += feature_dc_index_np.size * max_bit
-
-            quant_cholesky_elements_np = quant_cholesky_elements.cpu().numpy()
-            total_bits += quant_cholesky_elements_np.size * 6
-
-            cholesky_bits = (
-                cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits +
-                cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits +
-                quant_cholesky_elements_np.size * 6
-            )
-            feature_dc_bits = codebook_bits + feature_dc_index_np.size * max_bit
-
+            cholesky_quantizer = self.cholesky_quantizer_layer0 
         elif self.layer == 1:
             xyz = self._xyz_2D
-            position_bits = xyz.numel() * 16
-            total_bits += position_bits
+            features_dc_quantizer = self.features_dc_quantizer_layer1
+            cholesky_quantizer = self.cholesky_quantizer_layer1
 
-            # Support legacy single-tensor encoding
-            if not isinstance(feature_dc_index, list):
-                feature_dc_index = [feature_dc_index[s:e] for s, e in self.num_points_list]
-                quant_cholesky_elements = [quant_cholesky_elements[s:e] for s, e in self.num_points_list]
+        for layer in features_dc_quantizer.quantizer.layers:
+            codebook_bits += layer._codebook.embed.numel() * torch.finfo(layer._codebook.embed.dtype).bits
 
-            for t in range(self.T):
-                f_dc_q = self.features_dc_quantizer_layer1[t]
-                ch_q = self.cholesky_quantizer_layer1[t]
-                for layer in f_dc_q.quantizer.layers:
-                    codebook_bits += layer._codebook.embed.numel() * torch.finfo(layer._codebook.embed.dtype).bits
-                initial_bits += ch_q.scale.numel() * torch.finfo(ch_q.scale.dtype).bits
-                initial_bits += ch_q.beta.numel() * torch.finfo(ch_q.beta.dtype).bits
+        initial_bits += cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits
+        initial_bits += cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits
+        initial_bits += codebook_bits
 
-                feature_dc_index_np = feature_dc_index[t].int().cpu().numpy()
-                index_max = np.max(feature_dc_index_np)
-                max_bit = np.ceil(np.log2(index_max + 1))
-                feature_dc_bits += feature_dc_index_np.size * max_bit
+        total_bits += initial_bits
 
-                quant_cholesky_elements_np = quant_cholesky_elements[t].cpu().numpy()
-                cholesky_bits += (
-                    ch_q.scale.numel() * torch.finfo(ch_q.scale.dtype).bits +
-                    ch_q.beta.numel() * torch.finfo(ch_q.beta.dtype).bits +
-                    quant_cholesky_elements_np.size * 6
-                )
+        position_bits = xyz.numel() * 16
+        total_bits += position_bits
 
-            total_bits += initial_bits + codebook_bits + feature_dc_bits + cholesky_bits
-            feature_dc_bits += codebook_bits  # feature_dc_bits = codebook + index bits for return
+        feature_dc_index_np = feature_dc_index.int().cpu().numpy()
+        index_max = np.max(feature_dc_index_np)
+        max_bit = np.ceil(np.log2(index_max + 1))
+        total_bits += feature_dc_index_np.size * max_bit
+
+        quant_cholesky_elements_np = quant_cholesky_elements.cpu().numpy()
+        total_bits += quant_cholesky_elements_np.size * 6
+
+        cholesky_bits = (
+            cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits +
+            cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits +
+            quant_cholesky_elements_np.size * 6
+        )
+
+        feature_dc_bits = codebook_bits + feature_dc_index_np.size * max_bit
 
         bpp = total_bits / (self.H * self.W * self.T)
         position_bpp = position_bits / (self.H * self.W * self.T)
@@ -716,57 +630,34 @@ class GaussianVideo3D2D(nn.Module):
         if self.layer == 0:
             xyz = self._xyz_3D
             features_dc_quantizer = self.features_dc_quantizer_layer0
-            cholesky_quantizer = self.cholesky_quantizer_layer0
-
-            cholesky_compressed, cholesky_histogram_table, cholesky_unique = compress_matrix_flatten_categorical(
-                quant_cholesky_elements.int().flatten().tolist()
-            )
-            feature_dc_compressed, feature_dc_histogram_table, feature_dc_unique = compress_matrix_flatten_categorical(
-                feature_dc_index.int().flatten().tolist()
-            )
-            codebook_bits = 0
-            for layer in features_dc_quantizer.quantizer.layers:
-                codebook_bits += layer._codebook.embed.numel() * torch.finfo(layer._codebook.embed.dtype).bits
-            position_bits = xyz.numel() * 16
-            cholesky_bits = (
-                cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits +
-                cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits +
-                get_np_size(cholesky_histogram_table) * 8 +
-                get_np_size(cholesky_unique) * 8 +
-                get_np_size(cholesky_compressed) * 8
-            )
-            feature_dc_bits = codebook_bits + get_np_size(feature_dc_histogram_table) * 8 + get_np_size(feature_dc_unique) * 8 + get_np_size(feature_dc_compressed) * 8
-
+            cholesky_quantizer = self.cholesky_quantizer_layer0 
         elif self.layer == 1:
             xyz = self._xyz_2D
-            position_bits = xyz.numel() * 16
-            codebook_bits = 0
-            cholesky_bits = 0
-            feature_dc_bits = 0
-            # Support legacy single-tensor encoding
-            if not isinstance(feature_dc_index, list):
-                feature_dc_index = [feature_dc_index[s:e] for s, e in self.num_points_list]
-                quant_cholesky_elements = [quant_cholesky_elements[s:e] for s, e in self.num_points_list]
-            for t in range(self.T):
-                features_dc_quantizer = self.features_dc_quantizer_layer1[t]
-                cholesky_quantizer = self.cholesky_quantizer_layer1[t]
-                cholesky_compressed, cholesky_histogram_table, cholesky_unique = compress_matrix_flatten_categorical(
-                    quant_cholesky_elements[t].int().flatten().tolist()
-                )
-                feature_dc_compressed, feature_dc_histogram_table, feature_dc_unique = compress_matrix_flatten_categorical(
-                    feature_dc_index[t].int().flatten().tolist()
-                )
-                for layer in features_dc_quantizer.quantizer.layers:
-                    codebook_bits += layer._codebook.embed.numel() * torch.finfo(layer._codebook.embed.dtype).bits
-                cholesky_bits += (
-                    cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits +
-                    cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits +
-                    get_np_size(cholesky_histogram_table) * 8 +
-                    get_np_size(cholesky_unique) * 8 +
-                    get_np_size(cholesky_compressed) * 8
-                )
-                feature_dc_bits += get_np_size(feature_dc_histogram_table) * 8 + get_np_size(feature_dc_unique) * 8 + get_np_size(feature_dc_compressed) * 8
-            feature_dc_bits += codebook_bits
+            features_dc_quantizer = self.features_dc_quantizer_layer1
+            cholesky_quantizer = self.cholesky_quantizer_layer1
+
+        cholesky_compressed, cholesky_histogram_table, cholesky_unique = compress_matrix_flatten_categorical(
+            quant_cholesky_elements.int().flatten().tolist()
+        )
+        feature_dc_compressed, feature_dc_histogram_table, feature_dc_unique = compress_matrix_flatten_categorical(
+            feature_dc_index.int().flatten().tolist()
+        )
+        
+        codebook_bits = 0
+        for layer in features_dc_quantizer.quantizer.layers:
+            codebook_bits += layer._codebook.embed.numel() * torch.finfo(layer._codebook.embed.dtype).bits
+
+        position_bits = xyz.numel() * 16
+
+        cholesky_bits = (
+            cholesky_quantizer.scale.numel() * torch.finfo(cholesky_quantizer.scale.dtype).bits +
+            cholesky_quantizer.beta.numel() * torch.finfo(cholesky_quantizer.beta.dtype).bits +
+            get_np_size(cholesky_histogram_table) * 8 +
+            get_np_size(cholesky_unique) * 8 +
+            get_np_size(cholesky_compressed) * 8
+        )
+
+        feature_dc_bits = codebook_bits + get_np_size(feature_dc_histogram_table) * 8 + get_np_size(feature_dc_unique) * 8 + get_np_size(feature_dc_compressed) * 8
 
         total_bits = position_bits + cholesky_bits + feature_dc_bits
         bpp = total_bits / (self.H * self.W * self.T)

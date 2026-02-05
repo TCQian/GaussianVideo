@@ -72,7 +72,7 @@ class GaussianVideo3D2D(nn.Module):
 
         if checkpoint_path_layer0 is not None:
             print(f"Loading layer 0 checkpoint from: {checkpoint_path_layer0}")
-            checkpoint_layer0 = torch.load(checkpoint_path_layer0, map_location='cpu')
+            checkpoint_layer0 = torch.load(checkpoint_path_layer0)
             # Support both GaussianVideo format (_xyz, _cholesky, ...) and 3D2D format (_xyz_3D, _cholesky_3D, ...)
             if '_xyz_3D' in checkpoint_layer0:
                 xyz = checkpoint_layer0['_xyz_3D']
@@ -155,7 +155,6 @@ class GaussianVideo3D2D(nn.Module):
 
         elif self.layer == 1:
             if self._xyz_3D.shape[0] > 0:
-                self._opacity_3D.register_hook(lambda g: g / self.T)
                 self.trainable_params.append(self._opacity_3D)
             self.trainable_params.append(self._xyz_2D)
             self.trainable_params.append(self._cholesky_2D)

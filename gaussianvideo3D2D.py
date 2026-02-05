@@ -79,12 +79,25 @@ class GaussianVideo3D2D(nn.Module):
 
         if checkpoint_path_layer0 is not None:
             print(f"Loading layer 0 checkpoint from: {checkpoint_path_layer0}")
-            checkpoint_layer0 = torch.load(checkpoint_path_layer0)
-            
-            xyz = checkpoint_layer0['_xyz_3D']
-            cholesky = checkpoint_layer0['_cholesky_3D']
-            features_dc = checkpoint_layer0['_features_dc_3D']
-            self._opacity_3D = nn.Parameter(checkpoint_layer0['_opacity_3D'])
+            checkpoint_layer0 = torch.load(checkpoint_path_layer0, map_location='cpu')
+            # Support both GaussianVideo format (_xyz, _cholesky, ...) and 3D2D format (_xyz_3D, _cholesky_3D, ...)
+            if '_xyz_3D' in checkpoint_layer0:
+                xyz = checkpoint_layer0['_xyz_3D']
+                cholesky = checkpoint_layer0['_cholesky_3D']
+                features_dc = checkpoint_layer0['_features_dc_3D']
+                opacity = checkpoint_layer0['_opacity_3D']
+                layer0_format = "3D2D"
+            elif '_xyz' in checkpoint_layer0:
+                xyz = checkpoint_layer0['_xyz']
+                cholesky = checkpoint_layer0['_cholesky']
+                features_dc = checkpoint_layer0['_features_dc']
+                opacity = checkpoint_layer0['_opacity']
+                layer0_format = "GaussianVideo"
+            else:
+                raise KeyError("Layer 0 checkpoint must contain either 3D2D keys (_xyz_3D, ...) or GaussianVideo keys (_xyz, _cholesky, _features_dc, _opacity)")
+            print(f"Detected Layer 0 format: {layer0_format}")
+
+            self._opacity_3D = nn.Parameter(opacity)
 
             if self.layer == 0:
                 self._xyz_3D = nn.Parameter(xyz, requires_grad=True)
@@ -98,11 +111,17 @@ class GaussianVideo3D2D(nn.Module):
 
             if self.quantize:
                 try:
+                    # 3D2D format uses cholesky_quantizer_layer0 / features_dc_quantizer_layer0
                     self.cholesky_quantizer_layer0.load_state_dict(checkpoint_layer0['cholesky_quantizer_layer0'])
                     self.features_dc_quantizer_layer0.load_state_dict(checkpoint_layer0['features_dc_quantizer_layer0'])
-                except:
-                    self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
-                    print("Layer 0 quantization parameters not found, initialized new quantization parameters")
+                except (KeyError, TypeError):
+                    try:
+                        # GaussianVideo format uses cholesky_quantizer / features_dc_quantizer
+                        self.cholesky_quantizer_layer0.load_state_dict(checkpoint_layer0['cholesky_quantizer'])
+                        self.features_dc_quantizer_layer0.load_state_dict(checkpoint_layer0['features_dc_quantizer'])
+                    except (KeyError, TypeError):
+                        self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
+                        print("Layer 0 quantization parameters not found, initialized new quantization parameters")
 
             print(f"Layer 0 checkpoint loaded successfully with {self._xyz_3D.shape[0]} gaussians")
         else:

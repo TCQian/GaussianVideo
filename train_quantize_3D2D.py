@@ -76,7 +76,14 @@ class GaussianVideo3D2DTrainerQuantize:
         elif self.model_name == "GVGI":
             assert self.layer == 1, "GVGI is only able to process Layer 1 "
             checkpoint_layer0 = torch.load(args.model_path_layer0, map_location=self.device)
-            self.init_num_points_layer1 = int((self.num_points * self.T) - checkpoint_layer0['_xyz_3D'].shape[0])
+            if '_xyz_3D' in checkpoint_layer0:
+                num_points_layer0 = checkpoint_layer0['_xyz_3D'].shape[0]
+                self.init_num_points_layer1 = int((self.num_points * self.T) - num_points_layer0)
+            elif '_xyz' in checkpoint_layer0:
+                num_points_layer0 = checkpoint_layer0['_xyz'].shape[0]
+                self.init_num_points_layer1 = int(((self.num_points * 2) - num_points_layer0) / self.T)
+            else:
+                raise KeyError("Layer 0 checkpoint must contain either 3D2D keys (_xyz_3D, ...) or GaussianVideo keys (_xyz, _cholesky, _features_dc, _opacity)")
             num_points_per_frame = int(self.init_num_points_layer1 / self.T)
             print(f"GVGI: Available number of gaussians: {self.init_num_points_layer1} for layer 1")
 

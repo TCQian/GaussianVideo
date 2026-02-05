@@ -108,6 +108,31 @@ class GaussianVideo3D2DTrainer:
             num_points_per_frame = int(self.init_num_points_layer1 / self.T)
             print(f"GVGI: Available number of gaussians: {self.init_num_points_layer1} for layer 1")
 
+            self.gaussian_model_layer0 = GaussianVideo3D2D(
+                layer=0,
+                loss_type="L2",
+                opt_type="adan",
+                H=self.H,
+                W=self.W,
+                T=self.T,
+                BLOCK_H=BLOCK_H,
+                BLOCK_W=BLOCK_W,
+                BLOCK_T=BLOCK_T,
+                device=self.device,
+                quantize=False,
+                num_points=self.num_points,
+                iterations=self.iterations,
+                lr=args.lr
+            )
+            self.gaussian_model_layer0._create_data_from_checkpoint(args.model_path_layer0, None)
+            self.gaussian_model_layer0.to(self.device)
+
+            self.gaussian_model_layer0.eval()
+            with torch.no_grad():
+                out = self.gaussian_model_layer0()
+                bg_tensor = out["render"].float()
+            del self.gaussian_model_layer0
+
             self.gaussian_model_list = []
             for t in range(self.T):
                 if args.model_path_layer1 is not None:
@@ -115,16 +140,14 @@ class GaussianVideo3D2DTrainer:
                     if checkpoint_file_path.exists():
                         checkpoint = torch.load(checkpoint_file_path, map_location=self.device)
                         num_points = checkpoint['_xyz'].shape[0]
-                else:                
+                else:
                     if t == self.T - 1:
                         num_points = self.init_num_points_layer1 - (t * num_points_per_frame)
                     else:
                         num_points = num_points_per_frame
 
-                background_path = Path(f"{args.model_path_layer0.replace('layer_0_model.pth.tar', '')}/{self.video_name}_fitting_t{t}_layer0.png")
-                background_img = image_path_to_tensor(background_path).squeeze(0).permute(1, 2, 0).to(self.device)
                 gaussian_model = GaussianImage_Cholesky(
-                    background_image=background_img,
+                    background_image=bg_tensor[0, :, :, :, t].squeeze(0).permute(1, 2, 0),
                     loss_type="L2", 
                     opt_type="adan", 
                     num_points=num_points,

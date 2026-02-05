@@ -32,8 +32,8 @@ class GaussianVideo3D2DTrainerQuantize:
         start_frame: int = 0,
         log_dir: Path = None,
     ):
-        self.early_stopping_patience = 1000
-        self.early_stopping_min_delta = 1e-10
+        self.early_stopping_patience = 100
+        self.early_stopping_min_delta = 1e-9
 
         self.device = torch.device("cuda:0")
         self.gt_image = images_paths_to_tensor(images_paths).to(self.device)  # [1, C, H, W, T]

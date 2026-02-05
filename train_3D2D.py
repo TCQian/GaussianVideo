@@ -67,8 +67,8 @@ class GaussianVideo3D2DTrainer:
         self.save_imgs = args.save_imgs
         self.log_dir = log_dir
 
-        self.early_stopping_patience = 1000
-        self.early_stopping_min_delta = 1e-10
+        self.early_stopping_patience = 100
+        self.early_stopping_min_delta = 1e-9
         self.densify_until_iter = self.iterations - 5000
         self.densify_factor = 0.1
         

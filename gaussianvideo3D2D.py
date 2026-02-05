@@ -185,12 +185,11 @@ class GaussianVideo3D2D(nn.Module):
 
     def _init_layer1(self):
         assert not self.quantize, "Quantization can only be done on trained gaussians. Please load a checkpoint first."
+        self.num_points_layer0 = self._xyz_3D.shape[0]
         if self.layer0_format == "3D2D":
-            self.num_points_layer0 = self._xyz_3D.shape[0]
             self.init_num_points = int((self.num_points * self.T) - self.num_points_layer0)
             num_points_per_frame = int(self.init_num_points / self.T)
         elif self.layer0_format == "GaussianVideo":
-            self.num_points_layer0 = self._xyz.shape[0]
             self.init_num_points = int(((self.num_points * 2) - self.num_points_layer0) / self.T)
             num_points_per_frame = int(self.init_num_points / self.T)
         self.num_points_list = []

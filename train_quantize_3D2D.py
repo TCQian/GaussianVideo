@@ -112,6 +112,10 @@ class GaussianVideo3D2DTrainerQuantize:
                 encoding_dict = self.gaussian_model_layer0.compress_wo_ec()
                 out = self.gaussian_model_layer0.decompress_wo_ec(encoding_dict)
                 bg_tensor = out["render"].float()
+
+                mse_loss = F.mse_loss(bg_tensor, self.gt_image)
+                psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
+                print(f'Quantized L0 PSNR: {psnr:.4f}')
             del self.gaussian_model_layer0
 
             self.gaussian_model_list = []

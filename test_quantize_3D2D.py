@@ -115,6 +115,10 @@ class GaussianVideo3D2DTrainerQuantize:
                 out = self.gaussian_model_layer0.decompress_wo_ec(encoding_dict)
                 bg_tensor = out["render"].float()
 
+                mse_loss = F.mse_loss(bg_tensor, self.gt_image)
+                psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
+                print(f'L0 PSNR: {psnr:.4f}')
+
             self.gaussian_model_list = []
             for t in range(self.T):
                 if args.model_path_layer1 is not None:

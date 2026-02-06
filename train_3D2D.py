@@ -131,9 +131,6 @@ class GaussianVideo3D2DTrainer:
             with torch.no_grad():
                 out = self.gaussian_model_layer0()
                 bg_tensor = out["render"].float()
-                mse_loss = F.mse_loss(bg_tensor, self.gt_image)
-                psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
-                print(f'L0 PSNR: {psnr:.4f}')
             del self.gaussian_model_layer0
 
             self.gaussian_model_list = []

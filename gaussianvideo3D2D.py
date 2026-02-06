@@ -205,7 +205,7 @@ class GaussianVideo3D2D(nn.Module):
             self.init_num_points = int((self.num_points * self.T) - self.num_points_layer0)
             num_points_per_frame = int(self.init_num_points / self.T)
         elif self.layer0_format == "GaussianVideo":
-            self.init_num_points = int(((self.num_points * 2) - self.num_points_layer0) / self.T)
+            self.init_num_points = int(self.num_points * self.T)
             num_points_per_frame = int(self.init_num_points / self.T)
         self.num_points_list = []
         for t in range(self.T):

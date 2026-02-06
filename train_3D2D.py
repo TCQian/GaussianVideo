@@ -101,7 +101,7 @@ class GaussianVideo3D2DTrainer:
                 self.init_num_points_layer1 = int((self.num_points * self.T) - num_points_layer0)
             elif '_xyz' in checkpoint_layer0:
                 num_points_layer0 = checkpoint_layer0['_xyz'].shape[0]
-                self.init_num_points_layer1 = int(((self.num_points * 2) - num_points_layer0) / self.T)
+                self.init_num_points_layer1 = int(self.num_points *  self.T)
             else:
                 raise KeyError("Layer 0 checkpoint must contain either 3D2D keys (_xyz_3D, ...) or GaussianVideo keys (_xyz, _cholesky, _features_dc, _opacity)")
 

@@ -103,12 +103,27 @@ class GaussianVideo3D2D(nn.Module):
                 print(f'Layer 0 gaussians are frozen for Layer {self.layer} training')
 
             if self.quantize:
-                try:
-                    self.cholesky_quantizer_layer0.load_state_dict(checkpoint_layer0['cholesky_quantizer_layer0'])
-                    self.features_dc_quantizer_layer0.load_state_dict(checkpoint_layer0['features_dc_quantizer_layer0'])
-                except:
-                    self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
-                    print("Layer 0 quantization parameters not found, initialized new quantization parameters")
+                if self.layer0_format == "GaussianVideo":
+                    # GaussianVideo checkpoint uses flat keys: cholesky_quantizer.scale, features_dc_quantizer.quantizer.layers.0._codebook.embed, etc.
+                    def _sub(ckpt, prefix):
+                        return {k[len(prefix):]: v for k, v in ckpt.items() if isinstance(k, str) and k.startswith(prefix)}
+                    cholesky_sd = _sub(checkpoint_layer0, "cholesky_quantizer.")
+                    features_dc_sd = _sub(checkpoint_layer0, "features_dc_quantizer.")
+                    if cholesky_sd:
+                        self.cholesky_quantizer_layer0.load_state_dict(cholesky_sd, strict=False)
+                    if features_dc_sd:
+                        self.features_dc_quantizer_layer0.load_state_dict(features_dc_sd, strict=False)
+                    if not cholesky_sd and not features_dc_sd:
+                        self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
+                        print("Layer 0 quantization parameters not found in GaussianVideo checkpoint, initialized from data")
+                else:
+                    # 3D2D checkpoint uses nested keys
+                    try:
+                        self.cholesky_quantizer_layer0.load_state_dict(checkpoint_layer0["cholesky_quantizer_layer0"])
+                        self.features_dc_quantizer_layer0.load_state_dict(checkpoint_layer0["features_dc_quantizer_layer0"])
+                    except KeyError:
+                        self.cholesky_quantizer_layer0._init_data(self._cholesky_3D)
+                        print("Layer 0 quantization parameters not found, initialized new quantization parameters")
 
             print(f"Layer 0 checkpoint loaded successfully with {self._xyz_3D.shape[0]} gaussians")
         else:

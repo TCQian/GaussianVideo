@@ -1,6 +1,5 @@
 import math
 import os
-from re import A
 import time
 from pathlib import Path
 import argparse
@@ -49,70 +48,66 @@ class GaussianVideo3D2DTrainerQuantize:
         self.H, self.W, self.T = self.gt_video.shape[2], self.gt_video.shape[3], self.gt_video.shape[4]
         BLOCK_H, BLOCK_W, BLOCK_T = 16, 16, 1  # adjust BLOCK_T if needed
         self.iterations = args.iterations
-        self.iterations = args.iterations
         self.num_points = args.num_points
         self.save_imgs = args.save_imgs
         self.log_dir = log_dir
 
-        self.gaussian_model_layer0 = GaussianVideo3D2D(
-                layer=0,
-                loss_type="L2", 
-                opt_type="adan", 
-                H=self.H, 
-                W=self.W, 
-                T=self.T, 
-                BLOCK_H=BLOCK_H, 
-                BLOCK_W=BLOCK_W, 
-                BLOCK_T=BLOCK_T, 
-                device=self.device, 
-                quantize=True,
-                num_points=self.num_points,
-                iterations=self.iterations,
-                lr=args.lr
-            )
-        self.gaussian_model_layer0._create_data_from_checkpoint(args.model_path_layer0, None)
-        self.gaussian_model_layer0.to(self.device)
+        self.gaussian_model = GaussianVideo3D2D(
+            layer=0,
+            loss_type="L2",
+            opt_type="adan",
+            H=self.H,
+            W=self.W,
+            T=self.T,
+            BLOCK_H=BLOCK_H,
+            BLOCK_W=BLOCK_W,
+            BLOCK_T=BLOCK_T,
+            device=self.device,
+            quantize=True,
+            num_points=self.num_points,
+            iterations=self.iterations,
+            lr=args.lr
+        )
+        self.gaussian_model._create_data_from_checkpoint(args.model_path_layer0, None)
+        self.gaussian_model.to(self.device)
 
-        if self.model_name == "GV3D2D":
-            self.gaussian_model = GaussianVideo3D2D(
-                layer=1,
-                loss_type="L2", 
-                opt_type="adan", 
-                H=self.H, 
-                W=self.W, 
-                T=self.T, 
-                BLOCK_H=BLOCK_H, 
-                BLOCK_W=BLOCK_W, 
-                BLOCK_T=BLOCK_T, 
-                device=self.device, 
-                quantize=True,
-                num_points=self.num_points,
-                iterations=self.iterations,
-                lr=args.lr
-            )
-            self.gaussian_model._create_data_from_checkpoint(args.model_path_layer0, args.model_path_layer1)
-            self.gaussian_model.to(self.device)
-            self.gaussian_model.create_en_decoded_layer0() # initialize decoded layer 0 for layer 1 training
+        if self.model_name == "GV3D2D" and self.layer == 1:
+            self.gaussian_model_list = []
+            for t in range(self.T):
+                model = GaussianVideo3D2D(
+                        layer=1,
+                        loss_type="L2",
+                        opt_type="adan",
+                        H=self.H,
+                        W=self.W,
+                        T=self.T,
+                        BLOCK_H=BLOCK_H,
+                        BLOCK_W=BLOCK_W,
+                        BLOCK_T=BLOCK_T,
+                        device=self.device,
+                        quantize=True,
+                        num_points=self.num_points,
+                        iterations=self.iterations,
+                        lr=args.lr,
+                        frame_index=t,
+                    )
+                ckpt_layer1 = Path(args.model_path_layer1) / f"layer_1_model_t{t}.best.pth.tar"
+                model._create_data_from_checkpoint(args.model_path_layer0, ckpt_layer1)
+                model.to(self.device)
+                model.create_en_decoded_layer0()
+                self.gaussian_model_list.append(model)
 
-        if self.model_name == "GVGI":
+        elif self.model_name == "GVGI":
             assert self.layer == 1, "GVGI is only able to process Layer 1 "
-            checkpoint_layer0 = torch.load(args.model_path_layer0, map_location=self.device)
-            if '_xyz_3D' in checkpoint_layer0:
-                num_points_layer0 = checkpoint_layer0['_xyz_3D'].shape[0]
-                self.init_num_points_layer1 = int((self.num_points * self.T) - num_points_layer0)
-            elif '_xyz' in checkpoint_layer0:
-                num_points_layer0 = checkpoint_layer0['_xyz'].shape[0]
-                self.init_num_points_layer1 = int(((self.num_points * 2) - num_points_layer0) / self.T)
-            else:
-                raise KeyError("Layer 0 checkpoint must contain either 3D2D keys (_xyz_3D, ...) or GaussianVideo keys (_xyz, _cholesky, _features_dc, _opacity)")
+
+            self.init_num_points_layer1 = int((self.num_points * self.T))
             num_points_per_frame = int(self.init_num_points_layer1 / self.T)
             print(f"GVGI: Available number of gaussians: {self.init_num_points_layer1} for layer 1")
 
-            # get the background image tensor of layer 0
-            self.gaussian_model_layer0.eval()
+            self.gaussian_model.eval()
             with torch.no_grad():
-                encoding_dict = self.gaussian_model_layer0.compress_wo_ec()
-                out = self.gaussian_model_layer0.decompress_wo_ec(encoding_dict)
+                encoding_dict = self.gaussian_model.compress_wo_ec()
+                out = self.gaussian_model.decompress_wo_ec(encoding_dict)
                 bg_tensor = out["render"].float()
 
             self.gaussian_model_list = []
@@ -157,40 +152,68 @@ class GaussianVideo3D2DTrainerQuantize:
             encoding_dict = gaussian_model.compress_wo_ec()
             out = gaussian_model.decompress_wo_ec(encoding_dict)
             start_time = time.time()
-            for i in range(100):
+            for _ in range(100):
                 _ = gaussian_model.decompress_wo_ec(encoding_dict)
             end_time = (time.time() - start_time) / 100
         data_dict = gaussian_model.analysis(encoding_dict)
 
-        out_video = out["render"].float()  # Expected shape: [1, C, H, W, T]
+        out_video = out["render"].float()
         mse_loss = F.mse_loss(out_video, gt_image)
         psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
-        
         T = out_video.shape[-1]
         ms_ssim_total = 0.0
         for t in range(T):
-            frame_pred = out_video[..., t]  # shape: [1, C, H, W]
-            frame_gt = gt_image[..., t]  # shape: [1, C, H, W]
+            frame_pred = out_video[..., t]
+            frame_gt = gt_image[..., t]
             ms_ssim_total += ms_ssim(frame_pred, frame_gt, data_range=1, size_average=True).item()
-        
             if self.save_imgs:
                 transform = transforms.ToPILImage()
                 img = transform(frame_pred.squeeze(0))
                 name = f"{self.video_name}_fitting_t{t}_layer{layer}_codec_best.png"
                 img.save(str(self.log_dir / name))
-
         ms_ssim_value = ms_ssim_total / T
-        FPS = self.T/end_time
+        FPS = self.T / end_time
         data_dict["psnr"] = psnr
         data_dict["ms-ssim"] = ms_ssim_value
         data_dict["rendering_time"] = end_time
         data_dict["rendering_fps"] = FPS
-
         np.save(self.log_dir / f"test_layer_{layer}.npy", data_dict)
         self.logwriter.write("Layer {}: Eval time:{:.8f}s, FPS:{:.4f}".format(layer, end_time, FPS))
         self.logwriter.write("Layer {}: PSNR:{:.4f}, MS_SSIM:{:.6f}, bpp:{:.4f}".format(layer, psnr, ms_ssim_value, data_dict["bpp"]))
         self.logwriter.write("Layer {}: position_bpp:{:.4f}, cholesky_bpp:{:.4f}, feature_dc_bpp:{:.4f}".format(
             layer, data_dict["position_bpp"], data_dict["cholesky_bpp"], data_dict["feature_dc_bpp"]))
+        return data_dict
+
+    def test_GV3D2D_frame(self, gaussian_model, gt_video, t=0):
+        gaussian_model.eval()
+        with torch.no_grad():
+            encoding_dict = gaussian_model.compress_wo_ec()
+            out = gaussian_model.decompress_wo_ec(encoding_dict)
+            start_time = time.time()
+            for _ in range(100):
+                _ = gaussian_model.decompress_wo_ec(encoding_dict)
+            end_time = (time.time() - start_time) / 100
+        data_dict = gaussian_model.analysis(encoding_dict)
+        out_video = out["render"].float()
+        frame_pred = out_video[..., t]
+        frame_gt = gt_video[..., t]
+        mse_loss = F.mse_loss(frame_pred, frame_gt)
+        psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
+        ms_ssim_value = ms_ssim(frame_pred, frame_gt, data_range=1, size_average=True).item()
+        if self.save_imgs:
+            transform = transforms.ToPILImage()
+            Path(self.log_dir / f'frame_{t+1:04}').mkdir(parents=True, exist_ok=True)
+            img = transform(frame_pred.squeeze(0))
+            name = f"{self.video_name}_fitting_t{t}_layer{self.layer}_codec_best.png"
+            img.save(str(self.log_dir / f'frame_{t+1:04}' / name))
+        data_dict["psnr"] = psnr
+        data_dict["ms-ssim"] = ms_ssim_value
+        data_dict["rendering_time"] = end_time
+        data_dict["rendering_fps"] = 1 / end_time
+        data_dict["bpp"] *= self.T
+        data_dict["position_bpp"] *= self.T
+        data_dict["cholesky_bpp"] *= self.T
+        data_dict["feature_dc_bpp"] *= self.T
         return data_dict
 
     def test_GVGI(self, gaussian_model, gt_image, t=0):
@@ -226,48 +249,32 @@ class GaussianVideo3D2DTrainerQuantize:
         return data_dict
 
     def test(self):
-        # Test layer 0
-        data_dict = self.test_GV3D2D(self.gaussian_model_layer0, self.gt_video, layer=0)
+        data_dict = self.test_GV3D2D(self.gaussian_model, self.gt_video, layer=0)
 
-        if self.model_name == "GV3D2D":
-            data_dict_layer1 = self.test_GV3D2D(self.gaussian_model, self.gt_video, layer=1)
-            data_dict["psnr_layer1"] = data_dict_layer1["psnr"]
-            data_dict["ms-ssim_layer1"] = data_dict_layer1["ms-ssim"]
-            data_dict["rendering_time_layer1"] = data_dict_layer1["rendering_time"]
-            data_dict["rendering_fps_layer1"] = data_dict_layer1["rendering_fps"]
-            data_dict["bpp_layer1"] = data_dict_layer1["bpp"]
-            data_dict["position_bpp_layer1"] = data_dict_layer1["position_bpp"]
-            data_dict["cholesky_bpp_layer1"] = data_dict_layer1["cholesky_bpp"]
-            data_dict["feature_dc_bpp_layer1"] = data_dict_layer1["feature_dc_bpp"]
-        elif self.model_name == "GVGI":
-            psnr_list = []
-            ms_ssim_list = []
-            rendering_time_list = []
-            rendering_fps_list = []
-            bpp_list = []
-            position_bpp_list = []
-            cholesky_bpp_list = []
-            feature_dc_bpp_list = []
-            for t in range(self.T):
-                data_dict_layer1 = self.test_GVGI(self.gaussian_model_list[t], self.gt_video[..., t], t)
-                psnr_list.append(data_dict_layer1["psnr"])
-                ms_ssim_list.append(data_dict_layer1["ms-ssim"])
-                rendering_time_list.append(data_dict_layer1["rendering_time"])
-                rendering_fps_list.append(data_dict_layer1["rendering_fps"])
-                bpp_list.append(data_dict_layer1["bpp"])
-                position_bpp_list.append(data_dict_layer1["position_bpp"])
-                cholesky_bpp_list.append(data_dict_layer1["cholesky_bpp"])
-                feature_dc_bpp_list.append(data_dict_layer1["feature_dc_bpp"])
-
-            data_dict["psnr_layer1"] = sum(psnr_list) / len(psnr_list)
-            data_dict["ms-ssim_layer1"] = sum(ms_ssim_list) / len(ms_ssim_list)
-            data_dict["rendering_time_layer1"] = sum(rendering_time_list) / len(rendering_time_list)
-            data_dict["rendering_fps_layer1"] = sum(rendering_fps_list) / len(rendering_fps_list)
-            data_dict["bpp_layer1"] = sum(bpp_list) / len(bpp_list)
-            data_dict["position_bpp_layer1"] = sum(position_bpp_list) / len(position_bpp_list)
-            data_dict["cholesky_bpp_layer1"] = sum(cholesky_bpp_list) / len(cholesky_bpp_list)
-            data_dict["feature_dc_bpp_layer1"] = sum(feature_dc_bpp_list) / len(feature_dc_bpp_list)
-        
+        psnr_list, ms_ssim_list = [], []
+        rendering_time_list, rendering_fps_list = [], []
+        bpp_list, position_bpp_list, cholesky_bpp_list, feature_dc_bpp_list = [], [], [], []
+        for t in range(self.T):
+            if self.model_name == "GV3D2D":
+                data_dict_t = self.test_GV3D2D_frame(self.gaussian_model_list[t], self.gt_video, t)
+            else:
+                data_dict_t = self.test_GVGI(self.gaussian_model_list[t], self.gt_video[..., t], t)
+            psnr_list.append(data_dict_t["psnr"])
+            ms_ssim_list.append(data_dict_t["ms-ssim"])
+            rendering_time_list.append(data_dict_t["rendering_time"])
+            rendering_fps_list.append(data_dict_t["rendering_fps"])
+            bpp_list.append(data_dict_t["bpp"])
+            position_bpp_list.append(data_dict_t["position_bpp"])
+            cholesky_bpp_list.append(data_dict_t["cholesky_bpp"])
+            feature_dc_bpp_list.append(data_dict_t["feature_dc_bpp"])
+        data_dict["psnr_layer1"] = sum(psnr_list) / len(psnr_list)
+        data_dict["ms-ssim_layer1"] = sum(ms_ssim_list) / len(ms_ssim_list)
+        data_dict["rendering_time_layer1"] = sum(rendering_time_list) / len(rendering_time_list)
+        data_dict["rendering_fps_layer1"] = sum(rendering_fps_list) / len(rendering_fps_list)
+        data_dict["bpp_layer1"] = sum(bpp_list) / len(bpp_list)
+        data_dict["position_bpp_layer1"] = sum(position_bpp_list) / len(position_bpp_list)
+        data_dict["cholesky_bpp_layer1"] = sum(cholesky_bpp_list) / len(cholesky_bpp_list)
+        data_dict["feature_dc_bpp_layer1"] = sum(feature_dc_bpp_list) / len(feature_dc_bpp_list)
         return data_dict
 
 def parse_args(argv):

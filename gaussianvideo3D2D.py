@@ -1,3 +1,4 @@
+from pathlib import Path
 from gsplat.project_gaussians_video import project_gaussians_video
 from gsplat.rasterize_sum_video import rasterize_gaussians_sum_video
 from utils import *
@@ -38,6 +39,7 @@ class GaussianVideo3D2D(nn.Module):
         self.register_buffer('background', torch.ones(3))
         self.register_buffer('cholesky_bound_3D', torch.tensor([0.5, 0, 0, 0.5, 0, 0.5]).view(1, 6))
         self.register_buffer('cholesky_bound_2D', torch.tensor([0.5, 0, 0, 0.5, 0, 0]).view(1, 6))
+        self.frame_index = int(kwargs.get("frame_index", 0))
 
         self.opacity_activation = torch.sigmoid
 
@@ -49,7 +51,6 @@ class GaussianVideo3D2D(nn.Module):
         self._cholesky_2D = None
         self._features_dc_2D = None
         self._opacity_2D = None
-        self.num_points_list = None
         self.optimizer = None
         self.scheduler = None
 
@@ -133,16 +134,11 @@ class GaussianVideo3D2D(nn.Module):
         if checkpoint_path_layer1 is not None:
             print(f"Loading layer 1 checkpoint from: {checkpoint_path_layer1}")
             checkpoint_layer1 = torch.load(checkpoint_path_layer1)
-            self.num_points_list = checkpoint_layer1['gaussian_num_list']
-            self._ckpt_xyz_2D = checkpoint_layer1['_xyz_2D']
-            self._xyz_2D = nn.Parameter(self._ckpt_xyz_2D)
-
-            self._ckpt_cholesky_2D = checkpoint_layer1['_cholesky_2D']
-            self._cholesky_2D = nn.Parameter(self._ckpt_cholesky_2D)
-
+            self._xyz_2D = nn.Parameter(checkpoint_layer1['_xyz_2D'])
+            self._cholesky_2D = nn.Parameter(checkpoint_layer1['_cholesky_2D'])
             self._features_dc_2D = nn.Parameter(checkpoint_layer1['_features_dc_2D'])
-            self._opacity_3D = nn.Parameter(checkpoint_layer1['_opacity_3D']) # loading opacity_3D tuned in layer 1 training
             self._opacity_2D = nn.Parameter(checkpoint_layer1['_opacity_2D'])
+            self._opacity_3D = nn.Parameter(checkpoint_layer1['_opacity_3D'])
 
             if self.quantize:
                 try:
@@ -152,7 +148,7 @@ class GaussianVideo3D2D(nn.Module):
                     self.cholesky_quantizer_layer1._init_data(self._cholesky_2D)
                     print("Layer 1 quantization parameters not found, initialized new quantization parameters")
 
-            print(f"Layer 1 checkpoint loaded successfully with {self._xyz_2D.shape[0]} gaussians")
+            print(f"Layer 1 checkpoint loaded successfully with {self._xyz_2D.shape[0]} gaussians (frame t={self.frame_index})")
         else:
             if self.layer == 1:
                 self._init_layer1()
@@ -189,7 +185,7 @@ class GaussianVideo3D2D(nn.Module):
     def _init_layer0(self):
         assert not self.quantize, "Quantization can only be done on trained gaussians. Please load a checkpoint first."
 
-        self.init_num_points = int(self.num_points * self.T / 2)
+        self.init_num_points = int(self.num_points * self.T)
         self._xyz_3D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 3) - 0.5)))
         self._cholesky_3D = nn.Parameter(torch.rand(self.init_num_points, 6))
         self._opacity_3D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
@@ -201,29 +197,16 @@ class GaussianVideo3D2D(nn.Module):
     def _init_layer1(self):
         assert not self.quantize, "Quantization can only be done on trained gaussians. Please load a checkpoint first."
         self.num_points_layer0 = self._xyz_3D.shape[0]
-        if self.layer0_format == "3D2D":
-            self.init_num_points = int((self.num_points * self.T) - self.num_points_layer0)
-            num_points_per_frame = int(self.init_num_points / self.T)
-        elif self.layer0_format == "GaussianVideo":
-            self.init_num_points = int(self.num_points * self.T)
-            num_points_per_frame = int(self.init_num_points / self.T)
-        self.num_points_list = []
-        for t in range(self.T):
-            start = t * num_points_per_frame
-            if t == self.T - 1:
-                end = self.init_num_points
-            else:
-                end = start + num_points_per_frame
-            self.num_points_list.append((start, end))
+        self.init_num_points = int(self.num_points)
 
         self._xyz_2D = nn.Parameter(torch.atanh(2 * (torch.rand(self.init_num_points, 2) - 0.5)))
         self._cholesky_2D = nn.Parameter(torch.rand(self.init_num_points, 3))
 
         self._opacity_2D = nn.Parameter(torch.logit(0.1 * torch.ones(self.init_num_points, 1)))
         self._features_dc_2D = nn.Parameter(torch.rand(self.init_num_points, 3))
-            
+
         self.layer = 1
-        print("GaussianVideo3D2D: Layer 1 initialized, number of gaussians: ", self._xyz_2D.shape[0])
+        print("GaussianVideo3D2D: Layer 1 initialized, number of gaussians (single set, z=t): ", self._xyz_2D.shape[0])
         
     def save_checkpoint(self, path, best=False):
         if self.layer == 0:
@@ -242,16 +225,17 @@ class GaussianVideo3D2D(nn.Module):
                 '_features_dc_2D': self._features_dc_2D.data,
                 '_opacity_2D': self._opacity_2D.data,
                 '_opacity_3D': self._opacity_3D.data,
-                'gaussian_num_list': self.num_points_list,
                 'cholesky_quantizer_layer1': self.cholesky_quantizer_layer1.state_dict() if self.quantize else None,
                 'features_dc_quantizer_layer1': self.features_dc_quantizer_layer1.state_dict() if self.quantize else None,
             }
 
         if best:
-            torch.save(state, path / f"layer_{self.layer}_model.best.pth.tar")
+            fname = f"layer_1_model_t{self.frame_index}.best.pth.tar" if self.layer == 1 else f"layer_{self.layer}_model.best.pth.tar"
         else:
-            torch.save(state, path / f"layer_{self.layer}_model.pth.tar")
-        print(f"Checkpoint saved to: {path / f'layer_{self.layer}_model.pth.tar'}")
+            fname = f"layer_1_model_t{self.frame_index}.pth.tar" if self.layer == 1 else f"layer_{self.layer}_model.pth.tar"
+        save_path = Path(path) / fname
+        torch.save(state, save_path)
+        print(f"Checkpoint saved to: {save_path}")
 
     @property
     def get_xyz(self):
@@ -260,7 +244,12 @@ class GaussianVideo3D2D(nn.Module):
         elif self.layer == 1:
             xyz_3D_tanh = torch.tanh(self._xyz_3D)
             xyz_2D_spatial_tanh = torch.tanh(self._xyz_2D)
-            xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
+            # z in [-1,1] maps to frame index: 0.5*T*z+0.5*T = t => z = 2*t/T - 1
+            t_val = self.frame_index.float().to(self._xyz_2D.device)
+            z_norm = (2.0 * t_val / max(self.T - 1, 1)) - 1.0
+            xyz_2d_temporal = torch.full(
+                (self._xyz_2D.shape[0], 1), z_norm.item(), device=self._xyz_2D.device, dtype=self._xyz_2D.dtype
+            )
             xyz_2d_full = torch.cat((xyz_2D_spatial_tanh, xyz_2d_temporal), dim=1)
             return torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
         
@@ -273,7 +262,11 @@ class GaussianVideo3D2D(nn.Module):
         elif self.layer == 1:
             assert self.decoded_xyz_layer0 is not None, "To get xyz of layer 1, decoded_xyz_layer0 is required for layer 1"
             xyz_2d_spatial_quantized = self.xyz_quantizer(self._xyz_2D)
-            xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
+            t_val = self.frame_index.float().to(self._xyz_2D.device)
+            z_norm = (2.0 * t_val / max(self.T - 1, 1)) - 1.0
+            xyz_2d_temporal = torch.full(
+                (self._xyz_2D.shape[0], 1), z_norm.item(), device=self._xyz_2D.device, dtype=self._xyz_2D.dtype
+            )
             xyz_2d_spatial_tanh = torch.tanh(xyz_2d_spatial_quantized)
             xyz_2d_quantized = torch.cat((xyz_2d_spatial_tanh, xyz_2d_temporal), dim=1)
             xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0)
@@ -363,70 +356,42 @@ class GaussianVideo3D2D(nn.Module):
             self._opacity_2D = torch.nn.Parameter(self._opacity_2D[mask])
             for param_group in self.optimizer.param_groups:
                 param_group['params'] = [p for p in self.parameters() if p.requires_grad]
-
-            new_num_points_list = []
-            next_start = 0
-            for start, end in self.num_points_list:
-                keep_mask = mask[start:end]
-                end = next_start + keep_mask.sum()
-                assert end > next_start, f"end={end} must be greater than next_start={next_start}"
-                new_num_points_list.append((next_start, end))
-                next_start = end
-
-            self.num_points_list = new_num_points_list
             print(f"Pruned to {self._xyz_2D.shape[0]} Gaussians.")
 
     def densify(self, num_new_gaussians=100):
         assert self.layer == 1, "Densify is only supported for layer 1"
         device = self._xyz_2D.device
-        num_new_per_frame = int(num_new_gaussians / self.T)
-        # create a new tensor with the new total number of points
-        new_total_num_points = self._xyz_2D.shape[0] + num_new_per_frame * self.T
-        new_xyz = torch.zeros(new_total_num_points, 2, device=device)
-        new_cholesky = torch.zeros(new_total_num_points, 3, device=device)
-        new_opacity = torch.zeros(new_total_num_points, 1, device=device)
-        new_features_dc = torch.zeros(new_total_num_points, 3, device=device)
-        new_num_points_list = []
-
-        # insert the new gaussians in between the existing gaussians
-        next_start = 0
-        for start, end in self.num_points_list:
-            cur_start = next_start
-            cur_end = cur_start + (end - start)
-
-            new_xyz[cur_start:cur_end] = self._xyz_2D[start:end]
-            new_xyz[cur_end:cur_end+num_new_per_frame] = torch.atanh(2 * (torch.rand(num_new_per_frame, 2, device=device) - 0.5))
-            new_cholesky[cur_start:cur_end] = self._cholesky_2D[start:end]
-            new_cholesky[cur_end:cur_end+num_new_per_frame] = torch.rand(num_new_per_frame, 3, device=device)
-            new_opacity[cur_start:cur_end] = self._opacity_2D[start:end]
-            new_opacity[cur_end:cur_end+num_new_per_frame] = torch.logit(0.1 * torch.ones(num_new_per_frame, 1, device=device))
-            new_features_dc[cur_start:cur_end] = self._features_dc_2D[start:end]
-            new_features_dc[cur_end:cur_end+num_new_per_frame] = torch.rand(num_new_per_frame, 3, device=device)
-
-            new_num_points_list.append((cur_start, cur_end+num_new_per_frame))
-            next_start = cur_end + num_new_per_frame
-
+        new_xyz = torch.cat([
+            self._xyz_2D,
+            torch.atanh(2 * (torch.rand(num_new_gaussians, 2, device=device) - 0.5)),
+        ], dim=0)
+        new_cholesky = torch.cat([
+            self._cholesky_2D,
+            torch.rand(num_new_gaussians, 3, device=device),
+        ], dim=0)
+        new_opacity = torch.cat([
+            self._opacity_2D,
+            torch.logit(0.1 * torch.ones(num_new_gaussians, 1, device=device)),
+        ], dim=0)
+        new_features_dc = torch.cat([
+            self._features_dc_2D,
+            torch.rand(num_new_gaussians, 3, device=device),
+        ], dim=0)
         self._xyz_2D = torch.nn.Parameter(new_xyz)
         self._cholesky_2D = torch.nn.Parameter(new_cholesky)
         self._opacity_2D = torch.nn.Parameter(new_opacity)
         self._features_dc_2D = torch.nn.Parameter(new_features_dc)
-        self.num_points_list = new_num_points_list
         for param_group in self.optimizer.param_groups:
             param_group['params'] = [p for p in self.parameters() if p.requires_grad]
-        print(f"Added {num_new_per_frame} new gaussians per frame. Total: {self._xyz_2D.shape[0]} Gaussians.")
+        print(f"Added {num_new_gaussians} new gaussians. Total: {self._xyz_2D.shape[0]} Gaussians.")
 
     def _fix_temporal_coords_after_projection(self, xys):
-        if self.layer != 1 or self.num_points_list is None:
+        if self.layer != 1:
             return xys
-        
         xys_fixed = xys.clone()
         layer1_start = self._xyz_3D.shape[0] if self._xyz_3D.shape[0] > 0 else 0
-        
-        for t, (start, end) in enumerate(self.num_points_list):
-            idx_start = layer1_start + start
-            idx_end = layer1_start + end
-            xys_fixed[idx_start:idx_end, 2] = float(t)
-        
+        layer1_end = layer1_start + self._xyz_2D.shape[0]
+        xys_fixed[layer1_start:layer1_end, 2] = float(self.frame_index)
         return xys_fixed
 
     def forward(self):
@@ -435,7 +400,7 @@ class GaussianVideo3D2D(nn.Module):
         )
         # Fix temporal coordinates to exact frame indices after projection
         self.xys = self._fix_temporal_coords_after_projection(self.xys)
-    
+
         out_img = rasterize_gaussians_sum_video(
             self.xys, depths, radii, conics, num_tiles_hit,
             self.get_features, self.get_opacity, self.H, self.W, self.T,
@@ -444,6 +409,8 @@ class GaussianVideo3D2D(nn.Module):
         )
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
+        if self.layer == 1:
+            out_img = out_img[..., self.frame_index]
         return {"render": out_img}
 
     def train_iter(self, gt_image):
@@ -476,8 +443,8 @@ class GaussianVideo3D2D(nn.Module):
             num_points = self._xyz_2D.shape[0]
             num_xyz_dims = 2
         self.l_vqm, self.m_bit = 0, 16 * num_points * num_xyz_dims
-        self.l_vqr, self.r_bit = 0, 0 
-        
+        self.l_vqr, self.r_bit = 0, 0
+
         self.xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
             self.get_xyz_quantize, self.get_cholesky_elements_quantize, self.H, self.W, self.T, self.tile_bounds
         )
@@ -490,25 +457,23 @@ class GaussianVideo3D2D(nn.Module):
         )
         out_img = torch.clamp(out_img, 0, 1)  # [T, H, W, 3]
         out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
-        
+        if self.layer == 1:
+            out_img = out_img[..., self.frame_index]
         vq_loss = self.l_vqm + self.l_vqs + self.l_vqr + self.l_vqc
-
         return {"render": out_img, "vq_loss": vq_loss, "unit_bit": [self.m_bit, self.s_bit, self.r_bit, self.c_bit]}
 
 
     def train_iter_quantize(self, gt_video):
         render_pkg = self.forward_quantize()
-        video = render_pkg["render"]
-
-        loss = loss_fn(video, gt_video, self.loss_type, lambda_value=0.7) + render_pkg["vq_loss"]
-
+        image = render_pkg["render"]
+        loss = loss_fn(image, gt_video, self.loss_type, lambda_value=0.7) + render_pkg["vq_loss"]
+        with torch.no_grad():
+            mse_loss = F.mse_loss(image, gt_video)
         loss.backward()
 
         self.optimizer.step()
         self.optimizer.zero_grad(set_to_none=True)
-        
         with torch.no_grad():
-            mse_loss = F.mse_loss(video, gt_video)
             psnr = 10 * math.log10(1.0 / (mse_loss.item() + 1e-8))
         self.scheduler.step()
         

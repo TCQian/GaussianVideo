@@ -71,9 +71,7 @@ GV_CHECKPOINT_QUANT_DIR="/home/e/e0407638/github/GaussianVideo/checkpoints_quant
 CHECKPOINT_PATH_LAYER0_GV="${GV_CHECKPOINT_DIR}/gaussian_model.pth.tar"
 CHECKPOINT_QUANT_PATH_LAYER0_GV="${GV_CHECKPOINT_QUANT_DIR}/gaussian_model.best.pth.tar"
 
-CHECKPOINT_GI = "/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/GaussianImage_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/${DATA_NAME}/gaussian_model.pth.tar"
 
-
-python test_3D2D.py --gaussian_image_ckpt ${CHECKPOINT_PATH_LAYER0_GV} --output_dir ./test_3D2D_out --H 1080 --W 1920 --T 5 --content_frame 2 --num_points ${NUM_POINTS} --iterations ${TRAIN_ITERATIONS} --lr ${LEARNING_RATE}
+python test_3D2D.py --gaussian_image_ckpt gaussian.model.pth.tar --output_dir ./test_3D2D_out --H 1080 --W 1920 --T 11 --content_frame 6 --num_points ${NUM_POINTS} --iterations ${TRAIN_ITERATIONS} --lr ${LEARNING_RATE}
 
 echo "Done"

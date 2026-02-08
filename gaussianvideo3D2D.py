@@ -260,9 +260,7 @@ class GaussianVideo3D2D(nn.Module):
         elif self.layer == 1:
             xyz_3D_tanh = torch.tanh(self._xyz_3D)
             xyz_2D_spatial_tanh = torch.tanh(self._xyz_2D)
-            # z (temporal) = middle of self.T: e.g. T=3 -> 2, T=5 -> 3
-            mid_t = (self.T + 1) // 2
-            xyz_2d_temporal = torch.full((self._xyz_2D.shape[0], 1), float(mid_t), device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
+            xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
             xyz_2d_full = torch.cat((xyz_2D_spatial_tanh, xyz_2d_temporal), dim=1)
             return torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
         
@@ -275,8 +273,7 @@ class GaussianVideo3D2D(nn.Module):
         elif self.layer == 1:
             assert self.decoded_xyz_layer0 is not None, "To get xyz of layer 1, decoded_xyz_layer0 is required for layer 1"
             xyz_2d_spatial_quantized = self.xyz_quantizer(self._xyz_2D)
-            mid_t = (self.T + 1) // 2
-            xyz_2d_temporal = torch.full((self._xyz_2D.shape[0], 1), float(mid_t), device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
+            xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
             xyz_2d_spatial_tanh = torch.tanh(xyz_2d_spatial_quantized)
             xyz_2d_quantized = torch.cat((xyz_2d_spatial_tanh, xyz_2d_temporal), dim=1)
             xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0)
@@ -557,10 +554,9 @@ class GaussianVideo3D2D(nn.Module):
             assert self.decoded_xyz_layer0 is not None, "decoded_xyz_layer0 is required for layer 1"
             assert self.decoded_feature_dc_index_layer0 is not None, "decoded_feature_dc_index_layer0 is required for layer 1"
             assert self.decoded_quant_cholesky_elements_layer0 is not None, "decoded_quant_cholesky_elements_layer0 is required for layer 1"
-            # Apply tanh only to spatial coordinates, not to temporal component; z = middle of self.T
+            # Apply tanh only to spatial coordinates, not to temporal component
             xyz_2D_spatial_tanh = torch.tanh(xyz.float())
-            mid_t = (self.T + 1) // 2
-            xyz_2d_temporal = torch.full((self._xyz_2D.shape[0], 1), float(mid_t), device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
+            xyz_2d_temporal = torch.zeros(self._xyz_2D.shape[0], 1, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype)
             xyz_2d_full = torch.cat((xyz_2D_spatial_tanh, xyz_2d_temporal), dim=1)
             xyz_3D_tanh = torch.tanh(self.decoded_xyz_layer0.float())
             means = torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)

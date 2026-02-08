@@ -94,7 +94,10 @@ class GaussianVideo3D2DTrainerQuantize:
                     ckpt_layer1 = None
                 model._create_data_from_checkpoint(args.model_path_layer0, ckpt_layer1)
                 model.to(self.device)
-                model.create_en_decoded_layer0()
+                out = model.create_en_decoded_layer0()
+                # get psnr of decoded image
+                psnr = 10 * math.log10(1.0 / F.mse_loss(out["render"].float(), self.gt_image.float()))
+                print(f"PSNR of decoded image: {psnr:.4f}")
                 self.gaussian_model_list.append(model)
 
         elif self.model_name == "GVGI":

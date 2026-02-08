@@ -111,7 +111,10 @@ class GaussianVideo3D2DTrainer:
                         lr=args.lr,
                         frame_index=t,
                     )
-                ckpt_layer1 = Path(args.model_path_layer1) / f"layer_1_model_t{t}.pth.tar"
+                if args.model_path_layer1:
+                    ckpt_layer1 = Path(args.model_path_layer1) / f"layer_1_model_t{t}.pth.tar"
+                else:
+                    ckpt_layer1 = None
                 model._create_data_from_checkpoint(args.model_path_layer0, ckpt_layer1)
                 model.to(self.device)
                 self.gaussian_model_list.append(model)
@@ -333,6 +336,11 @@ class GaussianVideo3D2DTrainer:
                     psnr_value, ms_ssim_value, end_time, test_end_time, eval_fps = self.train_GVGI(
                         self.gaussian_model_list[t], self.gt_image[..., t], t
                     )
+                psnr_value_list.append(psnr_value)
+                ms_ssim_value_list.append(ms_ssim_value)
+                end_time_list.append(end_time)
+                test_end_time_list.append(test_end_time)
+                eval_fps_list.append(eval_fps)
             psnr_value = sum(psnr_value_list) / len(psnr_value_list)
             ms_ssim_value = sum(ms_ssim_value_list) / len(ms_ssim_value_list)
             end_time = sum(end_time_list) / len(end_time_list)

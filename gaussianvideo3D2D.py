@@ -167,6 +167,7 @@ class GaussianVideo3D2D(nn.Module):
         elif self.layer == 1:
             if self._xyz_3D.shape[0] > 0:
                 self.trainable_params.append(self._opacity_3D)
+            self._opacity_3D.requires_grad_(False)
             self.trainable_params.append(self._xyz_2D)
             self.trainable_params.append(self._cholesky_2D)
             self.trainable_params.append(self._features_dc_2D)
@@ -245,10 +246,10 @@ class GaussianVideo3D2D(nn.Module):
             xyz_3D_tanh = torch.tanh(self._xyz_3D)
             xyz_2D_spatial_tanh = torch.tanh(self._xyz_2D)
             # z in [-1,1] maps to frame index: 0.5*T*z+0.5*T = t => z = 2*t/T - 1
-            t_val = self.frame_index.float().to(self._xyz_2D.device)
+            t_val = float(self.frame_index)
             z_norm = (2.0 * t_val / max(self.T - 1, 1)) - 1.0
             xyz_2d_temporal = torch.full(
-                (self._xyz_2D.shape[0], 1), z_norm.item(), device=self._xyz_2D.device, dtype=self._xyz_2D.dtype
+                (self._xyz_2D.shape[0], 1), z_norm, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype
             )
             xyz_2d_full = torch.cat((xyz_2D_spatial_tanh, xyz_2d_temporal), dim=1)
             return torch.cat((xyz_3D_tanh, xyz_2d_full), dim=0)
@@ -262,10 +263,10 @@ class GaussianVideo3D2D(nn.Module):
         elif self.layer == 1:
             assert self.decoded_xyz_layer0 is not None, "To get xyz of layer 1, decoded_xyz_layer0 is required for layer 1"
             xyz_2d_spatial_quantized = self.xyz_quantizer(self._xyz_2D)
-            t_val = self.frame_index.float().to(self._xyz_2D.device)
+            t_val = float(self.frame_index)
             z_norm = (2.0 * t_val / max(self.T - 1, 1)) - 1.0
             xyz_2d_temporal = torch.full(
-                (self._xyz_2D.shape[0], 1), z_norm.item(), device=self._xyz_2D.device, dtype=self._xyz_2D.dtype
+                (self._xyz_2D.shape[0], 1), z_norm, device=self._xyz_2D.device, dtype=self._xyz_2D.dtype
             )
             xyz_2d_spatial_tanh = torch.tanh(xyz_2d_spatial_quantized)
             xyz_2d_quantized = torch.cat((xyz_2d_spatial_tanh, xyz_2d_temporal), dim=1)

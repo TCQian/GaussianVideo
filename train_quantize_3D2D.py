@@ -88,7 +88,10 @@ class GaussianVideo3D2DTrainerQuantize:
                         lr=args.lr,
                         frame_index=t,
                     )
-                ckpt_layer1 = Path(args.model_path_layer1) / f"layer_1_model_t{t}.pth.tar"
+                if args.model_path_layer1:
+                    ckpt_layer1 = Path(args.model_path_layer1) / f"layer_1_model_t{t}.pth.tar"
+                else:
+                    ckpt_layer1 = None
                 model._create_data_from_checkpoint(args.model_path_layer0, ckpt_layer1)
                 model.to(self.device)
                 model.create_en_decoded_layer0()

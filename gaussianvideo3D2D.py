@@ -495,20 +495,6 @@ class GaussianVideo3D2D(nn.Module):
         self.decoded_feature_dc_index_layer0 = decoded_feature_dc_index.detach()
         self.decoded_quant_cholesky_elements_layer0 = decoded_quant_cholesky_elements.detach()
     
-        # test the image from decoded layer 0
-        self.xys, depths, self.radii, conics, num_tiles_hit = project_gaussians_video(
-            self.decoded_xyz_layer0, self.decoded_quant_cholesky_elements_layer0, self.H, self.W, self.T, self.tile_bounds
-        )
-        out_img = rasterize_gaussians_sum_video(
-            self.xys, depths, self.radii, conics, num_tiles_hit,
-            self.decoded_feature_dc_index_layer0, self._opacity_3D, self.H, self.W, self.T,
-            self.BLOCK_H, self.BLOCK_W, self.BLOCK_T,
-            background=self.background, return_alpha=False
-        )
-        out_img = torch.clamp(out_img, 0, 1)
-        out_img = out_img.view(-1, self.T, self.H, self.W, 3).permute(0, 4, 2, 3, 1).contiguous()
-        self.decoded_image_layer0 = out_img
-    
     def compress_wo_ec(self):
         if self.layer == 0:
             xyz = self._xyz_3D.half()

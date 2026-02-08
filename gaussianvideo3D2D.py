@@ -167,7 +167,6 @@ class GaussianVideo3D2D(nn.Module):
         elif self.layer == 1:
             if self._xyz_3D.shape[0] > 0:
                 self.trainable_params.append(self._opacity_3D)
-            self._opacity_3D.requires_grad_(False)
             self.trainable_params.append(self._xyz_2D)
             self.trainable_params.append(self._cholesky_2D)
             self.trainable_params.append(self._features_dc_2D)

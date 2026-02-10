@@ -23,10 +23,11 @@ def rasterize_gaussians_sum_video(
     img_width: int,
     video_length: int,
     BLOCK_H: int=16,
-    BLOCK_W: int=16, 
+    BLOCK_W: int=16,
     BLOCK_T: int=1,
     background: Optional[Float[Tensor, "channels"]] = None,
     return_alpha: Optional[bool] = False,
+    return_contribution: Optional[bool] = False,
 ) -> Tensor:
     """Rasterizes 2D gaussians by sorting and binning gaussian intersections for each tile and returns an N-dimensional output using alpha-compositing.
 
@@ -87,6 +88,7 @@ def rasterize_gaussians_sum_video(
         BLOCK_T,
         background.contiguous(),
         return_alpha,
+        return_contribution,
     )
 
 
@@ -111,8 +113,10 @@ class _RasterizeGaussiansSumVideo(Function):
         BLOCK_T: int=1,
         background: Optional[Float[Tensor, "channels"]] = None,
         return_alpha: Optional[bool] = False,
+        return_contribution: Optional[bool] = False,
     ) -> Tensor:
         num_points = xys.size(0)
+        ctx.return_contribution = return_contribution
         BLOCK_X, BLOCK_Y, BLOCK_Z = BLOCK_W, BLOCK_H, BLOCK_T
         tile_bounds = (
             (img_width + BLOCK_X - 1) // BLOCK_X, # (1920 + 16 - 1) // 16 = 120
@@ -138,6 +142,7 @@ class _RasterizeGaussiansSumVideo(Function):
             tile_bins = torch.zeros(0, 2, device=xys.device)
             final_Ts = torch.zeros(video_length, img_height, img_width, device=xys.device)
             final_idx = torch.zeros(video_length, img_height, img_width, device=xys.device)
+            gaussian_contributed = torch.zeros(num_points, dtype=torch.int32, device=xys.device)
         else:
             (
                 isect_ids_unsorted,
@@ -155,8 +160,8 @@ class _RasterizeGaussiansSumVideo(Function):
                 tile_bounds,
             )
             rasterize_fn = _C.rasterize_sum_forward_video
-            
-            out_img, final_Ts, final_idx = rasterize_fn(
+
+            out_img, final_Ts, final_idx, gaussian_contributed = rasterize_fn(
                 tile_bounds,
                 block,
                 img_size,
@@ -188,14 +193,15 @@ class _RasterizeGaussiansSumVideo(Function):
             final_idx,
         )
 
+        if return_contribution:
+            return out_img, final_Ts, final_idx, gaussian_contributed
         if return_alpha:
             out_alpha = 1 - final_Ts
             return out_img, out_alpha
-        else:
-            return out_img
+        return out_img
 
     @staticmethod
-    def backward(ctx, v_out_img, v_out_alpha=None):
+    def backward(ctx, v_out_img, *other_grads):
         img_height = ctx.img_height
         img_width = ctx.img_width
         video_length = ctx.video_length
@@ -204,8 +210,11 @@ class _RasterizeGaussiansSumVideo(Function):
         BLOCK_T = ctx.BLOCK_T
         num_intersects = ctx.num_intersects
 
-        if v_out_alpha is None:
+        # When return_alpha we had 2 outputs so grad_outputs[1] is v_out_alpha; when return_contribution we had 4 outputs so grad_outputs[1] is not v_out_alpha
+        if getattr(ctx, "return_contribution", False) or len(other_grads) == 0:
             v_out_alpha = torch.zeros_like(v_out_img[..., 0])
+        else:
+            v_out_alpha = other_grads[0] if other_grads[0] is not None else torch.zeros_like(v_out_img[..., 0])
 
         (
             gaussian_ids_sorted,

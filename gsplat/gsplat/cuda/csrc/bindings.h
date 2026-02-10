@@ -358,6 +358,7 @@ std::tuple<torch::Tensor, torch::Tensor> map_gaussian_to_intersects_video_tensor
 std::tuple<
     torch::Tensor,
     torch::Tensor,
+    torch::Tensor,
     torch::Tensor
 > rasterize_forward_sum_video_tensor(
     const std::tuple<int, int, int> tile_bounds,

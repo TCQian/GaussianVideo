@@ -1189,6 +1189,7 @@ std::tuple<torch::Tensor, torch::Tensor> map_gaussian_to_intersects_video_tensor
 std::tuple<
     torch::Tensor,
     torch::Tensor,
+    torch::Tensor,
     torch::Tensor
 > rasterize_forward_sum_video_tensor(
     const std::tuple<int, int, int> tile_bounds,
@@ -1248,8 +1249,14 @@ std::tuple<
         {img_depth, img_height, img_width}, xyzs.options().dtype(torch::kInt32)
     );
 
+    const int num_points = xyzs.size(0);
+    torch::Tensor gaussian_contributed = torch::zeros(
+        {num_points}, xyzs.options().dtype(torch::kInt32)
+    );
+
     // Launch the kernel with updated 3D parameters
     rasterize_forward_sum_video<<<tile_bounds_dim3, block_dim3>>>(
+        num_points,
         tile_bounds_dim3,
         img_size_dim3,
         gaussian_ids_sorted.contiguous().data_ptr<int32_t>(),
@@ -1261,10 +1268,11 @@ std::tuple<
         final_Ts.contiguous().data_ptr<float>(),
         final_idx.contiguous().data_ptr<int>(),
         (float3 *)out_img.contiguous().data_ptr<float>(),
-        *(float3 *)background.contiguous().data_ptr<float>()
+        *(float3 *)background.contiguous().data_ptr<float>(),
+        gaussian_contributed.contiguous().data_ptr<int32_t>()
     );
 
-    return std::make_tuple(out_img, final_Ts, final_idx);
+    return std::make_tuple(out_img, final_Ts, final_idx, gaussian_contributed);
 }
 
 std::tuple<

@@ -13,8 +13,10 @@ Usage:
 import argparse
 from pathlib import Path
 
-import numpy as np
+import numpy as np 
 import torch
+import torch.nn.functional as F
+import math
 from PIL import Image
 
 # Reuse same bound as GaussianVideo
@@ -140,7 +142,7 @@ def render_single_gaussian(
         means, L_flat, H, W, T, tile_bounds
     )
     # Colors in [0,1]; boost opacity so single-Gaussian splat is clearly visible
-    colors = torch.sigmoid(features_dc).float().contiguous()
+    colors = features_dc.float().contiguous()
     opacity = torch.sigmoid(opacity_raw).clamp(min=0.95).contiguous()
     if background_zero:
         background = torch.zeros(3, dtype=torch.float32, device=device)
@@ -153,6 +155,11 @@ def render_single_gaussian(
         background=background, return_alpha=False,
     )
     out = torch.clamp(out, 0, 1)
+    # test psnr
+    for t in range(out.shape[0]):
+        mse_loss = F.mse_loss(out[t].float(), background.float())
+        psnr = 10 * math.log10(1.0 / mse_loss.item())
+        print(f"PSNR at frame {t}: {psnr.item()}")
     radius = radii[0].item() if radii.numel() else 0
     num_tiles = num_tiles_hit[0].item() if num_tiles_hit.numel() else 0
     return out, radius, num_tiles

@@ -197,6 +197,7 @@ __global__ void map_gaussian_to_intersects_video(
 );
 
 __global__ void rasterize_forward_sum_video(
+    const int num_points,                // Number of Gaussians (for contribution buffer)
     const dim3 tile_bounds,              // 3D tile grid dimensions
     const dim3 img_size,                 // 3D image dimensions (width, height, depth)
     const int32_t* __restrict__ gaussian_ids_sorted,
@@ -208,5 +209,6 @@ __global__ void rasterize_forward_sum_video(
     float* __restrict__ final_Ts,        // Final transmittance for each voxel
     int* __restrict__ final_index,       // Index of the last Gaussian affecting each voxel
     float3* __restrict__ out_img,        // Output 3D image colors
-    const float3& __restrict__ background // Background color
+    const float3& __restrict__ background, // Background color
+    int32_t* __restrict__ gaussian_contributed  // Output: 1 if Gaussian contributed to any pixel
 );

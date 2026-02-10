@@ -8,9 +8,9 @@
 
 source ~/.bashrc
 conda activate gv_h100
-# cd gsplat
-# pip install .[dev]
-# cd ..
+cd gsplat
+pip install .[dev] --no-build-isolation
+cd ..
 
 # Default variable values.
 DATA_NAME="Beauty"

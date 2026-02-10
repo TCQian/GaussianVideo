@@ -6,7 +6,7 @@ Usage:
   python test.py --checkpoint path/to/gaussian_model.pth.tar [--H 1080 --W 1920 --T 50] [--no-radii]
   python test.py --checkpoint path/to/layer_0_model.pth.tar  # 3D2D format also supported
 """
-
+import os
 import argparse
 from pathlib import Path
 from typing import Optional
@@ -267,7 +267,11 @@ def main():
     for s in lines:
         print(s)
 
-    summary_path = out_dir / f"{Path(args.checkpoint).stem}_summary.txt"
+    # eg. /home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/GaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/${DATA_NAME}
+    # get GaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}_${DATA_NAME}
+    list = os.dirname(args.checkpoint).split("/")
+    file_name = list[-2] + "_" + list[-1]
+    summary_path = out_dir / f"{file_name}_summary.txt"
     out_dir.mkdir(parents=True, exist_ok=True)
     with open(summary_path, "w") as f:
         f.write("\n".join(lines))

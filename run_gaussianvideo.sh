@@ -56,11 +56,9 @@ echo "Starting GaussianVideo_${DATA_NAME}_${NUM_FRAMES}_${NUM_POINTS}..."
 
 # Define dataset and checkpoint paths using the variables.
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
-DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
-CHECKPOINT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
-CHECKPOINT_QUANT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME}_i${QUANT_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
+GV_CHECKPOINT_DIR="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/GaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/${DATA_NAME}"
 
-python test.py --checkpoint ${CHECKPOINT_PATH}gaussian_model.pth.tar --H 1080 --W 1920 --T 50
+python test.py --checkpoint ${GV_CHECKPOINT_DIR}/gaussian_model.pth.tar --H 1080 --W 1920 --T 50
 
 
 echo "Done"

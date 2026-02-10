@@ -80,16 +80,36 @@ def scale_cholesky_czz(cholesky_1x6: torch.Tensor, czz_factor: float) -> torch.T
     return out
 
 
-def pick_big_small_xy(cov_flat: torch.Tensor) -> tuple:
-    """Return (idx_big_xy, idx_small_xy) using Cxx*Cyy as proxy for xy spread."""
+def pick_big_small_xy(cov_flat: torch.Tensor, top_pct: float = 15.0, bottom_pct: float = 15.0) -> tuple:
+    """
+    Pick from histogram distribution: big = has big Cxx OR big Cyy (top percentile),
+    small = bottom percentile by xy spread.
+    Returns (idx_big_xy, idx_small_xy).
+    """
     Cxx = cov_flat[:, 0]
     Cyy = cov_flat[:, 3]
-    xy_product = Cxx * Cyy
-    valid = (Cxx > 1e-8) & (Cyy > 1e-8)
+    valid = (Cxx > 1e-10) & (Cyy > 1e-10)
     if valid.sum() == 0:
         valid = torch.ones(cov_flat.shape[0], dtype=torch.bool, device=cov_flat.device)
-    idx_big = torch.where(valid, xy_product, torch.zeros_like(xy_product)).argmax().item()
-    idx_small = torch.where(valid, xy_product, torch.full_like(xy_product, float("inf"))).argmin().item()
+    Cxx_v, Cyy_v = Cxx[valid], Cyy[valid]
+    # Big: in top top_pct% by Cxx OR top top_pct% by Cyy (histogram upper tail)
+    p_high = 100.0 - top_pct
+    thresh_Cxx = torch.quantile(Cxx_v.float(), p_high / 100.0).item()
+    thresh_Cyy = torch.quantile(Cyy_v.float(), p_high / 100.0).item()
+    big_mask = valid & ((Cxx >= thresh_Cxx) | (Cyy >= thresh_Cyy))
+    if big_mask.sum() == 0:
+        big_mask = valid
+    # Among big candidates, pick the one with largest (Cxx + Cyy) for visibility
+    score_big = torch.where(big_mask, Cxx + Cyy, torch.zeros_like(Cxx))
+    idx_big = score_big.argmax().item()
+
+    # Small: bottom bottom_pct% by (Cxx + Cyy)
+    sum_xy = Cxx + Cyy
+    thresh_small = torch.quantile(sum_xy[valid].float(), bottom_pct / 100.0).item()
+    small_mask = valid & (sum_xy <= thresh_small)
+    if small_mask.sum() == 0:
+        small_mask = valid
+    idx_small = torch.where(small_mask, sum_xy, torch.full_like(sum_xy, float("inf"))).argmin().item()
     return idx_big, idx_small
 
 
@@ -119,8 +139,9 @@ def render_single_gaussian(
     xys, depths, radii, conics, num_tiles_hit = project_gaussians_video(
         means, L_flat, H, W, T, tile_bounds
     )
-    colors = features_dc.float().contiguous()
-    opacity = torch.sigmoid(opacity_raw).contiguous()
+    # Colors in [0,1]; boost opacity so single-Gaussian splat is clearly visible
+    colors = torch.sigmoid(features_dc).float().contiguous()
+    opacity = torch.sigmoid(opacity_raw).clamp(min=0.95).contiguous()
     if background_zero:
         background = torch.zeros(3, dtype=torch.float32, device=device)
     else:
@@ -145,6 +166,8 @@ def main():
     parser.add_argument("--W", type=int, default=1920)
     parser.add_argument("--T", type=int, default=50)
     parser.add_argument("--device", type=str, default="cuda:0")
+    parser.add_argument("--top_pct", type=float, default=15.0, help="Big = in top this %% by Cxx or Cyy (default 15)")
+    parser.add_argument("--bottom_pct", type=float, default=15.0, help="Small = in bottom this %% by Cxx+Cyy (default 15)")
     args = parser.parse_args()
 
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
@@ -157,9 +180,9 @@ def main():
     Cxx, Cyy, Czz = cov_flat[:, 0], cov_flat[:, 3], cov_flat[:, 5]
     N = cholesky_elements.shape[0]
 
-    idx_big, idx_small = pick_big_small_xy(cov_flat)
-    print(f"Big Cxx/Cyy Gaussian index: {idx_big}  (Cxx={Cxx[idx_big].item():.6f}, Cyy={Cyy[idx_big].item():.6f}, Czz={Czz[idx_big].item():.6f})")
-    print(f"Small Cxx/Cyy Gaussian index: {idx_small}  (Cxx={Cxx[idx_small].item():.6f}, Cyy={Cyy[idx_small].item():.6f}, Czz={Czz[idx_small].item():.6f})")
+    idx_big, idx_small = pick_big_small_xy(cov_flat, top_pct=args.top_pct, bottom_pct=args.bottom_pct)
+    print(f"Big (top {args.top_pct}% by Cxx or Cyy) Gaussian index: {idx_big}  (Cxx={Cxx[idx_big].item():.6f}, Cyy={Cyy[idx_big].item():.6f}, Czz={Czz[idx_big].item():.6f})")
+    print(f"Small (bottom {args.bottom_pct}% by Cxx+Cyy) Gaussian index: {idx_small}  (Cxx={Cxx[idx_small].item():.6f}, Cyy={Cyy[idx_small].item():.6f}, Czz={Czz[idx_small].item():.6f})")
 
     # Means in [-1,1]
     xyz = torch.tanh(xyz_raw)

@@ -91,6 +91,16 @@ class VideoTrainer:
 
             loss, psnr = self.gaussian_model.train_iter(self.gt_image)
             
+            # Save first frame at every 10k iteration
+            if iter % 10000 == 0:
+                (self.log_dir / "training_frame").mkdir(parents=True, exist_ok=True)
+                with torch.no_grad():
+                    out = self.gaussian_model()
+                    first_frame = out["render"][0, :, :, :, 0]  # [C, H, W]
+                    pil_image = transforms.ToPILImage()(first_frame.cpu())
+                    name = f"{iter}_{loss.item():.6f}_{psnr:.4f}.png"
+                    pil_image.save(str(self.log_dir / "training_frame" / name))
+            
             if self.early_stopping(loss.item()):
                 print(f"Early stopping at iteration {iter}")
                 break

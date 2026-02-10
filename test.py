@@ -1,6 +1,8 @@
 """
 Analyze GaussianVideo checkpoint: distributions of Cholesky elements,
-covariance elements (after LL^T), covariance scales (sqrt of diagonal), and radii.
+covariance elements (after LL^T), conic (Sigma^{-1}), scales, and radii.
+Picks one Gaussian per scale bin (small/medium/large) and reports covariance,
+conic, and the range of delta that decays power to 0.
 
 Usage:
   python test.py --checkpoint path/to/gaussian_model.pth.tar [--H 1080 --W 1920 --T 50] [--no-radii]
@@ -69,6 +71,119 @@ def covariance_diagonal_scales(cov_flat: torch.Tensor):
     return torch.stack([scale_x, scale_y, scale_z], dim=1)
 
 
+def cov_flat_to_matrix(cov_flat: torch.Tensor, idx: int) -> torch.Tensor:
+    """Single Gaussian: cov_flat (N,6) -> 3x3 symmetric Sigma at index idx."""
+    c = cov_flat[idx]
+    return torch.tensor(
+        [
+            [c[0].item(), c[1].item(), c[2].item()],
+            [c[1].item(), c[3].item(), c[4].item()],
+            [c[2].item(), c[4].item(), c[5].item()],
+        ],
+        dtype=cov_flat.dtype,
+        device=cov_flat.device,
+    )
+
+
+def covariance_to_conic_flat(cov_flat: torch.Tensor) -> torch.Tensor:
+    """
+    For each Gaussian: Sigma (from cov_flat) -> conic = Sigma^{-1}.
+    Returns (N, 6) upper triangular [invCxx, invCxy, invCxz, invCyy, invCyz, invCzz].
+    Batched for speed.
+    """
+    N = cov_flat.shape[0]
+    S = torch.zeros(N, 3, 3, dtype=cov_flat.dtype, device=cov_flat.device)
+    S[:, 0, 0] = cov_flat[:, 0]
+    S[:, 0, 1] = S[:, 1, 0] = cov_flat[:, 1]
+    S[:, 0, 2] = S[:, 2, 0] = cov_flat[:, 2]
+    S[:, 1, 1] = cov_flat[:, 3]
+    S[:, 1, 2] = S[:, 2, 1] = cov_flat[:, 4]
+    S[:, 2, 2] = cov_flat[:, 5]
+    try:
+        conic_3x3 = torch.linalg.inv(S)
+    except Exception:
+        conic_3x3 = torch.full_like(S, float("nan"))
+    conic_flat = torch.stack(
+        [
+            conic_3x3[:, 0, 0], conic_3x3[:, 0, 1], conic_3x3[:, 0, 2],
+            conic_3x3[:, 1, 1], conic_3x3[:, 1, 2], conic_3x3[:, 2, 2],
+        ],
+        dim=1,
+    )
+    return conic_flat
+
+
+def pick_example_gaussian_indices(scale_xyz: np.ndarray) -> tuple:
+    """
+    Bin by overall scale (geometric mean of scale_x, scale_y, scale_z).
+    Return one index from each bin: small (0-33p), medium (33-66p), large (66-100p).
+    """
+    # overall scale per Gaussian (geometric mean of the 3 scales)
+    scale_geom = np.exp(np.mean(np.log(scale_xyz + 1e-10), axis=1))
+    p33 = np.percentile(scale_geom, 33)
+    p66 = np.percentile(scale_geom, 66)
+    small_mask = scale_geom <= p33
+    medium_mask = (scale_geom > p33) & (scale_geom <= p66)
+    large_mask = scale_geom > p66
+    # pick median index in each bin (by scale_geom)
+    def pick_one(mask):
+        idx = np.where(mask)[0]
+        if len(idx) == 0:
+            return None
+        s = scale_geom[idx]
+        return idx[np.argmin(np.abs(s - np.median(s)))]
+    return pick_one(small_mask), pick_one(medium_mask), pick_one(large_mask)
+
+
+def format_gaussian_example(
+    idx: int,
+    cov_flat: np.ndarray,
+    conic_flat: np.ndarray,
+    scale_xyz: np.ndarray,
+    power_threshold: float = 1e-6,
+) -> str:
+    """Format one Gaussian: 3x3 covariance, 3x3 conic, and range of delta for power decay to threshold."""
+    lines = []
+    c = cov_flat[idx]
+    Sigma = np.array([[c[0], c[1], c[2]], [c[1], c[3], c[4]], [c[2], c[4], c[5]]])
+    invc = conic_flat[idx]
+    Conic = np.array([[invc[0], invc[1], invc[2]], [invc[1], invc[3], invc[4]], [invc[2], invc[4], invc[5]]])
+    lines.append(f"  Covariance Sigma (3x3):")
+    for row in Sigma:
+        lines.append(f"    [{row[0]:.6f}, {row[1]:.6f}, {row[2]:.6f}]")
+    lines.append(f"  Conic Sigma^{{-1}} (3x3):")
+    for row in Conic:
+        lines.append(f"    [{row[0]:.6f}, {row[1]:.6f}, {row[2]:.6f}]")
+    lines.append(f"  Covariance scales (sqrt diag): [{scale_xyz[idx, 0]:.6f}, {scale_xyz[idx, 1]:.6f}, {scale_xyz[idx, 2]:.6f}]")
+    decay = conic_decay_delta(Conic, power_threshold=power_threshold)
+    lines.append(f"  Power decay to {power_threshold:.0e}:")
+    deltas_str = ", ".join(f"{x:.6f}" for x in decay["principal_deltas"])
+    lines.append(f"    Principal-axis deltas (distance at which weight = {power_threshold:.0e}): [{deltas_str}]")
+    lines.append(f"    Max delta (effective radius): {decay['max_delta']:.6f}")
+    lines.append(f"    Min delta: {decay['min_delta']:.6f}")
+    return "\n".join(lines)
+
+
+def conic_decay_delta(conic_3x3: np.ndarray, power_threshold: float = 1e-6) -> dict:
+    """
+    Gaussian weight = exp(-0.5 * d^T @ conic @ d). Find range of delta (distance from center)
+    such that power decays to power_threshold.
+    conic = Sigma^{-1}. Returns principal-axis deltas and max delta.
+    """
+    # Eigenvalues of conic = 1/variance along each principal axis.
+    eigvals, eigvecs = np.linalg.eigh(conic_3x3)
+    eigvals = np.maximum(eigvals, 1e-12)
+    # d^T conic d = 2*ln(1/threshold) => along axis i: delta_i^2 * eigval_i = 2*ln(1/t) => delta_i = sqrt(2*ln(1/t)/eigval_i)
+    k = 2.0 * np.log(1.0 / power_threshold)
+    principal_deltas = np.sqrt(k / eigvals)
+    return {
+        "principal_deltas": principal_deltas,
+        "max_delta": float(np.max(principal_deltas)),
+        "min_delta": float(np.min(principal_deltas)),
+        "eigenvalues_conic": eigvals,
+    }
+
+
 def compute_projected_radii(xyz: torch.Tensor, cholesky_elements: torch.Tensor, H: int, W: int, T: int):
     """Run project_gaussians_video to get radii (in tile/pixel space)."""
     from gsplat.project_gaussians_video import project_gaussians_video
@@ -95,13 +210,15 @@ def plot_histograms(
     radii: Optional[np.ndarray],
     out_dir: Path,
     prefix: str = "",
+    conic_elements: Optional[np.ndarray] = None,
 ):
-    """Draw and save histograms for Cholesky, covariance, scales, and radii."""
+    """Draw and save histograms for Cholesky, covariance, conic, scales, and radii."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     chol_names = ["l11", "l21", "l31", "l22", "l32", "l33"]
     cov_names = ["Cxx", "Cxy", "Cxz", "Cyy", "Cyz", "Czz"]
+    conic_names = ["invCxx", "invCxy", "invCxz", "invCyy", "invCyz", "invCzz"]
     scale_names = ["scale_x", "scale_y", "scale_z"]
 
     def _hist(data, title, xlabel, fname, bins=80):
@@ -131,6 +248,19 @@ def plot_histograms(
             name,
             f"{prefix}hist_cov_{name}.png",
         )
+
+    # Conic elements (Sigma^{-1})
+    if conic_elements is not None:
+        valid = np.isfinite(conic_elements).all(axis=1)
+        if np.any(valid):
+            conic_valid = conic_elements[valid]
+            for i, name in enumerate(conic_names):
+                _hist(
+                    conic_valid[:, i],
+                    f"Conic element (Sigma^{{-1}}): {name}",
+                    name,
+                    f"{prefix}hist_conic_{name}.png",
+                )
 
     # Covariance scale (sqrt of diagonal)
     for i, name in enumerate(scale_names):
@@ -226,6 +356,10 @@ def main():
     scale_xyz = covariance_diagonal_scales(cov_flat)
     scale_np = scale_xyz.detach().cpu().numpy()
 
+    # Conic = Sigma^{-1} (for decay visualization and example report)
+    conic_flat = covariance_to_conic_flat(cov_flat)
+    conic_np = conic_flat.detach().cpu().numpy()
+
     # Projected radii (optional)
     radii_np = None
     if not args.no_radii:
@@ -264,12 +398,22 @@ def main():
         lines.append("")
         lines.append(f"Projected radii: min={radii_np.min()}, max={radii_np.max()}, mean(>0)={r.mean():.2f}")
 
+    # Conic (Sigma^{-1}) stats
+    conic_valid = conic_np[np.isfinite(conic_np).all(axis=1)]
+    if len(conic_valid) > 0:
+        lines.append("")
+        lines.append("Conic elements (Sigma^{-1}):")
+        for i, name in enumerate(["invCxx", "invCxy", "invCxz", "invCyy", "invCyz", "invCzz"]):
+            col = conic_valid[:, i]
+            s = f"  {name}: min={col.min():.4f}, max={col.max():.4f}, mean={col.mean():.4f}"
+            lines.append(s)
+
     for s in lines:
         print(s)
 
     # eg. /home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/GaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/${DATA_NAME}
     # get GaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}_${DATA_NAME}
-    list = os.dirname(args.checkpoint).split("/")
+    list = os.path.dirname(args.checkpoint).split("/")
     file_name = list[-2] + "_" + list[-1]
     summary_path = out_dir / f"{file_name}_summary.txt"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -277,9 +421,33 @@ def main():
         f.write("\n".join(lines))
     print(f"\nSummary written to: {summary_path}")
 
-    # Histograms
+    # Example Gaussians: one from small / medium / large scale bin (covariance, conic, delta range)
+    power_threshold = 1e-6
+    idx_small, idx_medium, idx_large = pick_example_gaussian_indices(scale_np)
+    example_lines = [
+        "Example Gaussians (one per scale bin: small / medium / large)",
+        "Power decay: weight = exp(-0.5 * d^T conic d); delta = distance at which weight reaches threshold.",
+        f"Threshold = {power_threshold:.0e}",
+        "",
+    ]
+    for label, idx in [("Small scale (0-33 pct)", idx_small), ("Medium scale (33-66 pct)", idx_medium), ("Large scale (66-100 pct)", idx_large)]:
+        if idx is None:
+            example_lines.append(f"{label}: no Gaussian in bin")
+            example_lines.append("")
+            continue
+        example_lines.append(f"--- {label} (index {idx}) ---")
+        example_lines.append(format_gaussian_example(idx, cov_np, conic_np, scale_np, power_threshold=power_threshold))
+        example_lines.append("")
+    example_text = "\n".join(example_lines)
+    print(example_text)
+    examples_path = out_dir / f"{Path(args.checkpoint).stem}_example_gaussians.txt"
+    with open(examples_path, "w") as f:
+        f.write(example_text)
+    print(f"Example Gaussians report written to: {examples_path}")
+
+    # Histograms (including conic)
     prefix = Path(args.checkpoint).stem + "_"
-    plot_histograms(cholesky_np, cov_np, scale_np, radii_np, out_dir, prefix=prefix)
+    plot_histograms(cholesky_np, cov_np, scale_np, radii_np, out_dir, prefix=prefix, conic_elements=conic_np)
     print(f"Histograms saved to: {out_dir}")
 
 

@@ -60,44 +60,7 @@ DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
 CHECKPOINT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/${MODEL_NAME}_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
 CHECKPOINT_QUANT_PATH="/home/e/e0407638/github/GaussianVideo/checkpoints_quant/${DATA_NAME}/${MODEL_NAME}_i${QUANT_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/"
 
-python utils.py "${YUV_PATH}" --width 1920 --height 1080 --start_frame ${START_FRAME}
+python test.py --checkpoint ${CHECKPOINT_PATH}gaussian_model.pth.tar --H 1080 --W 1920 --T 50
 
-# Run the training script with the required arguments.
-python train_video.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations "${TRAIN_ITERATIONS}" \
-    --model_name "${MODEL_NAME}" \
-    --num_points "${NUM_POINTS}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --lr "${LEARNING_RATE}" \
-    --save_imgs
-
-# Run the quantization training script.
-python train_quantize_video.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations "${QUANT_ITERATIONS}" \
-    --model_name "${MODEL_NAME}" \
-    --num_points "${NUM_POINTS}" \
-    --model_path "${CHECKPOINT_PATH}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --lr "${LEARNING_RATE}" \
-    --save_imgs
-
-# Run the quantization testing script.
-python test_quantize_video.py \
-    --dataset "${DATASET_PATH}" \
-    --data_name "${DATA_NAME}" \
-    --iterations "${QUANT_ITERATIONS}" \
-    --model_name "${MODEL_NAME}" \
-    --num_points "${NUM_POINTS}" \
-    --model_path "${CHECKPOINT_QUANT_PATH}" \
-    --start_frame "${START_FRAME}" \
-    --num_frames "${NUM_FRAMES}" \
-    --lr "${LEARNING_RATE}" \
-    --save_imgs
 
 echo "Done"

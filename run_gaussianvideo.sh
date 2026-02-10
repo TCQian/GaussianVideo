@@ -56,10 +56,11 @@ echo "Starting GaussianVideo_${DATA_NAME}_${NUM_FRAMES}_${NUM_POINTS}..."
 
 # Define dataset and checkpoint paths using the variables.
 YUV_PATH="/home/e/e0407638/github/GaussianVideo/YUV/${DATA_NAME}_1920x1080_120fps_420_8bit_YUV.yuv"
+DATASET_PATH="/home/e/e0407638/github/GaussianVideo/dataset/${DATA_NAME}/"
 GV_CHECKPOINT_DIR="/home/e/e0407638/github/GaussianVideo/checkpoints/${DATA_NAME}/GaussianVideo_i${TRAIN_ITERATIONS}_g${NUM_POINTS}_f${NUM_FRAMES}_s${START_FRAME}/${DATA_NAME}"
 
-# python test.py --checkpoint ${GV_CHECKPOINT_DIR}/gaussian_model.pth.tar --H 1080 --W 1920 --T 5
+python test.py --checkpoint ${GV_CHECKPOINT_DIR}/gaussian_model.pth.tar --H 1080 --W 1920 --T 5
 # python visualize_czz_spread.py --checkpoint ${GV_CHECKPOINT_DIR}/gaussian_model.pth.tar --H 1080 --W 1920 --T 5 --out_dir ./viz_czz_spread
-python identify_zero_contribution_gaussians.py --checkpoint ${GV_CHECKPOINT_DIR}/gaussian_model.pth.tar --H 1080 --W 1920 --T 5 --out_file zero_contrib.txt
+python identify_zero_contribution_gaussians.py --checkpoint ${GV_CHECKPOINT_DIR}/gaussian_model.pth.tar --H 1080 --W 1920 --T 5 --out_file zero_contrib.txt --detail_zero_intersection --gt_dir ${DATASET_PATH}
 
 echo "Done"

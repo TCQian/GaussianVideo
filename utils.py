@@ -25,26 +25,41 @@ class LogWriter:
             file.write(text + '\n')
 
 
+def _prepare_for_spatial_metrics(pred, target):
+    """
+    Ensure pred/target are 4D (N, C, H, W) for SSIM/MS-SSIM, which use spatial neighborhoods over H, W.
+    - If 5D (1, C, H, W, T): reshape to (T, C, H, W) so each frame gets correct per-frame spatial SSIM.
+    - If 4D: return as-is.
+    """
+    if pred.ndim == 5:
+        # (1, C, H, W, T) -> (T, C, H, W): SSIM then computed per frame over (H,W), then averaged over T
+        pred = pred.squeeze(0).permute(3, 0, 1, 2)   # (C, H, W, T) -> (T, C, H, W)
+        target = target.squeeze(0).permute(3, 0, 1, 2)
+    return pred, target
+
+
 def loss_fn(pred, target, loss_type='L2', lambda_value=0.7):
     target = target.detach()
     pred = pred.float()
     target  = target.float()
+    # For SSIM/MS-SSIM, use 4D (N,C,H,W) so spatial neighborhoods are within each frame only
+    pred_for_ssim, target_for_ssim = _prepare_for_spatial_metrics(pred, target)
     if loss_type == 'L2':
         loss = F.mse_loss(pred, target)
     elif loss_type == 'L1':
         loss = F.l1_loss(pred, target)
     elif loss_type == 'SSIM':
-        loss = 1 - ssim(pred, target, data_range=1, size_average=True)
+        loss = 1 - ssim(pred_for_ssim, target_for_ssim, data_range=1, size_average=True)
     elif loss_type == 'Fusion1':
-        loss = lambda_value * F.mse_loss(pred, target) + (1-lambda_value) * (1 - ssim(pred, target, data_range=1, size_average=True))
+        loss = lambda_value * F.mse_loss(pred, target) + (1-lambda_value) * (1 - ssim(pred_for_ssim, target_for_ssim, data_range=1, size_average=True))
     elif loss_type == 'Fusion2':
-        loss = lambda_value * F.l1_loss(pred, target) + (1-lambda_value) * (1 - ssim(pred, target, data_range=1, size_average=True))
+        loss = lambda_value * F.l1_loss(pred, target) + (1-lambda_value) * (1 - ssim(pred_for_ssim, target_for_ssim, data_range=1, size_average=True))
     elif loss_type == 'Fusion3':
         loss = lambda_value * F.mse_loss(pred, target) + (1-lambda_value) * F.l1_loss(pred, target)
     elif loss_type == 'Fusion4':
-        loss = lambda_value * F.l1_loss(pred, target) + (1-lambda_value) * (1 - ms_ssim(pred, target, data_range=1, size_average=True))
+        loss = lambda_value * F.l1_loss(pred, target) + (1-lambda_value) * (1 - ms_ssim(pred_for_ssim, target_for_ssim, data_range=1, size_average=True))
     elif loss_type == 'Fusion_hinerv':
-        loss = lambda_value * F.l1_loss(pred, target) + (1-lambda_value)  * (1 - ms_ssim(pred, target, data_range=1, size_average=True, win_size=5))
+        loss = lambda_value * F.l1_loss(pred, target) + (1-lambda_value)  * (1 - ms_ssim(pred_for_ssim, target_for_ssim, data_range=1, size_average=True, win_size=5))
     return loss
 
 def strip_lowerdiag(L):

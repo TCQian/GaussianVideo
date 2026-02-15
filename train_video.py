@@ -44,6 +44,8 @@ class VideoTrainer:
         self.iterations = iterations
         self.save_imgs = args.save_imgs
         self.log_dir = Path(f"./checkpoints/{args.data_name}/{model_name}_i{args.iterations_3d}_g{num_points}_f{num_frames}_s{start_frame}/{video_name}")
+        self.training_frame_dir = self.log_dir / "training_frame"
+        self.training_frame_dir.mkdir(parents=True, exist_ok=True)
             
         if model_name == "GaussianVideo":
             from gaussianvideo import GaussianVideo
@@ -90,7 +92,16 @@ class VideoTrainer:
                 self.gaussian_model.prune(opac_threshold=0.05)
 
             loss, psnr = self.gaussian_model.train_iter(self.gt_image)
-            
+
+            if iter % 1000 == 0:
+                with torch.no_grad():
+                    out = self.gaussian_model()
+                    first_frame = out["render"].float()[0, :, :, :, 0]
+                    transform = transforms.ToPILImage()
+                    pil_image = transform(first_frame)
+                    name = f"{iter}_{loss.item():.6f}_{psnr:.4f}.png"
+                    pil_image.save(str(self.training_frame_dir / name))
+
             if self.early_stopping(loss.item()):
                 print(f"Early stopping at iteration {iter}")
                 break
